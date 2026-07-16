@@ -13,4 +13,6 @@ public interface IEveAuthenticationService
     Task SignOutAsync(CancellationToken cancellationToken = default);
 
     Task<string> GetAccessTokenAsync(CancellationToken cancellationToken = default);
+
+    Task<string> RefreshAccessTokenAsync(CancellationToken cancellationToken = default);
 }

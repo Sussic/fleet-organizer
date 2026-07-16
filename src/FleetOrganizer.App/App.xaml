@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              ThemeMode="System">
   <Application.Resources>
+    <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
     <SolidColorBrush x:Key="EveAccentBrush" Color="#4F9FCE" />
     <SolidColorBrush x:Key="SuccessBrush" Color="#43A047" />
     <SolidColorBrush x:Key="WarningBrush" Color="#F5A623" />

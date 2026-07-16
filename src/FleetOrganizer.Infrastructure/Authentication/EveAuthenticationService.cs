@@ -189,24 +189,26 @@ internal sealed class EveAuthenticationService : IEveAuthenticationService, IDis
                 return currentAccessToken;
             }
 
-            var storedCharacter = await repository
-                .LoadAsync(cancellationToken)
-                .ConfigureAwait(false) ?? throw new InvalidOperationException(
-                    "The saved EVE authorization is missing. Sign in again.");
-            var refreshToken = secretProtector.Unprotect(storedCharacter.EncryptedRefreshToken);
-            var refreshedSession = await RefreshAsync(refreshToken, cancellationToken)
+            return await RefreshAccessTokenCoreAsync(character, cancellationToken)
                 .ConfigureAwait(false);
+        }
+        finally
+        {
+            sessionGate.Release();
+        }
+    }
 
-            if (refreshedSession.ValidatedToken.Character.CharacterId != character.CharacterId)
-            {
-                ClearInMemorySession();
-                throw new InvalidOperationException(
-                    "EVE returned an unexpected character while refreshing authorization.");
-            }
+    public async Task<string> RefreshAccessTokenAsync(
+        CancellationToken cancellationToken = default)
+    {
+        await sessionGate.WaitAsync(cancellationToken).ConfigureAwait(false);
 
-            await PersistAndActivateAsync(refreshedSession, refreshToken, cancellationToken)
+        try
+        {
+            var character = currentCharacter ?? throw new InvalidOperationException(
+                "Sign in with EVE before accessing the fleet.");
+            return await RefreshAccessTokenCoreAsync(character, cancellationToken)
                 .ConfigureAwait(false);
-            return accessToken!;
         }
         finally
         {
@@ -243,6 +245,30 @@ internal sealed class EveAuthenticationService : IEveAuthenticationService, IDis
             cancellationToken).ConfigureAwait(false);
 
         return new AuthenticationSession(tokenResponse, validatedToken);
+    }
+
+    private async Task<string> RefreshAccessTokenCoreAsync(
+        AuthenticatedCharacter character,
+        CancellationToken cancellationToken)
+    {
+        var storedCharacter = await repository
+            .LoadAsync(cancellationToken)
+            .ConfigureAwait(false) ?? throw new InvalidOperationException(
+                "The saved EVE authorization is missing. Sign in again.");
+        var refreshToken = secretProtector.Unprotect(storedCharacter.EncryptedRefreshToken);
+        var refreshedSession = await RefreshAsync(refreshToken, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (refreshedSession.ValidatedToken.Character.CharacterId != character.CharacterId)
+        {
+            ClearInMemorySession();
+            throw new InvalidOperationException(
+                "EVE returned an unexpected character while refreshing authorization.");
+        }
+
+        await PersistAndActivateAsync(refreshedSession, refreshToken, cancellationToken)
+            .ConfigureAwait(false);
+        return accessToken!;
     }
 
     private async Task PersistAndActivateAsync(

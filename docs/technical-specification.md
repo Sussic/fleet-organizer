@@ -1,7 +1,7 @@
 # Fleet Organizer — Technical Specification
 
 **Status:** Approved implementation baseline
-**Revision:** 1.0
+**Revision:** 1.1
 **Reviewed:** 16 July 2026
 **Target:** Windows 11, local single-user desktop application
 **Working title:** Fleet Organizer (name can change without affecting the architecture)
@@ -200,6 +200,7 @@ The implementation must confirm exact schemas against the pinned OpenAPI documen
 | Read fleet settings | `GET /fleets/{fleet_id}` |
 | Read members and roles | `GET /fleets/{fleet_id}/members` |
 | Read hierarchy | `GET /fleets/{fleet_id}/wings` |
+| Resolve live character/ship/location IDs | `POST /universe/names` |
 | Resolve pasted names | `POST /universe/ids` |
 | Invite a character | `POST /fleets/{fleet_id}/members` |
 | Move or change role | `PUT /fleets/{fleet_id}/members/{member_id}` |

@@ -1,6 +1,7 @@
 <Window x:Class="FleetOrganizer.App.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:FleetOrganizer.App.ViewModels"
         Title="Fleet Organizer"
         Width="1180"
         Height="760"
@@ -93,7 +94,7 @@
                 CornerRadius="12"
                 BorderThickness="1"
                 BorderBrush="{DynamicResource {x:Static SystemColors.ActiveBorderBrushKey}}">
-          <TextBlock Text="Secure sign-in build"
+          <TextBlock Text="Read-only live fleet build"
                      FontSize="12"
                      FontWeight="SemiBold" />
         </Border>
@@ -173,6 +174,8 @@
             <TextBlock Margin="0,7" Text="✓ EVE SSO Authorization Code + PKCE" />
             <TextBlock Margin="0,7" Text="✓ JWT signature, audience, and scope validation" />
             <TextBlock Margin="0,7" Text="✓ Encrypted remembered authorization" />
+            <TextBlock Margin="0,7" Text="✓ Read-only live fleet detection" />
+            <TextBlock Margin="0,7" Text="✓ Cache and rate-aware ESI reads" />
           </StackPanel>
         </Border>
 
@@ -181,11 +184,11 @@
             <TextBlock Text="Next implementation slice"
                        FontSize="17"
                        FontWeight="SemiBold" />
-            <TextBlock Margin="0,16,0,7" Text="1. Read-only current fleet detection" />
-            <TextBlock Margin="0,7" Text="2. Cache/rate-aware ESI client" />
-            <TextBlock Margin="0,7" Text="3. Live hierarchy and member view" />
-            <TextBlock Margin="0,7" Text="4. Profile editor and roster resolution" />
-            <TextBlock Margin="0,7" Text="5. Invite and placement operation engine" />
+            <TextBlock Margin="0,16,0,7" Text="1. Profile editor and local roster" />
+            <TextBlock Margin="0,7" Text="2. Character name-to-ID resolution" />
+            <TextBlock Margin="0,7" Text="3. Desired-versus-live preview" />
+            <TextBlock Margin="0,7" Text="4. Durable invite and placement operations" />
+            <TextBlock Margin="0,7" Text="5. Explicit, guarded ESI write actions" />
             <TextBlock Margin="0,16,0,0"
                        Text="No fleet writes are enabled yet."
                        FontWeight="SemiBold"
@@ -193,6 +196,136 @@
           </StackPanel>
         </Border>
       </Grid>
+
+      <ScrollViewer Grid.Row="1"
+                    Grid.RowSpan="2"
+                    Margin="0,28,0,0"
+                    VerticalScrollBarVisibility="Auto">
+        <ScrollViewer.Style>
+          <Style TargetType="ScrollViewer">
+            <Setter Property="Visibility" Value="Collapsed" />
+            <Style.Triggers>
+              <DataTrigger Binding="{Binding SelectedPage}" Value="Live Fleet">
+                <Setter Property="Visibility" Value="Visible" />
+              </DataTrigger>
+            </Style.Triggers>
+          </Style>
+        </ScrollViewer.Style>
+
+        <StackPanel>
+          <Border Style="{StaticResource CardStyle}">
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+
+              <StackPanel>
+                <TextBlock Text="{Binding LiveFleetStatusTitle}"
+                           FontSize="20"
+                           FontWeight="SemiBold" />
+                <TextBlock Text="{Binding LiveFleetStatusDetail}"
+                           Margin="0,7,24,0"
+                           TextWrapping="Wrap"
+                           Opacity="0.72" />
+                <TextBlock Text="{Binding LiveFleetFreshness}"
+                           Margin="0,10,24,0"
+                           FontSize="12"
+                           Opacity="0.58" />
+              </StackPanel>
+
+              <Button Grid.Column="1"
+                      MinWidth="120"
+                      Padding="14,9"
+                      VerticalAlignment="Center"
+                      Content="Refresh now"
+                      Command="{Binding RefreshFleetCommand}" />
+            </Grid>
+          </Border>
+
+          <Grid Margin="0,18,0,0"
+                Visibility="{Binding HasDetectedFleet, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="18" />
+              <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0" Style="{StaticResource CardStyle}">
+              <StackPanel>
+                <TextBlock Text="Fleet boss"
+                           FontSize="12"
+                           FontWeight="SemiBold"
+                           Opacity="0.62" />
+                <TextBlock Text="{Binding LiveFleetBoss}"
+                           Margin="0,7,0,0"
+                           FontSize="16"
+                           FontWeight="SemiBold"
+                           TextWrapping="Wrap" />
+              </StackPanel>
+            </Border>
+
+            <Border Grid.Column="2" Style="{StaticResource CardStyle}">
+              <StackPanel>
+                <TextBlock Text="Fleet state"
+                           FontSize="12"
+                           FontWeight="SemiBold"
+                           Opacity="0.62" />
+                <TextBlock Text="{Binding LiveFleetSummary}"
+                           Margin="0,7,0,0"
+                           FontSize="15"
+                           FontWeight="SemiBold"
+                           TextWrapping="Wrap" />
+              </StackPanel>
+            </Border>
+          </Grid>
+
+          <Border Margin="0,18,0,0"
+                  Style="{StaticResource CardStyle}"
+                  Visibility="{Binding IsLiveFleetReady, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <StackPanel>
+              <TextBlock Text="Live hierarchy"
+                         FontSize="17"
+                         FontWeight="SemiBold" />
+              <TextBlock Text="Read-only view from ESI. Character, ship, system, and station IDs are resolved to names in batches."
+                         Margin="0,6,0,12"
+                         TextWrapping="Wrap"
+                         Opacity="0.65" />
+
+              <TreeView ItemsSource="{Binding FleetHierarchy}"
+                        MinHeight="180"
+                        MaxHeight="430"
+                        ScrollViewer.CanContentScroll="True"
+                        VirtualizingPanel.IsVirtualizing="True">
+                <TreeView.Resources>
+                  <HierarchicalDataTemplate DataType="{x:Type vm:LiveFleetTreeNodeViewModel}"
+                                            ItemsSource="{Binding Children}">
+                    <StackPanel Margin="2,4" Orientation="Horizontal">
+                      <TextBlock Text="{Binding Title}"
+                                 FontWeight="SemiBold" />
+                      <TextBlock Text="{Binding Detail}"
+                                 Margin="7,0,0,0"
+                                 Opacity="0.62" />
+                    </StackPanel>
+                  </HierarchicalDataTemplate>
+                </TreeView.Resources>
+                <TreeView.ItemContainerStyle>
+                  <Style TargetType="TreeViewItem">
+                    <Setter Property="IsExpanded" Value="True" />
+                  </Style>
+                </TreeView.ItemContainerStyle>
+              </TreeView>
+            </StackPanel>
+          </Border>
+
+          <Border Margin="0,18,0,0" Style="{StaticResource CardStyle}">
+            <TextBlock Text="Safety boundary: this milestone performs GET fleet reads and public ID-to-name resolution only. Invitations, moves, role changes, kicks, and hierarchy changes remain disabled."
+                       TextWrapping="Wrap"
+                       Foreground="{StaticResource WarningBrush}"
+                       FontWeight="SemiBold" />
+          </Border>
+        </StackPanel>
+      </ScrollViewer>
 
       <ScrollViewer Grid.Row="1"
                     Grid.RowSpan="2"
@@ -291,6 +424,9 @@
               <DataTrigger Binding="{Binding SelectedPage}" Value="Settings">
                 <Setter Property="Visibility" Value="Collapsed" />
               </DataTrigger>
+              <DataTrigger Binding="{Binding SelectedPage}" Value="Live Fleet">
+                <Setter Property="Visibility" Value="Collapsed" />
+              </DataTrigger>
             </Style.Triggers>
           </Style>
         </Border.Style>
@@ -299,7 +435,7 @@
                      FontSize="20"
                      FontWeight="SemiBold"
                      HorizontalAlignment="Center" />
-          <TextBlock Text="Secure EVE sign-in is now implemented; live fleet and profile features follow next."
+          <TextBlock Text="Secure EVE sign-in and read-only live fleet detection are implemented; profile and operation features follow next."
                      Margin="0,9,0,0"
                      TextWrapping="Wrap"
                      TextAlignment="Center"

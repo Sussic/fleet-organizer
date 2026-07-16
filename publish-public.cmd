@@ -39,7 +39,7 @@ if errorlevel 1 exit /b 1
 
 git diff --cached --quiet
 if errorlevel 1 (
-  git commit -m "feat: scaffold Fleet Organizer"
+  git commit -m "feat: update Fleet Organizer"
   if errorlevel 1 exit /b 1
 ) else (
   echo No uncommitted source changes found.

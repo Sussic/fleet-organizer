@@ -1,6 +1,7 @@
 using FleetOrganizer.Core.Abstractions;
 using FleetOrganizer.Infrastructure.Authentication;
 using FleetOrganizer.Infrastructure.Configuration;
+using FleetOrganizer.Infrastructure.Esi;
 using FleetOrganizer.Infrastructure.Persistence;
 using FleetOrganizer.Infrastructure.Security;
 using Microsoft.Extensions.Configuration;
@@ -31,12 +32,14 @@ public static class DependencyInjection
                 Timeout = TimeSpan.FromSeconds(30),
             };
             client.DefaultRequestHeaders.UserAgent.ParseAdd(
-                "FleetOrganizer/0.1 (+https://github.com/Sussic/fleet-organizer)");
+                "FleetOrganizer/0.2 (+https://github.com/Sussic/fleet-organizer)");
             return client;
         });
         services.AddSingleton<AuthenticatedCharacterRepository>();
         services.AddSingleton<EveJwtValidator>();
         services.AddSingleton<IEveAuthenticationService, EveAuthenticationService>();
+        services.AddSingleton<EveEsiClient>();
+        services.AddSingleton<ILiveFleetService, EveFleetService>();
         services.AddSingleton<SqliteDatabaseInitializer>();
 
         return services;

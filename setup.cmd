@@ -42,8 +42,8 @@ if errorlevel 1 exit /b 1
 
 echo.
 echo Setup completed successfully.
-echo Before EVE login is implemented, place your public EVE client ID in:
+echo If it is not configured yet, place your public EVE client ID in:
 echo   src\FleetOrganizer.App\appsettings.Local.json
 echo.
-echo Start the app with run.cmd
+echo Start the app with run.cmd, sign in, then open Live Fleet.
 exit /b 0
