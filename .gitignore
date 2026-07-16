@@ -1,0 +1,28 @@
+## Build output
+bin/
+obj/
+artifacts/
+TestResults/
+
+## User/local configuration
+appsettings.Local.json
+*.user
+*.suo
+.vs/
+.vscode/
+.idea/
+
+## Local application data accidentally copied into the repo
+*.db
+*.db-shm
+*.db-wal
+logs/
+
+## Packages and publish output
+packages/
+publish/
+
+## OS files
+Thumbs.db
+Desktop.ini
+.DS_Store

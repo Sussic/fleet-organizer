@@ -1,0 +1,25 @@
+<Application x:Class="FleetOrganizer.App.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             ThemeMode="System">
+  <Application.Resources>
+    <SolidColorBrush x:Key="EveAccentBrush" Color="#4F9FCE" />
+    <SolidColorBrush x:Key="SuccessBrush" Color="#43A047" />
+    <SolidColorBrush x:Key="WarningBrush" Color="#F5A623" />
+
+    <Style x:Key="NavigationButtonStyle" TargetType="Button">
+      <Setter Property="HorizontalContentAlignment" Value="Left" />
+      <Setter Property="Padding" Value="14,10" />
+      <Setter Property="Margin" Value="0,2" />
+      <Setter Property="FontSize" Value="14" />
+    </Style>
+
+    <Style x:Key="CardStyle" TargetType="Border">
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Padding" Value="18" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="BorderBrush" Value="{DynamicResource {x:Static SystemColors.ActiveBorderBrushKey}}" />
+      <Setter Property="Background" Value="{DynamicResource {x:Static SystemColors.ControlBrushKey}}" />
+    </Style>
+  </Application.Resources>
+</Application>
