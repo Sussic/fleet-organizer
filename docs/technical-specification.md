@@ -1,10 +1,24 @@
 # Fleet Organizer — Technical Specification
 
 **Status:** Approved implementation baseline
-**Revision:** 1.1
+**Revision:** 1.2
 **Reviewed:** 16 July 2026
 **Target:** Windows 11, local single-user desktop application
 **Working title:** Fleet Organizer (name can change without affecting the architecture)
+
+### Implementation checkpoint — Milestone 2
+
+Implemented and tested in the current repository:
+
+- EVE SSO Authorization Code + PKCE, JWT validation, DPAPI refresh-token storage, and logout.
+- Cache/rate-aware read-only fleet detection with named hierarchy and member details.
+- SQLite-backed profile create, rename, duplicate, delete, and current-fleet capture.
+- Wing/squad add, rename, reorder, duplicate, and guarded deletion.
+- Newline/comma/tab and structured roster paste with exact public `POST /universe/ids` resolution in batches of 500.
+- Per-character desired squad, desired role, local tags, and bulk editing.
+- Versioned profile JSON import/export and validation before persistence.
+
+No ESI fleet write route is enabled at this checkpoint. Milestone 3 begins with desired-versus-live planning and a user-visible dry run before any guarded write implementation.
 
 ## 1. Executive decision
 

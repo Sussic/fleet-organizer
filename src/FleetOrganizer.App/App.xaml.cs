@@ -27,6 +27,7 @@ public partial class App : Application
             .ConfigureServices((context, services) =>
             {
                 services.AddFleetOrganizerInfrastructure(context.Configuration);
+                services.AddSingleton<ProfilesViewModel>();
                 services.AddSingleton<MainWindowViewModel>();
                 services.AddSingleton<MainWindow>();
             })

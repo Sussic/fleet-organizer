@@ -94,7 +94,7 @@
                 CornerRadius="12"
                 BorderThickness="1"
                 BorderBrush="{DynamicResource {x:Static SystemColors.ActiveBorderBrushKey}}">
-          <TextBlock Text="Read-only live fleet build"
+          <TextBlock Text="Milestone 2 • local planning"
                      FontSize="12"
                      FontWeight="SemiBold" />
         </Border>
@@ -165,17 +165,14 @@
             <TextBlock Text="Ready in this foundation"
                        FontSize="17"
                        FontWeight="SemiBold" />
-            <TextBlock Margin="0,16,0,7" Text="✓ Windows WPF application shell" />
-            <TextBlock Margin="0,7" Text="✓ Local SQLite database and migrations" />
-            <TextBlock Margin="0,7" Text="✓ DPAPI secret-protection service" />
-            <TextBlock Margin="0,7" Text="✓ Profile domain validation" />
-            <TextBlock Margin="0,7" Text="✓ Core and infrastructure test projects" />
-            <TextBlock Margin="0,7" Text="✓ Local EVE developer configuration" />
+            <TextBlock Margin="0,16,0,7" Text="✓ Windows WPF shell and local SQLite storage" />
             <TextBlock Margin="0,7" Text="✓ EVE SSO Authorization Code + PKCE" />
-            <TextBlock Margin="0,7" Text="✓ JWT signature, audience, and scope validation" />
-            <TextBlock Margin="0,7" Text="✓ Encrypted remembered authorization" />
-            <TextBlock Margin="0,7" Text="✓ Read-only live fleet detection" />
-            <TextBlock Margin="0,7" Text="✓ Cache and rate-aware ESI reads" />
+            <TextBlock Margin="0,7" Text="✓ JWT, audience, and scope validation" />
+            <TextBlock Margin="0,7" Text="✓ DPAPI-encrypted remembered authorization" />
+            <TextBlock Margin="0,7" Text="✓ Cache and rate-aware live fleet reads" />
+            <TextBlock Margin="0,7" Text="✓ Saved profiles, hierarchy, roster, roles, and tags" />
+            <TextBlock Margin="0,7" Text="✓ Exact public EVE character-name resolution" />
+            <TextBlock Margin="0,7" Text="✓ Profile validation and JSON portability" />
           </StackPanel>
         </Border>
 
@@ -184,10 +181,10 @@
             <TextBlock Text="Next implementation slice"
                        FontSize="17"
                        FontWeight="SemiBold" />
-            <TextBlock Margin="0,16,0,7" Text="1. Profile editor and local roster" />
-            <TextBlock Margin="0,7" Text="2. Character name-to-ID resolution" />
-            <TextBlock Margin="0,7" Text="3. Desired-versus-live preview" />
-            <TextBlock Margin="0,7" Text="4. Durable invite and placement operations" />
+            <TextBlock Margin="0,16,0,7" Text="1. Desired-versus-live preview" />
+            <TextBlock Margin="0,7" Text="2. Invite dry run and safety review" />
+            <TextBlock Margin="0,7" Text="3. Durable invite and placement operations" />
+            <TextBlock Margin="0,7" Text="4. Per-character outcomes and retry" />
             <TextBlock Margin="0,7" Text="5. Explicit, guarded ESI write actions" />
             <TextBlock Margin="0,16,0,0"
                        Text="No fleet writes are enabled yet."
@@ -196,6 +193,370 @@
           </StackPanel>
         </Border>
       </Grid>
+
+      <ScrollViewer Grid.Row="1"
+                    Grid.RowSpan="2"
+                    Margin="0,28,0,0"
+                    VerticalScrollBarVisibility="Auto">
+        <ScrollViewer.Style>
+          <Style TargetType="ScrollViewer">
+            <Setter Property="Visibility" Value="Collapsed" />
+            <Style.Triggers>
+              <DataTrigger Binding="{Binding SelectedPage}" Value="Profiles">
+                <Setter Property="Visibility" Value="Visible" />
+              </DataTrigger>
+            </Style.Triggers>
+          </Style>
+        </ScrollViewer.Style>
+
+        <StackPanel>
+          <Border Style="{StaticResource CardStyle}">
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <StackPanel>
+                <TextBlock Text="Saved fleet profiles"
+                           FontSize="20"
+                           FontWeight="SemiBold" />
+                <TextBlock Text="{Binding Profiles.StatusMessage}"
+                           Margin="0,7,24,0"
+                           TextWrapping="Wrap"
+                           Opacity="0.72" />
+              </StackPanel>
+              <WrapPanel Grid.Column="1" VerticalAlignment="Center">
+                <Button Margin="4,0"
+                        Padding="12,8"
+                        Content="New profile"
+                        Command="{Binding Profiles.NewProfileCommand}" />
+                <Button Margin="4,0"
+                        Padding="12,8"
+                        Content="Capture current"
+                        ToolTip="Read the current EVE fleet and save it as an editable local profile"
+                        Command="{Binding Profiles.CaptureCurrentFleetCommand}" />
+                <Button Margin="4,0"
+                        Padding="12,8"
+                        Content="Import JSON"
+                        Command="{Binding Profiles.ImportProfileCommand}" />
+              </WrapPanel>
+            </Grid>
+          </Border>
+
+          <Grid Margin="0,18,0,0">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="240" />
+              <ColumnDefinition Width="18" />
+              <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0" Style="{StaticResource CardStyle}">
+              <StackPanel>
+                <TextBlock Text="Profiles"
+                           FontSize="17"
+                           FontWeight="SemiBold" />
+                <TextBlock Text="Saved only on this PC"
+                           Margin="0,4,0,12"
+                           FontSize="12"
+                           Opacity="0.62" />
+                <ListBox ItemsSource="{Binding Profiles.ProfileItems}"
+                         SelectedItem="{Binding Profiles.SelectedProfile}"
+                         MinHeight="150"
+                         MaxHeight="310"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                  <ListBox.ItemTemplate>
+                    <DataTemplate>
+                      <StackPanel Margin="4,6">
+                        <TextBlock Text="{Binding Name}"
+                                   FontWeight="SemiBold"
+                                   TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{Binding Summary}"
+                                   Margin="0,3,0,0"
+                                   FontSize="11"
+                                   Opacity="0.62" />
+                      </StackPanel>
+                    </DataTemplate>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+              </StackPanel>
+            </Border>
+
+            <Border Grid.Column="2" Style="{StaticResource CardStyle}">
+              <StackPanel>
+                <TextBlock Text="Profile details"
+                           FontSize="17"
+                           FontWeight="SemiBold" />
+                <TextBlock Text="Choose a profile on the left, or create a new one."
+                           Margin="0,5,0,0"
+                           TextWrapping="Wrap"
+                           Opacity="0.62" />
+
+                <StackPanel Margin="0,16,0,0"
+                            IsEnabled="{Binding Profiles.CanEdit}"
+                            Visibility="{Binding Profiles.IsEditorActive, Converter={StaticResource BooleanToVisibilityConverter}}">
+                  <TextBlock Text="Profile name"
+                             FontWeight="SemiBold" />
+                  <TextBox Text="{Binding Profiles.ProfileName, UpdateSourceTrigger=PropertyChanged}"
+                           Margin="0,6,0,0"
+                           Padding="9,7"
+                           MaxLength="100" />
+                  <WrapPanel Margin="0,12,0,0">
+                    <Button Margin="0,0,8,0"
+                            Padding="12,8"
+                            Content="Save changes"
+                            Command="{Binding Profiles.SaveProfileCommand}" />
+                    <Button Margin="0,0,8,0"
+                            Padding="12,8"
+                            Content="Duplicate"
+                            Command="{Binding Profiles.DuplicateProfileCommand}" />
+                    <Button Margin="0,0,8,0"
+                            Padding="12,8"
+                            Content="Export JSON"
+                            Command="{Binding Profiles.ExportProfileCommand}" />
+                    <Button Padding="12,8"
+                            Content="Delete"
+                            Command="{Binding Profiles.DeleteProfileCommand}" />
+                  </WrapPanel>
+                  <TextBlock Text="{Binding Profiles.ValidationSummary}"
+                             Margin="0,12,0,0"
+                             TextWrapping="Wrap"
+                             FontSize="12"
+                             Opacity="0.72" />
+                </StackPanel>
+              </StackPanel>
+            </Border>
+          </Grid>
+
+          <Border Margin="0,18,0,0"
+                  Style="{StaticResource CardStyle}"
+                  Visibility="{Binding Profiles.IsEditorActive, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <StackPanel IsEnabled="{Binding Profiles.CanEdit}">
+              <DockPanel>
+                <Button DockPanel.Dock="Right"
+                        Padding="12,7"
+                        Content="Add wing"
+                        Command="{Binding Profiles.AddWingCommand}" />
+                <StackPanel>
+                  <TextBlock Text="Fleet hierarchy"
+                             FontSize="17"
+                             FontWeight="SemiBold" />
+                  <TextBlock Text="Wing and squad names follow EVE's 10-character limit. Use the arrows to set placement order."
+                             Margin="0,5,18,0"
+                             TextWrapping="Wrap"
+                             Opacity="0.62" />
+                </StackPanel>
+              </DockPanel>
+
+              <ItemsControl ItemsSource="{Binding Profiles.Wings}" Margin="0,14,0,0">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <Border Margin="0,0,0,10"
+                            Padding="12"
+                            BorderThickness="1"
+                            BorderBrush="{DynamicResource {x:Static SystemColors.ActiveBorderBrushKey}}"
+                            CornerRadius="6">
+                      <StackPanel>
+                        <Grid>
+                          <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                          </Grid.ColumnDefinitions>
+                          <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}"
+                                   Padding="8,5"
+                                   MaxLength="10"
+                                   FontWeight="SemiBold" />
+                          <WrapPanel Grid.Column="1" Margin="10,0,0,0">
+                            <Button Margin="2,0" Padding="8,5" Content="+ Squad"
+                                    Command="{Binding DataContext.Profiles.AddSquadCommand, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                                    CommandParameter="{Binding}" />
+                            <Button Margin="2,0" Padding="8,5" Content="Copy"
+                                    Command="{Binding DataContext.Profiles.DuplicateWingCommand, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                                    CommandParameter="{Binding}" />
+                            <Button Margin="2,0" Padding="8,5" Content="↑" ToolTip="Move wing up"
+                                    Command="{Binding DataContext.Profiles.MoveWingUpCommand, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                                    CommandParameter="{Binding}" />
+                            <Button Margin="2,0" Padding="8,5" Content="↓" ToolTip="Move wing down"
+                                    Command="{Binding DataContext.Profiles.MoveWingDownCommand, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                                    CommandParameter="{Binding}" />
+                            <Button Margin="2,0" Padding="8,5" Content="Delete"
+                                    Command="{Binding DataContext.Profiles.DeleteWingCommand, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                                    CommandParameter="{Binding}" />
+                          </WrapPanel>
+                        </Grid>
+
+                        <ItemsControl ItemsSource="{Binding Squads}" Margin="20,10,0,0">
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                              <Grid Margin="0,3">
+                                <Grid.ColumnDefinitions>
+                                  <ColumnDefinition Width="*" />
+                                  <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}"
+                                         Padding="8,5"
+                                         MaxLength="10" />
+                                <WrapPanel Grid.Column="1" Margin="10,0,0,0">
+                                  <Button Margin="2,0" Padding="8,5" Content="Copy"
+                                          Command="{Binding DataContext.Profiles.DuplicateSquadCommand, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                                          CommandParameter="{Binding}" />
+                                  <Button Margin="2,0" Padding="8,5" Content="↑" ToolTip="Move squad up"
+                                          Command="{Binding DataContext.Profiles.MoveSquadUpCommand, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                                          CommandParameter="{Binding}" />
+                                  <Button Margin="2,0" Padding="8,5" Content="↓" ToolTip="Move squad down"
+                                          Command="{Binding DataContext.Profiles.MoveSquadDownCommand, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                                          CommandParameter="{Binding}" />
+                                  <Button Margin="2,0" Padding="8,5" Content="Delete"
+                                          Command="{Binding DataContext.Profiles.DeleteSquadCommand, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                                          CommandParameter="{Binding}" />
+                                </WrapPanel>
+                              </Grid>
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                      </StackPanel>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+          </Border>
+
+          <Border Margin="0,18,0,0"
+                  Style="{StaticResource CardStyle}"
+                  Visibility="{Binding Profiles.IsEditorActive, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <StackPanel IsEnabled="{Binding Profiles.CanEdit}">
+              <TextBlock Text="Add characters"
+                         FontSize="17"
+                         FontWeight="SemiBold" />
+              <TextBlock Text="Paste exact EVE character names separated by new lines, commas, or tabs. Optional structured form: Name — Squad — Role."
+                         Margin="0,5,0,0"
+                         TextWrapping="Wrap"
+                         Opacity="0.62" />
+              <TextBox Text="{Binding Profiles.RosterPasteText, UpdateSourceTrigger=PropertyChanged}"
+                       Margin="0,12,0,0"
+                       Padding="9"
+                       MinHeight="82"
+                       AcceptsReturn="True"
+                       AcceptsTab="True"
+                       VerticalScrollBarVisibility="Auto"
+                       TextWrapping="Wrap" />
+              <DockPanel Margin="0,10,0,0">
+                <TextBlock VerticalAlignment="Center"
+                           Text="Uses ESI's public exact-name lookup; these characters do not sign in."
+                           TextWrapping="Wrap"
+                           Opacity="0.62" />
+                <Button DockPanel.Dock="Right"
+                        Margin="12,0,0,0"
+                        Padding="14,8"
+                        Content="Resolve and add"
+                        Command="{Binding Profiles.ResolveRosterCommand}" />
+              </DockPanel>
+              <ItemsControl ItemsSource="{Binding Profiles.UnresolvedRosterEntries}" Margin="0,8,0,0">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <TextBlock Text="{Binding}"
+                               Margin="0,2"
+                               Foreground="{StaticResource WarningBrush}" />
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+          </Border>
+
+          <Border Margin="0,18,0,0"
+                  Style="{StaticResource CardStyle}"
+                  Visibility="{Binding Profiles.IsEditorActive, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <StackPanel IsEnabled="{Binding Profiles.CanEdit}">
+              <TextBlock Text="Roster and placement"
+                         FontSize="17"
+                         FontWeight="SemiBold" />
+              <TextBlock Text="Select characters for quick bulk changes, or edit a single row. Tags are local notes such as logi, scout, or booster."
+                         Margin="0,5,0,0"
+                         TextWrapping="Wrap"
+                         Opacity="0.62" />
+
+              <WrapPanel Margin="0,12,0,8">
+                <Button Margin="0,0,6,6" Padding="9,6" Content="Select all"
+                        Command="{Binding Profiles.SelectAllAssignmentsCommand}" />
+                <Button Margin="0,0,14,6" Padding="9,6" Content="Clear selection"
+                        Command="{Binding Profiles.ClearAssignmentSelectionCommand}" />
+                <ComboBox Width="210" Margin="0,0,6,6"
+                          ItemsSource="{Binding Profiles.SquadOptions}"
+                          DisplayMemberPath="DisplayName"
+                          SelectedValuePath="Id"
+                          SelectedValue="{Binding Profiles.BulkTargetSquadId}" />
+                <Button Margin="0,0,14,6" Padding="9,6" Content="Apply squad"
+                        Command="{Binding Profiles.ApplyBulkSquadCommand}" />
+                <ComboBox Width="155" Margin="0,0,6,6"
+                          ItemsSource="{Binding Profiles.RoleOptions}"
+                          DisplayMemberPath="DisplayName"
+                          SelectedValuePath="Value"
+                          SelectedValue="{Binding Profiles.BulkDesiredRole}" />
+                <Button Margin="0,0,14,6" Padding="9,6" Content="Apply role"
+                        Command="{Binding Profiles.ApplyBulkRoleCommand}" />
+                <TextBox Width="155" Margin="0,0,6,6" Padding="7,5"
+                         ToolTip="Comma-separated local tags"
+                         Text="{Binding Profiles.BulkTagsText, UpdateSourceTrigger=PropertyChanged}" />
+                <Button Margin="0,0,14,6" Padding="9,6" Content="Apply tags"
+                        Command="{Binding Profiles.ApplyBulkTagsCommand}" />
+                <Button Margin="0,0,0,6" Padding="9,6" Content="Remove selected"
+                        Command="{Binding Profiles.RemoveSelectedAssignmentsCommand}" />
+              </WrapPanel>
+
+              <DataGrid ItemsSource="{Binding Profiles.Assignments}"
+                        AutoGenerateColumns="False"
+                        CanUserAddRows="False"
+                        CanUserDeleteRows="False"
+                        HeadersVisibility="Column"
+                        MinHeight="120"
+                        MaxHeight="360"
+                        SelectionMode="Single"
+                        EnableRowVirtualization="True">
+                <DataGrid.Columns>
+                  <DataGridCheckBoxColumn Width="42"
+                                          Header="Use"
+                                          Binding="{Binding IsSelected, UpdateSourceTrigger=PropertyChanged}" />
+                  <DataGridTextColumn Width="180"
+                                      Header="Character"
+                                      IsReadOnly="True"
+                                      Binding="{Binding CharacterName}" />
+                  <DataGridTemplateColumn Width="220" Header="Target squad">
+                    <DataGridTemplateColumn.CellTemplate>
+                      <DataTemplate>
+                        <ComboBox ItemsSource="{Binding DataContext.Profiles.SquadOptions, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                                  DisplayMemberPath="DisplayName"
+                                  SelectedValuePath="Id"
+                                  SelectedValue="{Binding TargetSquadId, UpdateSourceTrigger=PropertyChanged}" />
+                      </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                  </DataGridTemplateColumn>
+                  <DataGridTemplateColumn Width="165" Header="Desired role">
+                    <DataGridTemplateColumn.CellTemplate>
+                      <DataTemplate>
+                        <ComboBox ItemsSource="{Binding DataContext.Profiles.RoleOptions, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                                  DisplayMemberPath="DisplayName"
+                                  SelectedValuePath="Value"
+                                  SelectedValue="{Binding DesiredRole, UpdateSourceTrigger=PropertyChanged}" />
+                      </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                  </DataGridTemplateColumn>
+                  <DataGridTextColumn Width="*"
+                                      MinWidth="120"
+                                      Header="Tags"
+                                      Binding="{Binding TagsText, UpdateSourceTrigger=PropertyChanged}" />
+                </DataGrid.Columns>
+              </DataGrid>
+            </StackPanel>
+          </Border>
+
+          <Border Margin="0,18,0,0" Style="{StaticResource CardStyle}">
+            <TextBlock Text="Safety boundary: Milestone 2 saves and edits local plans only. Capturing a fleet is read-only. No invitations, moves, promotions, kicks, or hierarchy writes are sent to EVE."
+                       TextWrapping="Wrap"
+                       Foreground="{StaticResource WarningBrush}"
+                       FontWeight="SemiBold" />
+          </Border>
+        </StackPanel>
+      </ScrollViewer>
 
       <ScrollViewer Grid.Row="1"
                     Grid.RowSpan="2"
@@ -427,6 +788,9 @@
               <DataTrigger Binding="{Binding SelectedPage}" Value="Live Fleet">
                 <Setter Property="Visibility" Value="Collapsed" />
               </DataTrigger>
+              <DataTrigger Binding="{Binding SelectedPage}" Value="Profiles">
+                <Setter Property="Visibility" Value="Collapsed" />
+              </DataTrigger>
             </Style.Triggers>
           </Style>
         </Border.Style>
@@ -435,7 +799,7 @@
                      FontSize="20"
                      FontWeight="SemiBold"
                      HorizontalAlignment="Center" />
-          <TextBlock Text="Secure EVE sign-in and read-only live fleet detection are implemented; profile and operation features follow next."
+          <TextBlock Text="Profile planning and live fleet reads are implemented; operation execution follows in the next milestone."
                      Margin="0,9,0,0"
                      TextWrapping="Wrap"
                      TextAlignment="Center"

@@ -109,6 +109,45 @@ internal sealed class EveEsiClient : IDisposable
         }
     }
 
+    public async Task<EsiResult<UniverseIdsResponse>> PostUniverseIdsAsync(
+        string[] names,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(names);
+
+        if (names.Length is < 1 or > 500)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(names),
+                "ESI name resolution accepts between 1 and 500 names.");
+        }
+
+        if (names.Any(name => string.IsNullOrWhiteSpace(name) || name.Length > 100))
+        {
+            throw new ArgumentException(
+                "Each ESI name must contain between 1 and 100 characters.",
+                nameof(names));
+        }
+
+        await requestGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            return await SendAsync<UniverseIdsResponse>(
+                () => new HttpRequestMessage(HttpMethod.Post, new Uri(EsiBaseUri, "universe/ids"))
+                {
+                    Content = JsonContent.Create(names, options: SerializerOptions),
+                },
+                authenticated: false,
+                cachedEntry: null,
+                fallbackCacheDuration: TimeSpan.Zero,
+                cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            requestGate.Release();
+        }
+    }
+
     public void InvalidateCharacterFleet(long characterId)
     {
         var path = $"characters/{characterId}/fleet";

@@ -25,4 +25,7 @@ public sealed record ProfileAssignment(
     long CharacterId,
     string CharacterName,
     Guid TargetSquadId,
-    DesiredFleetRole DesiredRole);
+    DesiredFleetRole DesiredRole)
+{
+    public string[] Tags { get; init; } = [];
+}

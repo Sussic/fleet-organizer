@@ -32,7 +32,7 @@ public static class DependencyInjection
                 Timeout = TimeSpan.FromSeconds(30),
             };
             client.DefaultRequestHeaders.UserAgent.ParseAdd(
-                "FleetOrganizer/0.2 (+https://github.com/Sussic/fleet-organizer)");
+                "FleetOrganizer/0.3 (+https://github.com/Sussic/fleet-organizer)");
             return client;
         });
         services.AddSingleton<AuthenticatedCharacterRepository>();
@@ -40,6 +40,8 @@ public static class DependencyInjection
         services.AddSingleton<IEveAuthenticationService, EveAuthenticationService>();
         services.AddSingleton<EveEsiClient>();
         services.AddSingleton<ILiveFleetService, EveFleetService>();
+        services.AddSingleton<ICharacterNameResolver, EveCharacterNameResolver>();
+        services.AddSingleton<IFleetProfileRepository, FleetProfileRepository>();
         services.AddSingleton<SqliteDatabaseInitializer>();
 
         return services;

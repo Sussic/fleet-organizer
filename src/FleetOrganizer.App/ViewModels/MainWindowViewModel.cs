@@ -87,12 +87,16 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         IAppDataPaths paths,
         IOptions<EveDeveloperOptions> developerOptions,
         IEveAuthenticationService authenticationService,
-        ILiveFleetService liveFleetService)
+        ILiveFleetService liveFleetService,
+        ProfilesViewModel profiles)
     {
+        ArgumentNullException.ThrowIfNull(profiles);
+
         this.paths = paths;
         this.developerOptions = developerOptions.Value;
         this.authenticationService = authenticationService;
         this.liveFleetService = liveFleetService;
+        Profiles = profiles;
         requiredScopes = string.Join(Environment.NewLine, EveDeveloperOptions.RequiredScopes);
         fleetRefreshTimer = new DispatcherTimer(DispatcherPriority.Background)
         {
@@ -110,6 +114,8 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         "Settings" => "Configure EVE SSO, storage, polling, and appearance.",
         _ => string.Empty,
     };
+
+    public ProfilesViewModel Profiles { get; }
 
     public string ConfigurationStatus => developerOptions.IsClientIdConfigured
         ? "EVE client ID configured"
@@ -180,6 +186,8 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
 
     public async Task InitializeAsync()
     {
+        await Profiles.InitializeAsync();
+
         if (!developerOptions.IsClientIdConfigured)
         {
             return;

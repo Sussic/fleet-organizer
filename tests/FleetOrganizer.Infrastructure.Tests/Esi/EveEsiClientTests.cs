@@ -112,6 +112,43 @@ public sealed class EveEsiClientTests
     }
 
     [Fact]
+    public async Task CharacterNameResolutionUsesPublicUniverseIdsEndpointWithoutAuthorization()
+    {
+        string? requestBody = null;
+        string? authorization = "not-observed";
+        string? compatibilityDate = null;
+        using var httpClient = new HttpClient(new AsyncDelegateHandler(async (
+            request,
+            cancellationToken) =>
+        {
+            requestBody = await request.Content!.ReadAsStringAsync(cancellationToken);
+            authorization = request.Headers.Authorization?.ToString();
+            compatibilityDate = request.Headers.GetValues("X-Compatibility-Date").Single();
+            Assert.Equal(HttpMethod.Post, request.Method);
+            Assert.Equal("/universe/ids", request.RequestUri?.AbsolutePath);
+            return CreateJsonResponse(
+                HttpStatusCode.OK,
+                """
+                {"characters":[{"id":9001,"name":"Exact Pilot"}]}
+                """);
+        }));
+        using var client = CreateClient(httpClient, new TestAuthenticationService());
+        var names = new[] { "Exact Pilot", "Missing Pilot" };
+
+        var result = await client.PostUniverseIdsAsync(names, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var character = Assert.Single(result.Value!.Characters!);
+        Assert.Equal(9001, character.Id);
+        Assert.Equal("Exact Pilot", character.Name);
+        Assert.Null(authorization);
+        Assert.Equal("2026-07-15", compatibilityDate);
+        var capturedBody = Assert.IsType<string>(requestBody);
+        Assert.Contains("Exact Pilot", capturedBody, StringComparison.Ordinal);
+        Assert.Contains("Missing Pilot", capturedBody, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task FleetServiceBuildsNamedReadOnlySnapshotFromCurrentOpenApiContracts()
     {
         using var httpClient = new HttpClient(new DelegateHandler(request =>
@@ -209,6 +246,16 @@ public sealed class EveEsiClientTests
             cancellationToken.ThrowIfCancellationRequested();
             return Task.FromResult(send(request));
         }
+    }
+
+    private sealed class AsyncDelegateHandler(
+        Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> send) :
+        HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken) =>
+            send(request, cancellationToken);
     }
 
     private sealed class TestAuthenticationService : IEveAuthenticationService

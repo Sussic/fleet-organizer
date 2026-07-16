@@ -83,4 +83,11 @@ internal sealed record UniverseNameResponse(
     [property: JsonPropertyName("category")] string Category,
     [property: JsonPropertyName("id")] long Id,
     [property: JsonPropertyName("name")] string Name);
+
+internal sealed record UniverseIdNameResponse(
+    [property: JsonPropertyName("id")] long Id,
+    [property: JsonPropertyName("name")] string Name);
+
+internal sealed record UniverseIdsResponse(
+    [property: JsonPropertyName("characters")] UniverseIdNameResponse[]? Characters);
 #pragma warning restore CA1812
