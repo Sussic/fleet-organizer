@@ -107,7 +107,17 @@ public static class FleetProfileFactory
                 Guid.NewGuid(),
                 rule.ShipTypeName,
                 squadIdMap[rule.TargetSquadId],
-                rule.SortOrder))
+                rule.SortOrder)
+            {
+                Label = rule.Label,
+                OverflowSquadId = rule.OverflowSquadId is Guid overflowSquadId &&
+                    squadIdMap.TryGetValue(overflowSquadId, out var newOverflowSquadId)
+                        ? newOverflowSquadId
+                        : null,
+                MaximumPerSquad = rule.MaximumPerSquad,
+                BalanceAcrossTargets = rule.BalanceAcrossTargets,
+                IsFallback = rule.IsFallback,
+            })
             .ToArray();
 
         return new FleetProfile(Guid.NewGuid(), name.Trim(), wings, assignments)

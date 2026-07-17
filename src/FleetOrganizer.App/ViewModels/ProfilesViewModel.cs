@@ -31,7 +31,9 @@ public partial class ProfilesViewModel : ObservableObject, IDisposable
     private FleetDryRunPlan? lastDryRunPlan;
     private FleetProfile? lastPreparedProfile;
     private int lastShipRuleMatchCount;
+    private int lastShipRuleCapacitySkipCount;
     private FleetOperation? currentOperation;
+    private Guid? inviteTimeoutRaisedForOperation;
     private FleetDeskPreferences preferences = new();
 
     [ObservableProperty]
@@ -159,6 +161,24 @@ public partial class ProfilesViewModel : ObservableObject, IDisposable
     public partial bool AttentionSoundsEnabled { get; set; } = true;
 
     [ObservableProperty]
+    public partial int FleetPollingSeconds { get; set; } = 30;
+
+    [ObservableProperty]
+    public partial int InvitationCheckSeconds { get; set; } = 30;
+
+    [ObservableProperty]
+    public partial int InvitationTimeoutMinutes { get; set; } = 10;
+
+    [ObservableProperty]
+    public partial bool StartMinimized { get; set; }
+
+    [ObservableProperty]
+    public partial bool MinimizeToTray { get; set; }
+
+    [ObservableProperty]
+    public partial FleetDeskTheme SelectedTheme { get; set; } = FleetDeskTheme.System;
+
+    [ObservableProperty]
     public partial bool IsWaitingForInvites { get; set; }
 
     [ObservableProperty]
@@ -211,6 +231,8 @@ public partial class ProfilesViewModel : ObservableObject, IDisposable
 
     public ObservableCollection<FleetOperationStepViewModel> OperationItems { get; } = [];
 
+    public ObservableCollection<FleetOperationHistoryItemViewModel> OperationHistory { get; } = [];
+
     public ObservableCollection<WaitingCharacterViewModel> WaitingCharacters { get; } = [];
 
     public ICollectionView FilteredProfileItems { get; }
@@ -232,6 +254,13 @@ public partial class ProfilesViewModel : ObservableObject, IDisposable
         new(FleetRunMode.PlacePresent, "Place joined", "Move characters already in fleet; never invite."),
         new(FleetRunMode.FixStructure, "Fix structure", "Create or rename wings and squads only."),
         new(FleetRunMode.AssignCommanders, "Assign commanders", "Promote configured commanders after placement is ready."),
+    ];
+
+    public ThemeOptionViewModel[] ThemeOptions { get; } =
+    [
+        new(FleetDeskTheme.System, "Use Windows setting"),
+        new(FleetDeskTheme.Light, "Light"),
+        new(FleetDeskTheme.Dark, "Dark"),
     ];
 
     public event EventHandler<FleetAttentionEventArgs>? AttentionRequested;
@@ -303,6 +332,14 @@ public partial class ProfilesViewModel : ObservableObject, IDisposable
                 ? preferences.RunMode
                 : FleetRunMode.FullOrganise;
             AttentionSoundsEnabled = preferences.AttentionSoundsEnabled;
+            FleetPollingSeconds = Math.Clamp(preferences.FleetPollingSeconds, 15, 300);
+            InvitationCheckSeconds = Math.Clamp(preferences.InvitationCheckSeconds, 15, 300);
+            InvitationTimeoutMinutes = Math.Clamp(preferences.InvitationTimeoutMinutes, 1, 120);
+            StartMinimized = preferences.StartMinimized;
+            MinimizeToTray = preferences.MinimizeToTray;
+            SelectedTheme = Enum.IsDefined(preferences.Theme)
+                ? preferences.Theme
+                : FleetDeskTheme.System;
             await ReloadProfilesAsync(preferences.DefaultProfileId ?? preferences.LastUsedProfileId);
             isLoadingPreferences = false;
             var resumableOperation = await operationService.LoadLatestResumableAsync();
@@ -310,6 +347,8 @@ public partial class ProfilesViewModel : ObservableObject, IDisposable
             {
                 ShowOperation(resumableOperation);
             }
+
+            await ReloadOperationHistoryAsync();
 
             StatusMessage = ProfileItems.Count == 0
                 ? "No saved profiles yet. Create one or capture the current live fleet."
@@ -787,6 +826,7 @@ public partial class ProfilesViewModel : ObservableObject, IDisposable
             var resolution = ShipRuleResolver.Resolve(profile, liveResult.Snapshot);
             lastPreparedProfile = resolution.EffectiveProfile;
             lastShipRuleMatchCount = resolution.Matches.Count;
+            lastShipRuleCapacitySkipCount = resolution.CapacitySkipped.Count;
             var plan = FleetPlanModeFilter.Apply(
                 FleetPlanner.Build(resolution.EffectiveProfile, liveResult.Snapshot),
                 SelectedRunMode);
@@ -862,6 +902,7 @@ public partial class ProfilesViewModel : ObservableObject, IDisposable
             }
 
             ShowOperation(result.Operation);
+            await ReloadOperationHistoryAsync();
             StatusMessage = result.UserMessage;
         }
         catch (Exception exception)
@@ -883,6 +924,8 @@ public partial class ProfilesViewModel : ObservableObject, IDisposable
             return;
         }
 
+        RaiseInvitationTimeoutAttention(operation);
+
         await RunOperationActionAsync(
             () => operationService.ContinueAsync(operation.Id),
             "Checking accepted invitations and current placements…");
@@ -899,9 +942,36 @@ public partial class ProfilesViewModel : ObservableObject, IDisposable
             return;
         }
 
+        RaiseInvitationTimeoutAttention(operation);
         await RunOperationActionAsync(
             () => operationService.ContinueAsync(operation.Id),
             "Automatically checking for accepted invitations…");
+    }
+
+    private void RaiseInvitationTimeoutAttention(FleetOperation operation)
+    {
+        if (inviteTimeoutRaisedForOperation == operation.Id)
+        {
+            return;
+        }
+
+        var waitingSince = operation.Steps
+            .Where(step => step.Type == FleetOperationStepType.Invite &&
+                step.State == FleetOperationStepState.Waiting)
+            .Select(step => step.UpdatedAtUtc)
+            .DefaultIfEmpty(operation.CreatedAtUtc)
+            .Min();
+        if (DateTimeOffset.UtcNow - waitingSince < TimeSpan.FromMinutes(InvitationTimeoutMinutes))
+        {
+            return;
+        }
+
+        inviteTimeoutRaisedForOperation = operation.Id;
+        AttentionRequested?.Invoke(
+            this,
+            new FleetAttentionEventArgs(
+                $"Invitations have been waiting for {InvitationTimeoutMinutes} minutes. Automatic safe checks will continue; inspect the listed clients when convenient.",
+                isUrgent: true));
     }
 
     [RelayCommand]
@@ -995,6 +1065,34 @@ public partial class ProfilesViewModel : ObservableObject, IDisposable
         HasRestoreSnapshot = false;
     }
 
+    [RelayCommand]
+    private async Task OpenHistoryOperationAsync(FleetOperationHistoryItemViewModel? item)
+    {
+        if (item is null || IsBusy)
+        {
+            return;
+        }
+
+        IsBusy = true;
+        try
+        {
+            var operation = await operationService.LoadAsync(item.Id);
+            if (operation is null)
+            {
+                StatusMessage = "That saved run is no longer available.";
+                await ReloadOperationHistoryAsync();
+                return;
+            }
+
+            ShowOperation(operation);
+            StatusMessage = $"Opened saved run from {operation.UpdatedAtUtc.ToLocalTime():g}.";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
     public async Task<bool> PrepareRestorePreviewAsync()
     {
         var operation = currentOperation;
@@ -1031,6 +1129,7 @@ public partial class ProfilesViewModel : ObservableObject, IDisposable
             };
             lastPreparedProfile = restoreProfile;
             lastShipRuleMatchCount = 0;
+            lastShipRuleCapacitySkipCount = 0;
             var plan = FleetPlanModeFilter.Apply(
                 FleetPlanner.Build(restoreProfile, liveResult.Snapshot),
                 FleetRunMode.FullOrganise);
@@ -1102,6 +1201,7 @@ public partial class ProfilesViewModel : ObservableObject, IDisposable
         };
         lastPreparedProfile = profile;
         lastShipRuleMatchCount = 0;
+        lastShipRuleCapacitySkipCount = 0;
         var plan = FleetPlanModeFilter.Apply(
             FleetPlanner.Build(profile, snapshot),
             FleetRunMode.PlacePresent);
@@ -1227,7 +1327,8 @@ public partial class ProfilesViewModel : ObservableObject, IDisposable
 
         var squadIds = wing.Squads.Select(squad => squad.Id).ToHashSet();
         if (Assignments.Any(assignment => squadIds.Contains(assignment.TargetSquadId)) ||
-            ShipRules.Any(rule => squadIds.Contains(rule.TargetSquadId)))
+            ShipRules.Any(rule => squadIds.Contains(rule.TargetSquadId) ||
+                (rule.OverflowSquadId is Guid overflowId && squadIds.Contains(overflowId))))
         {
             StatusMessage = "Move or remove characters and ship rules assigned to this wing before deleting it.";
             return;
@@ -1251,7 +1352,7 @@ public partial class ProfilesViewModel : ObservableObject, IDisposable
         }
 
         if (Assignments.Any(assignment => assignment.TargetSquadId == squad.Id) ||
-            ShipRules.Any(rule => rule.TargetSquadId == squad.Id))
+            ShipRules.Any(rule => rule.TargetSquadId == squad.Id || rule.OverflowSquadId == squad.Id))
         {
             StatusMessage = "Move or remove characters and ship rules assigned to this squad before deleting it.";
             return;
@@ -1277,13 +1378,29 @@ public partial class ProfilesViewModel : ObservableObject, IDisposable
         var rule = new ProfileShipRuleEditorViewModel(
             Guid.NewGuid(),
             string.Empty,
-            SquadOptions[0].Id);
+            SquadOptions[0].Id,
+            label: $"Ship group {ShipRules.Count + 1}");
         HookShipRule(rule);
         ShipRules.Add(rule);
         MarkEditorDirty();
         RefreshValidation();
         InvalidateDryRun();
-        StatusMessage = "Choose an exact EVE ship type and its destination squad.";
+        StatusMessage = "Add one or more exact ship types, then choose primary and optional overflow squads.";
+    }
+
+    [RelayCommand]
+    private void MoveShipRuleUp(ProfileShipRuleEditorViewModel? rule) => MoveShipRule(rule, -1);
+
+    [RelayCommand]
+    private void MoveShipRuleDown(ProfileShipRuleEditorViewModel? rule) => MoveShipRule(rule, 1);
+
+    [RelayCommand]
+    private void ClearShipRuleOverflow(ProfileShipRuleEditorViewModel? rule)
+    {
+        if (CanEdit && rule is not null)
+        {
+            rule.OverflowSquadId = null;
+        }
     }
 
     [RelayCommand]
@@ -1469,6 +1586,34 @@ public partial class ProfilesViewModel : ObservableObject, IDisposable
         }
     }
 
+    partial void OnFleetPollingSecondsChanged(int value) => SaveOperationalPreference(value is >= 15 and <= 300);
+
+    partial void OnInvitationCheckSecondsChanged(int value) => SaveOperationalPreference(value is >= 15 and <= 300);
+
+    partial void OnInvitationTimeoutMinutesChanged(int value) => SaveOperationalPreference(value is >= 1 and <= 120);
+
+    partial void OnStartMinimizedChanged(bool value)
+    {
+        _ = value;
+        SaveOperationalPreference(isValid: true);
+    }
+
+    partial void OnMinimizeToTrayChanged(bool value)
+    {
+        _ = value;
+        SaveOperationalPreference(isValid: true);
+    }
+
+    partial void OnSelectedThemeChanged(FleetDeskTheme value) => SaveOperationalPreference(Enum.IsDefined(value));
+
+    private void SaveOperationalPreference(bool isValid)
+    {
+        if (!isLoadingPreferences && isValid)
+        {
+            _ = SavePreferencesSafelyAsync();
+        }
+    }
+
     private async Task ReloadProfilesAsync(Guid? selectedProfileId)
     {
         var profiles = await repository.LoadAllAsync();
@@ -1516,6 +1661,12 @@ public partial class ProfilesViewModel : ObservableObject, IDisposable
                     .ToArray(),
                 RunMode = SelectedRunMode,
                 AttentionSoundsEnabled = AttentionSoundsEnabled,
+                FleetPollingSeconds = Math.Clamp(FleetPollingSeconds, 15, 300),
+                InvitationCheckSeconds = Math.Clamp(InvitationCheckSeconds, 15, 300),
+                InvitationTimeoutMinutes = Math.Clamp(InvitationTimeoutMinutes, 1, 120),
+                StartMinimized = StartMinimized,
+                MinimizeToTray = MinimizeToTray,
+                Theme = SelectedTheme,
             };
             await preferencesRepository.SaveAsync(preferences);
         }
@@ -1575,7 +1726,12 @@ public partial class ProfilesViewModel : ObservableObject, IDisposable
             var editor = new ProfileShipRuleEditorViewModel(
                 rule.Id,
                 rule.ShipTypeName,
-                rule.TargetSquadId);
+                rule.TargetSquadId,
+                rule.Label,
+                rule.OverflowSquadId,
+                rule.MaximumPerSquad,
+                rule.BalanceAcrossTargets,
+                rule.IsFallback);
             HookShipRule(editor);
             ShipRules.Add(editor);
         }
@@ -1657,7 +1813,14 @@ public partial class ProfilesViewModel : ObservableObject, IDisposable
                 rule.Id,
                 rule.ShipTypeName.Trim(),
                 rule.TargetSquadId,
-                ruleIndex)).ToArray(),
+                ruleIndex)
+            {
+                Label = rule.Label.Trim(),
+                OverflowSquadId = rule.OverflowSquadId,
+                MaximumPerSquad = rule.MaximumPerSquad,
+                BalanceAcrossTargets = rule.BalanceAcrossTargets,
+                IsFallback = rule.IsFallback,
+            }).ToArray(),
         };
 
     private void RefreshValidation()
@@ -1844,7 +2007,7 @@ public partial class ProfilesViewModel : ObservableObject, IDisposable
     private void UpdateObservedShipTypes(LiveFleetSnapshot snapshot)
     {
         var selectedShipNames = ShipRules
-            .Select(rule => rule.ShipTypeName.Trim())
+            .SelectMany(rule => ShipRuleResolver.ParseShipTypes(rule.ShipTypeName))
             .Where(name => name.Length > 0);
         var names = snapshot.Members
             .Select(member => member.ShipTypeName.Trim())
@@ -1870,6 +2033,19 @@ public partial class ProfilesViewModel : ObservableObject, IDisposable
 
         MoveItem(Wings, wing, offset);
         UpdateSquadOptions();
+        MarkEditorDirty();
+        RefreshValidation();
+        InvalidateDryRun();
+    }
+
+    private void MoveShipRule(ProfileShipRuleEditorViewModel? rule, int offset)
+    {
+        if (!CanEdit || rule is null)
+        {
+            return;
+        }
+
+        MoveItem(ShipRules, rule, offset);
         MarkEditorDirty();
         RefreshValidation();
         InvalidateDryRun();
@@ -2025,6 +2201,7 @@ public partial class ProfilesViewModel : ObservableObject, IDisposable
         lastDryRunPlan = null;
         lastPreparedProfile = null;
         lastShipRuleMatchCount = 0;
+        lastShipRuleCapacitySkipCount = 0;
         DryRunItems.Clear();
         HasDryRun = false;
         DryRunTitle = "No comparison generated.";
@@ -2041,11 +2218,14 @@ public partial class ProfilesViewModel : ObservableObject, IDisposable
             $"'{plan.ProfileName}' compared with fleet {plan.FleetId} • live state confirmed {confirmedAtUtc.ToLocalTime():t}";
         DryRunSummary = BuildDryRunSummary(plan);
         DryRunSafetyMessage = BuildDryRunSafetyMessage(plan);
-        ShipRuleMatchSummary = lastShipRuleMatchCount == 0
-            ? ShipRules.Count == 0
-                ? "No automatic ship placement rules are enabled."
-                : "No current live characters matched the saved ship rules."
-            : $"{lastShipRuleMatchCount} live character{(lastShipRuleMatchCount == 1 ? string.Empty : "s")} added to this preview by ship type.";
+        ShipRuleMatchSummary = ShipRules.Count == 0
+            ? "No automatic ship placement rules are enabled."
+            : lastShipRuleMatchCount == 0 && lastShipRuleCapacitySkipCount == 0
+                ? "No current live characters matched the saved ship rules."
+                : $"{lastShipRuleMatchCount} live character{(lastShipRuleMatchCount == 1 ? string.Empty : "s")} matched by ship policy" +
+                    (lastShipRuleCapacitySkipCount == 0
+                        ? "."
+                        : $" • {lastShipRuleCapacitySkipCount} left untouched because every configured target was full.");
         DryRunPrimaryMessage = plan.BlockingIssues > 0
             ? "This run needs attention before it can start"
             : plan.TotalChanges == 0
@@ -2065,6 +2245,7 @@ public partial class ProfilesViewModel : ObservableObject, IDisposable
         {
             var operation = await action();
             ShowOperation(operation);
+            await ReloadOperationHistoryAsync();
             StatusMessage = operation.Message ?? "Operation updated.";
         }
         catch (Exception exception)
@@ -2077,9 +2258,24 @@ public partial class ProfilesViewModel : ObservableObject, IDisposable
         }
     }
 
+    private async Task ReloadOperationHistoryAsync()
+    {
+        var operations = await operationService.LoadRecentAsync();
+        OperationHistory.Clear();
+        foreach (var operation in operations)
+        {
+            OperationHistory.Add(new FleetOperationHistoryItemViewModel(operation));
+        }
+    }
+
     private void ShowOperation(FleetOperation operation)
     {
         var previousState = currentOperation?.State;
+        if (currentOperation?.Id != operation.Id)
+        {
+            inviteTimeoutRaisedForOperation = null;
+        }
+
         currentOperation = operation;
         OperationItems.Clear();
         foreach (var step in operation.Steps.OrderBy(step => step.SortOrder))

@@ -9,7 +9,12 @@ public sealed class FleetProfileJsonSerializerTests
     public void ExportRoundTripPreservesHierarchyAssignmentsRolesAndTags()
     {
         var squadId = Guid.NewGuid();
-        var squads = new[] { new ProfileSquad(squadId, "Squad 1", 0) };
+        var overflowSquadId = Guid.NewGuid();
+        var squads = new[]
+        {
+            new ProfileSquad(squadId, "Squad 1", 0),
+            new ProfileSquad(overflowSquadId, "Squad 2", 1),
+        };
         var wings = new[] { new ProfileWing(Guid.NewGuid(), "Wing 1", 0, squads) };
         var tags = new[] { "logi" };
         var assignments = new[]
@@ -25,7 +30,16 @@ public sealed class FleetProfileJsonSerializerTests
         };
         var source = new FleetProfile(Guid.NewGuid(), "Doctrine Alpha", wings, assignments)
         {
-            ShipRules = [new(Guid.NewGuid(), "Basilisk", squadId, 0)],
+            ShipRules =
+            [
+                new(Guid.NewGuid(), "Basilisk, Scimitar", squadId, 0)
+                {
+                    Label = "Logistics",
+                    OverflowSquadId = overflowSquadId,
+                    MaximumPerSquad = 7,
+                    BalanceAcrossTargets = true,
+                },
+            ],
         };
 
         var json = FleetProfileJsonSerializer.Serialize(source);
@@ -39,8 +53,12 @@ public sealed class FleetProfileJsonSerializerTests
         Assert.Equal(DesiredFleetRole.SquadCommander, assignment.DesiredRole);
         Assert.Equal("logi", Assert.Single(assignment.Tags));
         var shipRule = Assert.Single(restored.ShipRules);
-        Assert.Equal("Basilisk", shipRule.ShipTypeName);
+        Assert.Equal("Basilisk, Scimitar", shipRule.ShipTypeName);
         Assert.Equal(squadId, shipRule.TargetSquadId);
+        Assert.Equal(overflowSquadId, shipRule.OverflowSquadId);
+        Assert.Equal("Logistics", shipRule.Label);
+        Assert.Equal(7, shipRule.MaximumPerSquad);
+        Assert.True(shipRule.BalanceAcrossTargets);
     }
 
     [Fact]

@@ -77,6 +77,42 @@ public sealed class FleetOperationRepositoryTests : IDisposable
             step => Assert.Equal(FleetOperationStepType.Place, step.Type));
     }
 
+    [Fact]
+    public async Task RecentHistoryIsNewestFirstAndHonoursLimit()
+    {
+        var paths = new TestAppDataPaths(testRoot);
+        var initializer = new SqliteDatabaseInitializer(
+            paths,
+            NullLogger<SqliteDatabaseInitializer>.Instance);
+        await initializer.InitializeAsync(CancellationToken.None);
+
+        var squadId = Guid.NewGuid();
+        var profile = new FleetProfile(
+            Guid.NewGuid(),
+            "History Fleet",
+            [new ProfileWing(Guid.NewGuid(), "Main", 0, [new ProfileSquad(squadId, "Squad 1", 0)])],
+            [new ProfileAssignment(9002, "Second Pilot", squadId, DesiredFleetRole.SquadMember)]);
+        await new FleetProfileRepository(paths, TimeProvider.System)
+            .SaveAsync(profile, CancellationToken.None);
+
+        var snapshot = CreateSnapshot();
+        var plan = FleetPlanner.Build(profile, snapshot);
+        var repository = new FleetOperationRepository(paths);
+        var oldest = FleetOperationFactory.Create(Guid.NewGuid(), profile, snapshot, plan, Now);
+        var middle = FleetOperationFactory.Create(Guid.NewGuid(), profile, snapshot, plan, Now.AddMinutes(1));
+        var newest = FleetOperationFactory.Create(Guid.NewGuid(), profile, snapshot, plan, Now.AddMinutes(2));
+        await repository.SaveAsync(oldest, snapshot, CancellationToken.None);
+        await repository.SaveAsync(middle, snapshot, CancellationToken.None);
+        await repository.SaveAsync(newest, snapshot, CancellationToken.None);
+
+        var recent = await repository.LoadRecentAsync(2, CancellationToken.None);
+
+        Assert.Collection(
+            recent,
+            operation => Assert.Equal(newest.Id, operation.Id),
+            operation => Assert.Equal(middle.Id, operation.Id));
+    }
+
     public void Dispose()
     {
         SqliteConnection.ClearAllPools();

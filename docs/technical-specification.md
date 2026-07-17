@@ -1,7 +1,7 @@
 # Fleet Organizer — Technical Specification
 
 **Status:** Approved implementation baseline
-**Revision:** 1.8
+**Revision:** 1.9
 **Reviewed:** 17 July 2026
 **Target:** Windows 11, local single-user desktop application
 **Working title:** Fleet Organizer (name can change without affecting the architecture)
@@ -45,10 +45,15 @@ Implemented and tested in the current repository:
 - A named invitation waiting room with a visible automatic-check countdown.
 - A staged Live Fleet Board for ordinary-member drag/drop, pending-change review, and one final confirmation through the existing durable engine.
 - Best-effort pre-run snapshot restore preview and in-app/Windows-sound attention notifications.
+- Searchable multi-select Live Fleet staging by character, ship, role, wing, or squad.
+- Ordered multi-ship policies with capacity, overflow, even balancing, and a final fallback rule.
+- Durable latest-50 run history with direct per-run reopening.
+- Configurable fleet/invitation polling and attention timeout, System/Light/Dark theme, and optional notification-tray operation.
+- Redacted diagnostics ZIP, typed local reset, manual stable-release checking, semantic versioning, and self-contained Windows release packaging.
 
 Milestone 5 keeps the complete write queue serialized. Structure create results are persisted before dependent naming/placement steps, interrupted creates are reconciled against the initial snapshot, and ambiguous outcomes require attention instead of blind duplication. Rename and commander writes are also verified from fresh live state.
 
-The FC workflow slice adds the repetitive-use interface around that engine: a guided Home launcher, remembered frequent templates, safe partial-run modes, plain-language review and operation phases, a live staging board, visual template squad cards, local multi-character drag/drop, exact ship placement rules, named automatic acceptance checks, restore previews, profile/roster filtering, recycling virtualization, filtered bulk selection, optional hierarchy editing, unsaved-change status, and keyboard shortcuts. Chronological history and redacted diagnostic export remain separate recovery slices; this UI checkpoint does not widen the ESI write boundary.
+The FC workflow slice adds the repetitive-use interface around that engine: a guided Home launcher, remembered frequent templates, safe partial-run modes, plain-language review and operation phases, a searchable/bulk live staging board, visual template squad cards, local multi-character drag/drop, ordered capacity-aware ship policies, named automatic acceptance checks, restore previews, durable history, redacted diagnostics, configurable polling/tray/theme preferences, recycling virtualization, optional hierarchy editing, unsaved-change status, and keyboard shortcuts. This UI checkpoint does not widen the ESI write boundary.
 
 ## 1. Executive decision
 
@@ -704,12 +709,14 @@ No Rust, Node.js, database server, Docker, IIS, or cloud account is required.
 - Multi-select drag/drop, ship placement rules, automatic invite-acceptance checks, snapshots, restore preview, activity history, diagnostic export, keyboard flows, tray behavior, sounds, and stale-state badges.
 - **Exit:** routine repeated use requires only profile choice, one click, and invite acceptance.
 
-**Implemented in the FC workflow slice:** frequent-template preferences, safe partial modes, template/live-board drag staging, ship rules, named acceptance waiting, capacity preflight, restore preview, keyboard flows, and attention sounds. Chronological history, redacted diagnostic export, and tray/minimize polish remain.
+**Implemented:** frequent-template preferences, safe partial modes, searchable multi-select template/live-board staging, priority/overflow/balanced/fallback ship policies, named acceptance waiting and timeout, capacity preflight, restore preview, durable chronological history, redacted diagnostic export, keyboard flows, theme/startup/tray preferences, and attention sounds.
 
 ### Milestone 7 — release hardening
 
 - Clean-machine package test, performance/accessibility pass, rate/network soak tests, ESI contract review, documentation, checksum, and release workflow.
 - **Exit:** self-contained Windows release meets all acceptance criteria.
+
+**Implemented in repository automation:** semantic version metadata, MIT license/changelog, self-contained single-file Windows x64 packaging, SHA-256 generation, CI artifact upload, a read-only manual/tag release-candidate workflow, a manual stable-release check, and explicit exclusion of developer-local configuration. Publishing a GitHub Release, code signing, installer packaging, and clean-machine/manual EVE acceptance remain explicit release-operator tasks.
 
 ## 16. MVP acceptance criteria
 
@@ -736,15 +743,15 @@ The MVP is complete when all statements below are true:
 - Live fleet numeric wing/squad IDs do not persist between fleets; profile mapping must be name/parent based.
 - Best-effort restore cannot reconstruct a fleet exactly if characters leave or the live hierarchy changes incompatibly.
 
-## 18. Open decisions that do not block coding
+## 18. Remaining release-operator decisions
 
 - Final product name, icon, and color accent.
-- Portable executable only versus signed installer for the first public handoff.
+- Portable ZIP only versus a signed installer for a later public handoff.
 - Whether profile import/export uses JSON only or also a simple CSV roster format.
-- Whether ship rules enter MVP or the first follow-up release; the architecture supports them either way.
-- Optional completion sounds and minimize-to-tray defaults.
+- Whether to purchase a Windows code-signing certificate.
+- Whether the first tag is a prerelease after the clean-machine/two-alt acceptance run.
 
-None of these changes the selected stack or core operation engine. They can be decided independently while Milestone 6 is implemented.
+None of these changes the selected stack or core operation engine.
 
 ## 19. Research sources
 
@@ -762,4 +769,4 @@ None of these changes the selected stack or core operation engine. They can be d
 
 ## 20. Current build checkpoint
 
-Milestones 0–5 and the FC workflow slice are implemented in the repository. The current live-write boundary includes safe structure creation/renaming, invitations, managed-member staging, and serialized squad/wing commander transitions with final verification. Frequent-template preferences, filtered quick-run modes, visual template and live-board drag/drop, exact ship placement rules, named automatic acceptance checks, capacity preflight, restore preview, and attention sounds are implemented without widening that boundary. Remaining recovery slices are chronological activity history and redacted diagnostics.
+Milestones 0–6 and the repository-side Milestone 7 packaging work are implemented. The current live-write boundary includes safe structure creation/renaming, invitations, managed-member staging, and serialized squad/wing commander transitions with final verification. Frequent-template preferences, filtered quick-run modes, searchable bulk staging, priority/overflow ship policies, named automatic acceptance checks, configurable timeouts/polling, capacity preflight, restore preview, durable history, redacted diagnostics, themes, tray mode, and attention sounds are implemented without widening that boundary. A signed installer and live clean-machine/two-alt acceptance remain release work rather than missing application behavior.

@@ -33,7 +33,7 @@ public sealed class SqliteDatabaseInitializerTests : IDisposable
             await command.ExecuteScalarAsync(CancellationToken.None),
             System.Globalization.CultureInfo.InvariantCulture);
 
-        Assert.Equal(3, version);
+        Assert.Equal(4, version);
 
         await using var columnCommand = connection.CreateCommand();
         columnCommand.CommandText =
@@ -50,6 +50,14 @@ public sealed class SqliteDatabaseInitializerTests : IDisposable
             await shipRuleTableCommand.ExecuteScalarAsync(CancellationToken.None),
             System.Globalization.CultureInfo.InvariantCulture);
         Assert.Equal(1, shipRuleTableCount);
+
+        await using var shipPolicyColumnCommand = connection.CreateCommand();
+        shipPolicyColumnCommand.CommandText =
+            "SELECT COUNT(*) FROM pragma_table_info('profile_ship_rules') WHERE name IN ('label', 'overflow_squad_id', 'max_per_squad', 'balance_targets', 'is_fallback');";
+        var shipPolicyColumnCount = Convert.ToInt64(
+            await shipPolicyColumnCommand.ExecuteScalarAsync(CancellationToken.None),
+            System.Globalization.CultureInfo.InvariantCulture);
+        Assert.Equal(5, shipPolicyColumnCount);
     }
 
     [Fact]
@@ -66,13 +74,13 @@ public sealed class SqliteDatabaseInitializerTests : IDisposable
         await using var connection = new SqliteConnection($"Data Source={paths.DatabasePath}");
         await connection.OpenAsync(CancellationToken.None);
         await using var command = connection.CreateCommand();
-        command.CommandText = "SELECT COUNT(*) FROM schema_migrations WHERE version IN (1, 2, 3);";
+        command.CommandText = "SELECT COUNT(*) FROM schema_migrations WHERE version IN (1, 2, 3, 4);";
 
         var migrationCount = Convert.ToInt64(
             await command.ExecuteScalarAsync(CancellationToken.None),
             System.Globalization.CultureInfo.InvariantCulture);
 
-        Assert.Equal(3, migrationCount);
+        Assert.Equal(4, migrationCount);
     }
 
     [Fact]
@@ -126,7 +134,7 @@ public sealed class SqliteDatabaseInitializerTests : IDisposable
         var version = Convert.ToInt64(
             await versionCommand.ExecuteScalarAsync(CancellationToken.None),
             System.Globalization.CultureInfo.InvariantCulture);
-        Assert.Equal(3, version);
+        Assert.Equal(4, version);
     }
 
     [Fact]

@@ -112,7 +112,7 @@ public sealed class ProfileValidatorTests
 
         var errors = ProfileValidator.Validate(profile);
 
-        Assert.Contains(errors, error => error.Code == "ship_rule.ship.duplicate");
+        Assert.Contains(errors, error => error.Code == "ship_rule.match.duplicate");
     }
 
     [Fact]
@@ -126,6 +126,56 @@ public sealed class ProfileValidatorTests
         var errors = ProfileValidator.Validate(profile);
 
         Assert.Contains(errors, error => error.Code == "ship_rule.squad.missing");
+    }
+
+    [Fact]
+    public void FallbackRuleMustBeUniqueAndLast()
+    {
+        var squadId = Guid.NewGuid();
+        var profile = new FleetProfile(
+            Guid.NewGuid(),
+            "Mining",
+            [new(Guid.NewGuid(), "Main", 0, [new(squadId, "Barges", 0)])],
+            [])
+        {
+            ShipRules =
+            [
+                new(Guid.NewGuid(), string.Empty, squadId, 0) { IsFallback = true },
+                new(Guid.NewGuid(), "Hulk", squadId, 1),
+                new(Guid.NewGuid(), string.Empty, squadId, 2) { IsFallback = true },
+            ],
+        };
+
+        var errors = ProfileValidator.Validate(profile);
+
+        Assert.Contains(errors, error => error.Code == "ship_rule.fallback.order");
+        Assert.Contains(errors, error => error.Code == "ship_rule.fallback.duplicate");
+    }
+
+    [Fact]
+    public void ShipPolicyCapacityAndOverflowAreValidated()
+    {
+        var squadId = Guid.NewGuid();
+        var profile = new FleetProfile(
+            Guid.NewGuid(),
+            "Mining",
+            [new(Guid.NewGuid(), "Main", 0, [new(squadId, "Barges", 0)])],
+            [])
+        {
+            ShipRules =
+            [
+                new(Guid.NewGuid(), "Hulk, Mackinaw", squadId, 0)
+                {
+                    MaximumPerSquad = 11,
+                    OverflowSquadId = squadId,
+                },
+            ],
+        };
+
+        var errors = ProfileValidator.Validate(profile);
+
+        Assert.Contains(errors, error => error.Code == "ship_rule.capacity.invalid");
+        Assert.Contains(errors, error => error.Code == "ship_rule.overflow.invalid");
     }
 
     [Fact]

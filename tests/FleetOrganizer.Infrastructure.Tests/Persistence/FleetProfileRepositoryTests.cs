@@ -23,7 +23,12 @@ public sealed class FleetProfileRepositoryTests : IDisposable
         await initializer.InitializeAsync(CancellationToken.None);
         var repository = new FleetProfileRepository(paths, TimeProvider.System);
         var squadId = Guid.NewGuid();
-        var squads = new[] { new ProfileSquad(squadId, "Squad 1", 0) };
+        var overflowSquadId = Guid.NewGuid();
+        var squads = new[]
+        {
+            new ProfileSquad(squadId, "Squad 1", 0),
+            new ProfileSquad(overflowSquadId, "Squad 2", 1),
+        };
         var wings = new[] { new ProfileWing(Guid.NewGuid(), "Wing 1", 0, squads) };
         var tags = new[] { "logi", "anchor" };
         var assignments = new[]
@@ -43,7 +48,17 @@ public sealed class FleetProfileRepositoryTests : IDisposable
             wings,
             assignments)
         {
-            ShipRules = [new(Guid.NewGuid(), "Basilisk", squadId, 0)],
+            ShipRules =
+            [
+                new(Guid.NewGuid(), "Basilisk, Scimitar", squadId, 0)
+                {
+                    Label = "Logistics",
+                    OverflowSquadId = overflowSquadId,
+                    MaximumPerSquad = 7,
+                    BalanceAcrossTargets = true,
+                    IsFallback = false,
+                },
+            ],
         };
 
         await repository.SaveAsync(profile, CancellationToken.None);
@@ -60,8 +75,13 @@ public sealed class FleetProfileRepositoryTests : IDisposable
             tag => Assert.Equal("logi", tag),
             tag => Assert.Equal("anchor", tag));
         var loadedRule = Assert.Single(loaded.ShipRules);
-        Assert.Equal("Basilisk", loadedRule.ShipTypeName);
+        Assert.Equal("Basilisk, Scimitar", loadedRule.ShipTypeName);
         Assert.Equal(squadId, loadedRule.TargetSquadId);
+        Assert.Equal("Logistics", loadedRule.Label);
+        Assert.Equal(overflowSquadId, loadedRule.OverflowSquadId);
+        Assert.Equal(7, loadedRule.MaximumPerSquad);
+        Assert.True(loadedRule.BalanceAcrossTargets);
+        Assert.False(loadedRule.IsFallback);
 
         var renamed = profile with { Name = "Doctrine Bravo" };
         await repository.SaveAsync(renamed, CancellationToken.None);

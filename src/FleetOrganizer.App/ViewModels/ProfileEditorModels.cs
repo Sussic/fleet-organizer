@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using FleetOrganizer.Core.Domain;
 using FleetOrganizer.Core.Operations;
 using FleetOrganizer.Core.Planning;
+using FleetOrganizer.Core.Profiles;
 
 namespace FleetOrganizer.App.ViewModels;
 
@@ -99,7 +100,12 @@ public sealed record ProfileSquadOptionViewModel(Guid Id, string DisplayName);
 public sealed partial class ProfileShipRuleEditorViewModel(
     Guid id,
     string shipTypeName,
-    Guid targetSquadId) : ObservableObject
+    Guid targetSquadId,
+    string label = "",
+    Guid? overflowSquadId = null,
+    int maximumPerSquad = 10,
+    bool balanceAcrossTargets = false,
+    bool isFallback = false) : ObservableObject
 {
     public Guid Id { get; } = id;
 
@@ -108,6 +114,41 @@ public sealed partial class ProfileShipRuleEditorViewModel(
 
     [ObservableProperty]
     public partial Guid TargetSquadId { get; set; } = targetSquadId;
+
+    [ObservableProperty]
+    public partial string Label { get; set; } = label;
+
+    [ObservableProperty]
+    public partial Guid? OverflowSquadId { get; set; } = overflowSquadId;
+
+    [ObservableProperty]
+    public partial int MaximumPerSquad { get; set; } = maximumPerSquad;
+
+    [ObservableProperty]
+    public partial bool BalanceAcrossTargets { get; set; } = balanceAcrossTargets;
+
+    [ObservableProperty]
+    public partial bool IsFallback { get; set; } = isFallback;
+}
+
+public sealed record FleetOperationHistoryItemViewModel(FleetOperation Operation)
+{
+    public Guid Id => Operation.Id;
+
+    public string Title => $"{Operation.ProfileName} • fleet {Operation.FleetId}";
+
+    public string When => Operation.UpdatedAtUtc.ToLocalTime().ToString("g", System.Globalization.CultureInfo.CurrentCulture);
+
+    public string Status => Operation.State switch
+    {
+        OperationState.Complete => "Completed",
+        OperationState.Cancelled => "Cancelled",
+        OperationState.NeedsAttention => "Needs attention",
+        _ => Operation.State.ToString(),
+    };
+
+    public string Summary =>
+        $"{Operation.SucceededSteps} succeeded • {Operation.FailedSteps} failed • {Operation.SkippedSteps} skipped";
 }
 
 public sealed record DesiredRoleOptionViewModel(DesiredFleetRole Value, string DisplayName);
@@ -116,6 +157,8 @@ public sealed record FleetRunModeOptionViewModel(
     FleetRunMode Value,
     string DisplayName,
     string Description);
+
+public sealed record ThemeOptionViewModel(FleetDeskTheme Value, string DisplayName);
 
 public sealed record WaitingCharacterViewModel(
     long CharacterId,

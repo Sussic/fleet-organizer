@@ -36,4 +36,15 @@ public sealed record ProfileShipRule(
     Guid Id,
     string ShipTypeName,
     Guid TargetSquadId,
-    int SortOrder);
+    int SortOrder)
+{
+    public string Label { get; init; } = string.Empty;
+
+    public Guid? OverflowSquadId { get; init; }
+
+    public int MaximumPerSquad { get; init; } = 10;
+
+    public bool BalanceAcrossTargets { get; init; }
+
+    public bool IsFallback { get; init; }
+}

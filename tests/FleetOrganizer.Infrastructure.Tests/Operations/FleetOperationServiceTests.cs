@@ -428,6 +428,15 @@ public sealed class FleetOperationServiceTests
             return Task.FromResult(operation is { IsTerminal: false } ? operation : null);
         }
 
+        public Task<FleetOperation[]> LoadRecentAsync(
+            int maximumCount,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            _ = maximumCount;
+            return Task.FromResult(operation is null ? [] : new[] { operation });
+        }
+
         public Task<LiveFleetSnapshot?> LoadInitialSnapshotAsync(
             Guid operationId,
             CancellationToken cancellationToken = default)

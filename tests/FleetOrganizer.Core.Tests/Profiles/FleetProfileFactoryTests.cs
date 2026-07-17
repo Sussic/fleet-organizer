@@ -57,7 +57,12 @@ public sealed class FleetProfileFactoryTests
     public void DuplicateCreatesIndependentIdsAndPreservesRosterTags()
     {
         var squadId = Guid.NewGuid();
-        var squads = new[] { new ProfileSquad(squadId, "Squad 1", 0) };
+        var overflowSquadId = Guid.NewGuid();
+        var squads = new[]
+        {
+            new ProfileSquad(squadId, "Squad 1", 0),
+            new ProfileSquad(overflowSquadId, "Squad 2", 1),
+        };
         var wings = new[] { new ProfileWing(Guid.NewGuid(), "Wing 1", 0, squads) };
         var tags = new[] { "logi", "anchor" };
         var assignments = new[]
@@ -73,7 +78,16 @@ public sealed class FleetProfileFactoryTests
         };
         var source = new FleetProfile(Guid.NewGuid(), "Source", wings, assignments)
         {
-            ShipRules = [new(Guid.NewGuid(), "Basilisk", squadId, 0)],
+            ShipRules =
+            [
+                new(Guid.NewGuid(), "Basilisk, Scimitar", squadId, 0)
+                {
+                    Label = "Logistics",
+                    OverflowSquadId = overflowSquadId,
+                    MaximumPerSquad = 7,
+                    BalanceAcrossTargets = true,
+                },
+            ],
         };
 
         var duplicate = FleetProfileFactory.Duplicate(source, "Source Copy");
@@ -88,8 +102,12 @@ public sealed class FleetProfileFactoryTests
             tag => Assert.Equal("logi", tag),
             tag => Assert.Equal("anchor", tag));
         var shipRule = Assert.Single(duplicate.ShipRules);
-        Assert.Equal("Basilisk", shipRule.ShipTypeName);
+        Assert.Equal("Basilisk, Scimitar", shipRule.ShipTypeName);
         Assert.Equal(duplicate.Wings[0].Squads[0].Id, shipRule.TargetSquadId);
+        Assert.Equal(duplicate.Wings[0].Squads[1].Id, shipRule.OverflowSquadId);
+        Assert.Equal("Logistics", shipRule.Label);
+        Assert.Equal(7, shipRule.MaximumPerSquad);
+        Assert.True(shipRule.BalanceAcrossTargets);
         Assert.NotEqual(source.ShipRules[0].Id, shipRule.Id);
     }
 

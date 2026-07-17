@@ -230,7 +230,7 @@ internal sealed class FleetProfileRepository(
     {
         await using var command = connection.CreateCommand();
         command.CommandText =
-            "SELECT id, ship_type_name, target_squad_id, sort_order FROM profile_ship_rules WHERE profile_id = $profileId ORDER BY sort_order, ship_type_name COLLATE NOCASE;";
+            "SELECT id, ship_type_name, target_squad_id, sort_order, label, overflow_squad_id, max_per_squad, balance_targets, is_fallback FROM profile_ship_rules WHERE profile_id = $profileId ORDER BY sort_order, ship_type_name COLLATE NOCASE;";
         command.Parameters.AddWithValue("$profileId", profile.Id.ToString("D"));
         await using var reader = await command
             .ExecuteReaderAsync(cancellationToken)
@@ -241,7 +241,14 @@ internal sealed class FleetProfileRepository(
                 Guid.Parse(reader.GetString(0)),
                 reader.GetString(1),
                 Guid.Parse(reader.GetString(2)),
-                reader.GetInt32(3)));
+                reader.GetInt32(3))
+            {
+                Label = reader.GetString(4),
+                OverflowSquadId = reader.IsDBNull(5) ? null : Guid.Parse(reader.GetString(5)),
+                MaximumPerSquad = reader.GetInt32(6),
+                BalanceAcrossTargets = reader.GetInt32(7) != 0,
+                IsFallback = reader.GetInt32(8) != 0,
+            });
         }
     }
 
@@ -379,14 +386,28 @@ internal sealed class FleetProfileRepository(
                     profile_id,
                     ship_type_name,
                     target_squad_id,
-                    sort_order)
-                VALUES ($id, $profileId, $shipTypeName, $targetSquadId, $sortOrder);
+                    sort_order,
+                    label,
+                    overflow_squad_id,
+                    max_per_squad,
+                    balance_targets,
+                    is_fallback)
+                VALUES ($id, $profileId, $shipTypeName, $targetSquadId, $sortOrder, $label, $overflowSquadId, $maxPerSquad, $balanceTargets, $isFallback);
                 """;
             command.Parameters.AddWithValue("$id", rule.Id.ToString("D"));
             command.Parameters.AddWithValue("$profileId", profile.Id.ToString("D"));
             command.Parameters.AddWithValue("$shipTypeName", rule.ShipTypeName.Trim());
             command.Parameters.AddWithValue("$targetSquadId", rule.TargetSquadId.ToString("D"));
             command.Parameters.AddWithValue("$sortOrder", ruleIndex);
+            command.Parameters.AddWithValue("$label", rule.Label.Trim());
+            command.Parameters.AddWithValue(
+                "$overflowSquadId",
+                rule.OverflowSquadId is Guid overflowSquadId
+                    ? overflowSquadId.ToString("D")
+                    : DBNull.Value);
+            command.Parameters.AddWithValue("$maxPerSquad", rule.MaximumPerSquad);
+            command.Parameters.AddWithValue("$balanceTargets", rule.BalanceAcrossTargets ? 1 : 0);
+            command.Parameters.AddWithValue("$isFallback", rule.IsFallback ? 1 : 0);
             await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         }
     }

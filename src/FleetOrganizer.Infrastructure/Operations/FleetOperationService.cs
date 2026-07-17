@@ -35,6 +35,16 @@ internal sealed class FleetOperationService : IFleetOperationService, IDisposabl
         CancellationToken cancellationToken = default) =>
         repository.LoadLatestResumableAsync(cancellationToken);
 
+    public Task<FleetOperation?> LoadAsync(
+        Guid operationId,
+        CancellationToken cancellationToken = default) =>
+        repository.LoadAsync(operationId, cancellationToken);
+
+    public Task<FleetOperation[]> LoadRecentAsync(
+        int maximumCount = 50,
+        CancellationToken cancellationToken = default) =>
+        repository.LoadRecentAsync(maximumCount, cancellationToken);
+
     public Task<LiveFleetSnapshot?> LoadInitialSnapshotAsync(
         Guid operationId,
         CancellationToken cancellationToken = default) =>

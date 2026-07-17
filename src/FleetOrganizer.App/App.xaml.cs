@@ -52,10 +52,10 @@ public partial class App : Application
             await databaseInitializer.InitializeAsync();
 
             var mainWindow = host.Services.GetRequiredService<MainWindow>();
-            mainWindow.Show();
-
             var viewModel = host.Services.GetRequiredService<MainWindowViewModel>();
             await viewModel.InitializeAsync();
+            mainWindow.Show();
+            mainWindow.ApplyStartupPreferences();
         }
         catch (Exception exception)
         {

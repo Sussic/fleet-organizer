@@ -236,25 +236,58 @@ public static class ProfileValidator
             .SelectMany(wing => wing.Squads)
             .Select(squad => squad.Id)
             .ToHashSet();
-        var shipTypeNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var fallbackCount = 0;
+        var ruleKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         for (var ruleIndex = 0; ruleIndex < profile.ShipRules.Count; ruleIndex++)
         {
             var rule = profile.ShipRules[ruleIndex];
             var rulePath = $"profile.shipRules[{ruleIndex}]";
-            if (string.IsNullOrWhiteSpace(rule.ShipTypeName))
+            var shipTypes = ShipRuleResolver.ParseShipTypes(rule.ShipTypeName);
+            var ruleKey = rule.IsFallback
+                ? "<fallback>"
+                : string.Join(",", shipTypes.OrderBy(name => name, StringComparer.OrdinalIgnoreCase));
+            if (!ruleKeys.Add(ruleKey))
+            {
+                errors.Add(new(
+                    "ship_rule.match.duplicate",
+                    "Two ship rules have the same match set. Combine them or change their priority targets.",
+                    rulePath));
+            }
+
+            if (rule.IsFallback)
+            {
+                fallbackCount++;
+                if (fallbackCount > 1)
+                {
+                    errors.Add(new(
+                        "ship_rule.fallback.duplicate",
+                        "A profile can have only one fallback ship rule.",
+                        rulePath));
+                }
+
+                if (ruleIndex != profile.ShipRules.Count - 1)
+                {
+                    errors.Add(new(
+                        "ship_rule.fallback.order",
+                        "The fallback ship rule must be last so it cannot hide later policies.",
+                        rulePath));
+                }
+            }
+            else if (shipTypes.Length == 0)
             {
                 errors.Add(new(
                     "ship_rule.ship.required",
-                    "Choose an exact ship type for each automatic placement rule.",
+                    "Add one or more exact ship types, separated by commas.",
                     $"{rulePath}.shipTypeName"));
             }
-            else if (!shipTypeNames.Add(rule.ShipTypeName.Trim()))
+
+            if (rule.MaximumPerSquad is < 1 or > MaximumCharactersPerSquad)
             {
                 errors.Add(new(
-                    "ship_rule.ship.duplicate",
-                    $"Ship type '{rule.ShipTypeName}' has more than one placement rule.",
-                    $"{rulePath}.shipTypeName"));
+                    "ship_rule.capacity.invalid",
+                    $"Ship-rule capacity must be between 1 and {MaximumCharactersPerSquad}.",
+                    $"{rulePath}.maximumPerSquad"));
             }
 
             if (!squadIds.Contains(rule.TargetSquadId))
@@ -263,6 +296,15 @@ public static class ProfileValidator
                     "ship_rule.squad.missing",
                     $"The rule for '{rule.ShipTypeName}' targets a squad that is not in this profile.",
                     $"{rulePath}.targetSquadId"));
+            }
+
+            if (rule.OverflowSquadId is Guid overflowSquadId &&
+                (!squadIds.Contains(overflowSquadId) || overflowSquadId == rule.TargetSquadId))
+            {
+                errors.Add(new(
+                    "ship_rule.overflow.invalid",
+                    "Choose a different existing squad for overflow/balancing.",
+                    $"{rulePath}.overflowSquadId"));
             }
         }
     }

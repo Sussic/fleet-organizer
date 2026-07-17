@@ -100,6 +100,22 @@ public sealed class MainWindowXamlTests
         Assert.Contains("ClearStagedLiveMovesCommand", xaml, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void FcScaleAndMaintenanceControlsAreVisible()
+    {
+        var xaml = ReadMainWindowXaml();
+
+        Assert.Contains("LiveFleetSearchText", xaml, StringComparison.Ordinal);
+        Assert.Contains("SelectAllVisibleLiveMembersCommand", xaml, StringComparison.Ordinal);
+        Assert.Contains("StageSelectedLiveMembersCommand", xaml, StringComparison.Ordinal);
+        Assert.Contains("Profiles.OperationHistory", xaml, StringComparison.Ordinal);
+        Assert.Contains("Profiles.MoveShipRuleUpCommand", xaml, StringComparison.Ordinal);
+        Assert.Contains("Profiles.InvitationTimeoutMinutes", xaml, StringComparison.Ordinal);
+        Assert.Contains("ExportDiagnosticsCommand", xaml, StringComparison.Ordinal);
+        Assert.Contains("CheckForUpdatesCommand", xaml, StringComparison.Ordinal);
+        Assert.Contains("ResetLocalDataCommand", xaml, StringComparison.Ordinal);
+    }
+
     private static string ReadMainWindowXaml()
     {
         var xamlPath = Path.Combine(

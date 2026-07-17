@@ -8,7 +8,7 @@ public sealed partial class SqliteDatabaseInitializer(
     IAppDataPaths paths,
     ILogger<SqliteDatabaseInitializer> logger)
 {
-    private const long CurrentSchemaVersion = 3;
+    private const long CurrentSchemaVersion = 4;
 
     static SqliteDatabaseInitializer()
     {
@@ -68,6 +68,12 @@ public sealed partial class SqliteDatabaseInitializer(
         {
             ApplyVersionThree(connection);
             LogMigrationApplied(logger, 3);
+        }
+
+        if (currentVersion < 4)
+        {
+            ApplyVersionFour(connection);
+            LogMigrationApplied(logger, 4);
         }
 
         LogDatabaseReady(logger, CurrentSchemaVersion);
@@ -150,6 +156,27 @@ public sealed partial class SqliteDatabaseInitializer(
         migrationCommand.CommandText =
             "INSERT INTO schema_migrations (version, applied_utc) VALUES ($version, $appliedUtc);";
         migrationCommand.Parameters.AddWithValue("$version", 3);
+        migrationCommand.Parameters.AddWithValue(
+            "$appliedUtc",
+            DateTimeOffset.UtcNow.ToString("O", System.Globalization.CultureInfo.InvariantCulture));
+        migrationCommand.ExecuteNonQuery();
+
+        transaction.Commit();
+    }
+
+    private static void ApplyVersionFour(SqliteConnection connection)
+    {
+        using var transaction = connection.BeginTransaction();
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = VersionFourSql;
+        command.ExecuteNonQuery();
+
+        using var migrationCommand = connection.CreateCommand();
+        migrationCommand.Transaction = transaction;
+        migrationCommand.CommandText =
+            "INSERT INTO schema_migrations (version, applied_utc) VALUES ($version, $appliedUtc);";
+        migrationCommand.Parameters.AddWithValue("$version", 4);
         migrationCommand.Parameters.AddWithValue(
             "$appliedUtc",
             DateTimeOffset.UtcNow.ToString("O", System.Globalization.CultureInfo.InvariantCulture));
@@ -312,5 +339,23 @@ public sealed partial class SqliteDatabaseInitializer(
 
         CREATE INDEX ix_profile_ship_rules_profile_sort
             ON profile_ship_rules(profile_id, sort_order);
+        """;
+
+    private const string VersionFourSql =
+        """
+        ALTER TABLE profile_ship_rules
+            ADD COLUMN label TEXT NOT NULL DEFAULT '';
+
+        ALTER TABLE profile_ship_rules
+            ADD COLUMN overflow_squad_id TEXT NULL;
+
+        ALTER TABLE profile_ship_rules
+            ADD COLUMN max_per_squad INTEGER NOT NULL DEFAULT 10;
+
+        ALTER TABLE profile_ship_rules
+            ADD COLUMN balance_targets INTEGER NOT NULL DEFAULT 0;
+
+        ALTER TABLE profile_ship_rules
+            ADD COLUMN is_fallback INTEGER NOT NULL DEFAULT 0;
         """;
 }

@@ -32,6 +32,12 @@ public sealed class FleetDeskPreferencesRepositoryTests : IDisposable
             PinnedProfileIds = [defaultId, pinnedId],
             RunMode = FleetRunMode.PlacePresent,
             AttentionSoundsEnabled = false,
+            FleetPollingSeconds = 45,
+            InvitationCheckSeconds = 20,
+            InvitationTimeoutMinutes = 8,
+            StartMinimized = true,
+            MinimizeToTray = true,
+            Theme = FleetDeskTheme.Dark,
         };
 
         await repository.SaveAsync(preferences, CancellationToken.None);
@@ -42,6 +48,12 @@ public sealed class FleetDeskPreferencesRepositoryTests : IDisposable
         Assert.Equal(FleetRunMode.PlacePresent, loaded.RunMode);
         Assert.False(loaded.AttentionSoundsEnabled);
         Assert.Equal([defaultId, pinnedId], loaded.PinnedProfileIds);
+        Assert.Equal(45, loaded.FleetPollingSeconds);
+        Assert.Equal(20, loaded.InvitationCheckSeconds);
+        Assert.Equal(8, loaded.InvitationTimeoutMinutes);
+        Assert.True(loaded.StartMinimized);
+        Assert.True(loaded.MinimizeToTray);
+        Assert.Equal(FleetDeskTheme.Dark, loaded.Theme);
     }
 
     public void Dispose()

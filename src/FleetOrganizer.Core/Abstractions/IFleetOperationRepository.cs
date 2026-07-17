@@ -12,6 +12,10 @@ public interface IFleetOperationRepository
     Task<FleetOperation?> LoadLatestResumableAsync(
         CancellationToken cancellationToken = default);
 
+    Task<FleetOperation[]> LoadRecentAsync(
+        int maximumCount,
+        CancellationToken cancellationToken = default);
+
     Task<LiveFleetSnapshot?> LoadInitialSnapshotAsync(
         Guid operationId,
         CancellationToken cancellationToken = default);
