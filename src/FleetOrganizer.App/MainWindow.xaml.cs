@@ -13,7 +13,7 @@ using Point = System.Windows.Point;
 
 namespace FleetOrganizer.App;
 
-public partial class MainWindow : Window
+public sealed partial class MainWindow : Window, IDisposable
 {
     private const string AssignmentDragFormat = "FleetOrganizer.ProfileAssignment";
     private const string LiveMemberDragFormat = "FleetOrganizer.LiveFleetMember";
@@ -22,6 +22,7 @@ public partial class MainWindow : Window
     private readonly Forms.ContextMenuStrip trayMenu;
     private Point dragStartPoint;
     private bool isExplicitExit;
+    private bool isDisposed;
 
     public MainWindow(MainWindowViewModel viewModel)
     {
@@ -83,11 +84,23 @@ public partial class MainWindow : Window
 
     protected override void OnClosed(EventArgs e)
     {
+        Dispose();
+        base.OnClosed(e);
+    }
+
+    public void Dispose()
+    {
+        if (isDisposed)
+        {
+            return;
+        }
+
+        isDisposed = true;
         viewModel.Profiles.PropertyChanged -= OnProfilePreferencesChanged;
         trayIcon.Visible = false;
         trayIcon.Dispose();
         trayMenu.Dispose();
-        base.OnClosed(e);
+        GC.SuppressFinalize(this);
     }
 
     private void OnTrayIconDoubleClick(object? sender, EventArgs e)
@@ -126,12 +139,6 @@ public partial class MainWindow : Window
     {
         var useDark = theme == FleetDeskTheme.Dark ||
             (theme == FleetDeskTheme.System && WindowsUsesDarkTheme());
-        Application.Current.ThemeMode = theme switch
-        {
-            FleetDeskTheme.Dark => ThemeMode.Dark,
-            FleetDeskTheme.Light => ThemeMode.Light,
-            _ => ThemeMode.System,
-        };
         SetBrush("AppBackgroundBrush", useDark ? "#0B1220" : "#F4F7FB");
         SetBrush("SurfaceBrush", useDark ? "#151E2E" : "#FFFFFF");
         SetBrush("SurfaceAltBrush", useDark ? "#1B2638" : "#F7F9FC");
