@@ -51,6 +51,7 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(PageSubtitle))]
+    [NotifyPropertyChangedFor(nameof(PageTitle))]
     public partial string SelectedPage { get; set; } = "Home";
 
     [ObservableProperty]
@@ -113,6 +114,13 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         "Activity" => "See what the current run needs next, then open per-step recovery details.",
         "Settings" => "Configure EVE SSO, storage, polling, and appearance.",
         _ => string.Empty,
+    };
+
+    public string PageTitle => SelectedPage switch
+    {
+        "Profiles" => "Fleet templates",
+        "Activity" => "Current run",
+        _ => SelectedPage,
     };
 
     public ProfilesViewModel Profiles { get; }
@@ -336,8 +344,14 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
 
     private async void OnFleetRefreshTimerTick(object? sender, EventArgs e)
     {
-        if (isFleetPollingEnabled &&
-            string.Equals(SelectedPage, "Live Fleet", StringComparison.Ordinal) &&
+        if (!isFleetPollingEnabled)
+        {
+            return;
+        }
+
+        await Profiles.AutoContinueOperationAsync();
+
+        if (string.Equals(SelectedPage, "Live Fleet", StringComparison.Ordinal) &&
             CanRefreshFleet())
         {
             await RefreshFleetAsync();

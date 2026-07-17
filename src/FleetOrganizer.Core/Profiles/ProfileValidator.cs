@@ -22,6 +22,7 @@ public static class ProfileValidator
 
         ValidateWings(profile.Wings, errors);
         ValidateAssignments(profile, errors);
+        ValidateShipRules(profile, errors);
 
         return errors;
     }
@@ -179,6 +180,45 @@ public static class ProfileValidator
                 default:
                     throw new InvalidOperationException(
                         $"Assignment for character {assignment.CharacterId} has unknown desired fleet role '{assignment.DesiredRole}'.");
+            }
+        }
+    }
+
+    private static void ValidateShipRules(
+        FleetProfile profile,
+        List<ProfileValidationError> errors)
+    {
+        var squadIds = profile.Wings
+            .SelectMany(wing => wing.Squads)
+            .Select(squad => squad.Id)
+            .ToHashSet();
+        var shipTypeNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        for (var ruleIndex = 0; ruleIndex < profile.ShipRules.Count; ruleIndex++)
+        {
+            var rule = profile.ShipRules[ruleIndex];
+            var rulePath = $"profile.shipRules[{ruleIndex}]";
+            if (string.IsNullOrWhiteSpace(rule.ShipTypeName))
+            {
+                errors.Add(new(
+                    "ship_rule.ship.required",
+                    "Choose an exact ship type for each automatic placement rule.",
+                    $"{rulePath}.shipTypeName"));
+            }
+            else if (!shipTypeNames.Add(rule.ShipTypeName.Trim()))
+            {
+                errors.Add(new(
+                    "ship_rule.ship.duplicate",
+                    $"Ship type '{rule.ShipTypeName}' has more than one placement rule.",
+                    $"{rulePath}.shipTypeName"));
+            }
+
+            if (!squadIds.Contains(rule.TargetSquadId))
+            {
+                errors.Add(new(
+                    "ship_rule.squad.missing",
+                    $"The rule for '{rule.ShipTypeName}' targets a squad that is not in this profile.",
+                    $"{rulePath}.targetSquadId"));
             }
         }
     }

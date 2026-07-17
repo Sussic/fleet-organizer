@@ -33,7 +33,7 @@ public sealed class SqliteDatabaseInitializerTests : IDisposable
             await command.ExecuteScalarAsync(CancellationToken.None),
             System.Globalization.CultureInfo.InvariantCulture);
 
-        Assert.Equal(2, version);
+        Assert.Equal(3, version);
 
         await using var columnCommand = connection.CreateCommand();
         columnCommand.CommandText =
@@ -42,6 +42,14 @@ public sealed class SqliteDatabaseInitializerTests : IDisposable
             await columnCommand.ExecuteScalarAsync(CancellationToken.None),
             System.Globalization.CultureInfo.InvariantCulture);
         Assert.Equal(3, operationColumnCount);
+
+        await using var shipRuleTableCommand = connection.CreateCommand();
+        shipRuleTableCommand.CommandText =
+            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'profile_ship_rules';";
+        var shipRuleTableCount = Convert.ToInt64(
+            await shipRuleTableCommand.ExecuteScalarAsync(CancellationToken.None),
+            System.Globalization.CultureInfo.InvariantCulture);
+        Assert.Equal(1, shipRuleTableCount);
     }
 
     [Fact]
@@ -58,17 +66,17 @@ public sealed class SqliteDatabaseInitializerTests : IDisposable
         await using var connection = new SqliteConnection($"Data Source={paths.DatabasePath}");
         await connection.OpenAsync(CancellationToken.None);
         await using var command = connection.CreateCommand();
-        command.CommandText = "SELECT COUNT(*) FROM schema_migrations WHERE version IN (1, 2);";
+        command.CommandText = "SELECT COUNT(*) FROM schema_migrations WHERE version IN (1, 2, 3);";
 
         var migrationCount = Convert.ToInt64(
             await command.ExecuteScalarAsync(CancellationToken.None),
             System.Globalization.CultureInfo.InvariantCulture);
 
-        Assert.Equal(2, migrationCount);
+        Assert.Equal(3, migrationCount);
     }
 
     [Fact]
-    public async Task ExistingVersionOneDatabaseUpgradesToVersionTwo()
+    public async Task ExistingVersionOneDatabaseUpgradesToCurrentVersion()
     {
         var paths = new TestAppDataPaths(testRoot);
         Directory.CreateDirectory(paths.RootDirectory);
@@ -118,7 +126,7 @@ public sealed class SqliteDatabaseInitializerTests : IDisposable
         var version = Convert.ToInt64(
             await versionCommand.ExecuteScalarAsync(CancellationToken.None),
             System.Globalization.CultureInfo.InvariantCulture);
-        Assert.Equal(2, version);
+        Assert.Equal(3, version);
     }
 
     [Fact]

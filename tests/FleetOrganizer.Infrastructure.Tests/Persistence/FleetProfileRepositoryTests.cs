@@ -41,7 +41,10 @@ public sealed class FleetProfileRepositoryTests : IDisposable
             Guid.NewGuid(),
             "Doctrine Alpha",
             wings,
-            assignments);
+            assignments)
+        {
+            ShipRules = [new(Guid.NewGuid(), "Basilisk", squadId, 0)],
+        };
 
         await repository.SaveAsync(profile, CancellationToken.None);
         var loaded = Assert.Single(
@@ -56,6 +59,9 @@ public sealed class FleetProfileRepositoryTests : IDisposable
             loadedAssignment.Tags,
             tag => Assert.Equal("logi", tag),
             tag => Assert.Equal("anchor", tag));
+        var loadedRule = Assert.Single(loaded.ShipRules);
+        Assert.Equal("Basilisk", loadedRule.ShipTypeName);
+        Assert.Equal(squadId, loadedRule.TargetSquadId);
 
         var renamed = profile with { Name = "Doctrine Bravo" };
         await repository.SaveAsync(renamed, CancellationToken.None);

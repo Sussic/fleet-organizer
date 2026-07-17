@@ -987,7 +987,7 @@ internal sealed class FleetOperationService : IFleetOperationService, IDisposabl
             step.State == FleetOperationStepState.Waiting))
         {
             state = OperationState.AwaitAcceptance;
-            message = "Accept the pending invitations in EVE, then choose Refresh & continue.";
+            message = "Accept the pending invitations in EVE. Fleet Desk checks automatically every 30 seconds while open; Check now is also available.";
         }
         else if (operation.Steps.Any(step =>
             step.Type == FleetOperationStepType.Place &&

@@ -6,6 +6,8 @@ public sealed record FleetProfile(
     IReadOnlyList<ProfileWing> Wings,
     IReadOnlyList<ProfileAssignment> Assignments)
 {
+    public IReadOnlyList<ProfileShipRule> ShipRules { get; init; } = [];
+
     public static FleetProfile Create(string name) =>
         new(Guid.NewGuid(), name, [], []);
 }
@@ -29,3 +31,9 @@ public sealed record ProfileAssignment(
 {
     public string[] Tags { get; init; } = [];
 }
+
+public sealed record ProfileShipRule(
+    Guid Id,
+    string ShipTypeName,
+    Guid TargetSquadId,
+    int SortOrder);

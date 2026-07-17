@@ -71,7 +71,10 @@ public sealed class FleetProfileFactoryTests
                 Tags = tags,
             },
         };
-        var source = new FleetProfile(Guid.NewGuid(), "Source", wings, assignments);
+        var source = new FleetProfile(Guid.NewGuid(), "Source", wings, assignments)
+        {
+            ShipRules = [new(Guid.NewGuid(), "Basilisk", squadId, 0)],
+        };
 
         var duplicate = FleetProfileFactory.Duplicate(source, "Source Copy");
 
@@ -84,6 +87,10 @@ public sealed class FleetProfileFactoryTests
             assignment.Tags,
             tag => Assert.Equal("logi", tag),
             tag => Assert.Equal("anchor", tag));
+        var shipRule = Assert.Single(duplicate.ShipRules);
+        Assert.Equal("Basilisk", shipRule.ShipTypeName);
+        Assert.Equal(duplicate.Wings[0].Squads[0].Id, shipRule.TargetSquadId);
+        Assert.NotEqual(source.ShipRules[0].Id, shipRule.Id);
     }
 
     private static LiveFleetMember CreateMember(

@@ -1,12 +1,12 @@
 # Fleet Organizer — Technical Specification
 
 **Status:** Approved implementation baseline
-**Revision:** 1.6
+**Revision:** 1.7
 **Reviewed:** 17 July 2026
 **Target:** Windows 11, local single-user desktop application
 **Working title:** Fleet Organizer (name can change without affecting the architecture)
 
-### Implementation checkpoint — Milestone 6 usability slice
+### Implementation checkpoint — Fleet Desk usability slice
 
 Implemented and tested in the current repository:
 
@@ -34,10 +34,15 @@ Implemented and tested in the current repository:
 - Unmanaged commander occupancy is a hard blocker; fleet-boss transfer/demotion, hierarchy deletion, and kicks remain outside the operation boundary.
 - Final live hierarchy/member/role drift verification before a clean completion state.
 - Global WPF dispatcher exception capture with a visible failure message and timestamped local crash report; operation state remains durable across restart.
+- SQLite schema v3 persistence for exact ship-type placement rules.
+- Native WPF multi-character drag/drop from the template roster to visual squad cards; dragging edits local desired state only.
+- Exact live ship-type matching with explicit-character precedence, fleet-boss exclusion, ordinary-member-only roles, and visible preview match counts.
+- Automatic 30-second continuation while a confirmed operation waits for invitation acceptance, with the manual check action retained.
+- A cohesive Fleet Desk visual system and plain preview → organise → monitor terminology across Home, templates, and activity.
 
 Milestone 5 keeps the complete write queue serialized. Structure create results are persisted before dependent naming/placement steps, interrupted creates are reconciled against the initial snapshot, and ambiguous outcomes require attention instead of blind duplication. Rename and commander writes are also verified from fresh live state.
 
-The first Milestone 6 slice adds the repetitive-use interface around that engine: a guided Home launcher, plain-language review and operation phases, a real Activity page, profile/roster filtering, recycling virtualization for growing tables, filtered bulk selection, simple-versus-advanced profile editing, unsaved-change status, and keyboard shortcuts. Snapshot restore preview, chronological history, and redacted diagnostic export remain separate recovery slices; this UI checkpoint does not widen the ESI write boundary.
+The Fleet Desk slice adds the repetitive-use interface around that engine: a guided Home launcher, plain-language review and operation phases, visual squad cards, local multi-character drag/drop, exact ship placement rules, automatic acceptance checks, profile/roster filtering, recycling virtualization, filtered bulk selection, optional hierarchy editing, unsaved-change status, and keyboard shortcuts. Snapshot restore preview, chronological history, and redacted diagnostic export remain separate recovery slices; this UI checkpoint does not widen the ESI write boundary.
 
 ## 1. Executive decision
 
@@ -72,7 +77,7 @@ Only the boss character needs an ESI token. Invitees are identified by character
 - Invite saved characters who are not currently in fleet.
 - Wait for accepted characters to appear, then place them automatically.
 - Reconcile the live fleet to a selected profile using only necessary ESI writes.
-- Drag one or multiple live members to a target squad.
+- Drag one or multiple saved character assignments to a target squad before previewing the run.
 - Promote/demote members with a clear preview of the resulting change.
 - Save a snapshot before a profile is applied and offer best-effort restore.
 - Persist operations so a run can resume safely after restart or network failure.
@@ -102,7 +107,7 @@ These are either outside the simple organiser goal or not available through ESI.
 | HTTP | Typed `HttpClient` services | Central authentication, retry, compatibility-date, rate, and cache handlers |
 | Local database | SQLite through `Microsoft.Data.Sqlite` | One portable file, transactions and migrations without a server |
 | Secrets at rest | Windows DPAPI, `DataProtectionScope.CurrentUser` | Refresh token is decryptable only by the same Windows user on the same Windows installation |
-| Drag/drop | `GongSolutions.WPF.DragDrop` | MVVM-aware tree/list drag/drop and multi-selection support |
+| Drag/drop | Native WPF drag/drop events | No extra dependency; local template rows carry only a character ID and update the view model after a validated squad drop |
 | Logging | `Microsoft.Extensions.Logging` + Serilog file sink | Structured local diagnostics with rotation and redaction |
 | Tests | xUnit + fake `HttpMessageHandler` fixtures | Fast deterministic core and HTTP contract testing |
 | Packaging | Self-contained `win-x64` single-file publish | No runtime installation required for the released build |
@@ -309,7 +314,7 @@ SQLite runs in WAL mode, enables foreign keys, and uses explicit transactions. S
 | `ProfileSquad` | local GUID, wing GUID, name, sort order |
 | `RosterCharacter` | character ID, canonical name, aliases/display note, tags, last resolved |
 | `ProfileAssignment` | profile ID, character ID, target squad GUID, desired role |
-| `PlacementRule` | profile ID, priority, rule type, JSON condition, target squad/role |
+| `ProfileShipRule` | local GUID, exact ship type name, target squad GUID, sort order |
 | `ActiveOperation` | operation GUID, profile/fleet IDs, state, created/updated, cancellation reason |
 | `OperationStep` | operation ID, stable step key, type, target, state, attempts, last failure |
 | `FleetSnapshot` | operation/fleet ID, captured time, serialized immutable hierarchy/members |
@@ -325,20 +330,17 @@ ESI wing and squad IDs are ephemeral fleet-instance identifiers and are never us
 - Names are trimmed, normalized, and validated against ESI's current length/schema constraints before save. The UI initially enforces the current 10-character fleet wing/squad name limit.
 - Duplicate character assignments are rejected.
 - A squad may have at most one desired squad commander, a wing at most one wing commander, and the profile at most one desired fleet commander.
-- Rules have deterministic integer priority and a single default fallback.
+- Ship rules have deterministic integer order, unique case-insensitive exact ship names, and a valid target squad.
 
 ### 8.4 Placement precedence
 
 When a member has several possible destinations, the first match wins:
 
-1. Temporary override made in the current run.
-2. Exact character assignment.
-3. Highest-priority character-tag rule.
-4. Highest-priority ship-type/group rule using current ESI member data.
-5. Profile default squad.
-6. Leave in current position and mark **Unassigned**.
+1. Exact saved character assignment.
+2. First exact ship-type rule using the current ESI member ship name.
+3. Leave the live member untouched.
 
-The planner records why each decision was made so the UI can say, for example, “Moved to Logi — matched tag `logi`”.
+Ship rules resolve only members currently in the fleet, skip the fleet boss, and generate ordinary squad-member assignments. They cannot invite an absent character or request a commander role. The preview reports how many characters were added by ship rules before the user confirms the guarded run.
 
 ## 9. Desired-state reconciliation engine
 
@@ -383,7 +385,7 @@ Every transition and external write is recorded. On restart, the runner does not
 - The currently authenticated fleet boss is never demoted, moved into a state that would lose required write authority, or treated as fleet commander/boss interchangeably.
 - Before each commander write, refresh the involved member(s) if the cached state could be stale.
 - A failed transition stops only the dependent role chain; unrelated squad-member placements continue.
-- Drag/drop uses the same planner and execution path as a profile run, so manual and automated moves have identical validation.
+- Drag/drop edits local profile assignments and invalidates any stale preview; live movement still goes through the normal saved-profile validation, preview, confirmation, and operation engine.
 
 ### 9.4 Invite behavior
 
@@ -517,7 +519,7 @@ Required table-driven coverage:
 - Structure matching with missing, duplicate, renamed, and extra live nodes.
 - Desired/actual diff emits only necessary operations.
 - Re-running an already-satisfied profile emits no writes.
-- Placement precedence for override, exact, tag, ship, default, and unassigned.
+- Placement precedence for exact assignments, ship rules, fleet-boss exclusion, and unmatched live members.
 - Commander swaps and legal intermediate transitions.
 - Authenticated boss protection.
 - Invite partitioning: present, missing, unresolved, failed, accepted.
@@ -583,7 +585,6 @@ The WPF app additionally sets `UseWPF=true`. Any unavoidable XAML-generated warn
 - `Microsoft.Extensions.Http`
 - `Microsoft.Data.Sqlite`
 - `System.Security.Cryptography.ProtectedData`
-- `GongSolutions.WPF.DragDrop`
 - `Serilog.Extensions.Hosting`
 - `Serilog.Sinks.File`
 - `xunit`
@@ -683,7 +684,7 @@ No Rust, Node.js, database server, Docker, IIS, or cloud account is required.
 - Pure diff planner, durable operation state machine, invite queue, acceptance detection, ordinary member placement, resume/cancel, and per-character progress.
 - **Exit:** one button invites a 15-character saved roster and places accepted characters idempotently.
 
-**Implemented:** guarded start/re-review, durable steps and snapshot, serialized invite queue, acceptance checks, ordinary placement, restart resume, retry/skip/cancel, CSPA guidance, and rate-pause timestamps. A routine run continues with **Refresh & continue** after invitations are accepted; unattended background polling remains a later quality-of-life option.
+**Implemented:** guarded start/re-review, durable steps and snapshot, serialized invite queue, acceptance checks, ordinary placement, restart resume, retry/skip/cancel, CSPA guidance, and rate-pause timestamps. A waiting confirmed run checks for accepted invitations every 30 seconds while the app is open; **Check now** remains available.
 
 ### Milestone 5 — hierarchy and commanders
 
@@ -694,7 +695,7 @@ No Rust, Node.js, database server, Docker, IIS, or cloud account is required.
 
 ### Milestone 6 — quality-of-life and recovery
 
-- Multi-select drag/drop, snapshots, restore preview, activity history, diagnostic export, keyboard flows, tray behavior, sounds, and stale-state badges.
+- Multi-select drag/drop, ship placement rules, automatic invite-acceptance checks, snapshots, restore preview, activity history, diagnostic export, keyboard flows, tray behavior, sounds, and stale-state badges.
 - **Exit:** routine repeated use requires only profile choice, one click, and invite acceptance.
 
 ### Milestone 7 — release hardening
@@ -750,8 +751,7 @@ None of these changes the selected stack or core operation engine. They can be d
 - [Microsoft.Data.Sqlite](https://learn.microsoft.com/en-us/dotnet/standard/data/sqlite/)
 - [Windows data protection from .NET](https://learn.microsoft.com/en-us/dotnet/standard/security/how-to-use-data-protection)
 - [.NET single-file deployment](https://learn.microsoft.com/en-us/dotnet/core/deploying/single-file/overview)
-- [GongSolutions WPF DragDrop](https://github.com/punker76/gong-wpf-dragdrop)
 
 ## 20. Current build checkpoint
 
-Milestones 0–5 and the first Milestone 6 usability slice are implemented in the repository. The current live-write boundary includes safe structure creation/renaming, invitations, managed-member staging, and serialized squad/wing commander transitions with final verification. Remaining Milestone 6 recovery slices are snapshot/restore preview, chronological activity history, and redacted diagnostics.
+Milestones 0–5 and the Fleet Desk usability slice are implemented in the repository. The current live-write boundary includes safe structure creation/renaming, invitations, managed-member staging, and serialized squad/wing commander transitions with final verification. Visual local drag/drop, exact ship placement rules, and automatic acceptance checks are implemented without widening that boundary. Remaining recovery slices are snapshot/restore preview, chronological activity history, and redacted diagnostics.

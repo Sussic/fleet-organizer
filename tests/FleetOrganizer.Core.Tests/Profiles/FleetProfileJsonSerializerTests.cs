@@ -23,7 +23,10 @@ public sealed class FleetProfileJsonSerializerTests
                 Tags = tags,
             },
         };
-        var source = new FleetProfile(Guid.NewGuid(), "Doctrine Alpha", wings, assignments);
+        var source = new FleetProfile(Guid.NewGuid(), "Doctrine Alpha", wings, assignments)
+        {
+            ShipRules = [new(Guid.NewGuid(), "Basilisk", squadId, 0)],
+        };
 
         var json = FleetProfileJsonSerializer.Serialize(source);
         var restored = FleetProfileJsonSerializer.Deserialize(json);
@@ -35,6 +38,31 @@ public sealed class FleetProfileJsonSerializerTests
         var assignment = Assert.Single(restored.Assignments);
         Assert.Equal(DesiredFleetRole.SquadCommander, assignment.DesiredRole);
         Assert.Equal("logi", Assert.Single(assignment.Tags));
+        var shipRule = Assert.Single(restored.ShipRules);
+        Assert.Equal("Basilisk", shipRule.ShipTypeName);
+        Assert.Equal(squadId, shipRule.TargetSquadId);
+    }
+
+    [Fact]
+    public void OlderVersionOneProfileWithoutShipRulesStillImports()
+    {
+        var profileId = Guid.NewGuid();
+        var json = $$"""
+            {
+              "exportVersion": 1,
+              "profile": {
+                "id": "{{profileId}}",
+                "name": "Legacy",
+                "wings": [],
+                "assignments": []
+              }
+            }
+            """;
+
+        var restored = FleetProfileJsonSerializer.Deserialize(json);
+
+        Assert.Equal(profileId, restored.Id);
+        Assert.Empty(restored.ShipRules);
     }
 
     [Fact]

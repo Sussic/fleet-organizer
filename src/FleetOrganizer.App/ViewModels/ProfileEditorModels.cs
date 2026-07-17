@@ -13,7 +13,8 @@ public sealed record ProfileListItemViewModel(FleetProfile Profile)
     public string Name => Profile.Name;
 
     public string Summary =>
-        $"{Profile.Assignments.Count} characters • {Profile.Wings.Count} wings";
+        $"{Profile.Assignments.Count} characters • {Profile.Wings.Count} wings • " +
+        $"{Profile.ShipRules.Count} ship rule{(Profile.ShipRules.Count == 1 ? string.Empty : "s")}";
 }
 
 public sealed partial class ProfileWingEditorViewModel(
@@ -36,6 +37,21 @@ public sealed partial class ProfileSquadEditorViewModel(
 
     [ObservableProperty]
     public partial string Name { get; set; } = name;
+
+    [ObservableProperty]
+    public partial int AssignmentCount { get; set; }
+
+    [ObservableProperty]
+    public partial string CharacterPreview { get; set; } = "Drop characters here";
+
+    public string AssignmentCountText =>
+        $"{AssignmentCount} character{(AssignmentCount == 1 ? string.Empty : "s")}";
+
+    partial void OnAssignmentCountChanged(int value)
+    {
+        _ = value;
+        OnPropertyChanged(nameof(AssignmentCountText));
+    }
 }
 
 public sealed partial class ProfileAssignmentEditorViewModel(
@@ -63,6 +79,20 @@ public sealed partial class ProfileAssignmentEditorViewModel(
 }
 
 public sealed record ProfileSquadOptionViewModel(Guid Id, string DisplayName);
+
+public sealed partial class ProfileShipRuleEditorViewModel(
+    Guid id,
+    string shipTypeName,
+    Guid targetSquadId) : ObservableObject
+{
+    public Guid Id { get; } = id;
+
+    [ObservableProperty]
+    public partial string ShipTypeName { get; set; } = shipTypeName;
+
+    [ObservableProperty]
+    public partial Guid TargetSquadId { get; set; } = targetSquadId;
+}
 
 public sealed record DesiredRoleOptionViewModel(DesiredFleetRole Value, string DisplayName);
 

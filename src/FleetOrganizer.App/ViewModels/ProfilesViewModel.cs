@@ -26,6 +26,8 @@ public partial class ProfilesViewModel : ObservableObject
     private readonly IFleetOperationService operationService;
     private bool isLoadingEditor;
     private FleetDryRunPlan? lastDryRunPlan;
+    private FleetProfile? lastPreparedProfile;
+    private int lastShipRuleMatchCount;
     private FleetOperation? currentOperation;
 
     [ObservableProperty]
@@ -101,6 +103,9 @@ public partial class ProfilesViewModel : ObservableObject
         "Choose a profile and check the live fleet.";
 
     [ObservableProperty]
+    public partial string ShipRuleMatchSummary { get; set; } = string.Empty;
+
+    [ObservableProperty]
     public partial bool ShowAlreadyCorrect { get; set; }
 
     [ObservableProperty]
@@ -166,7 +171,11 @@ public partial class ProfilesViewModel : ObservableObject
 
     public ObservableCollection<ProfileAssignmentEditorViewModel> Assignments { get; } = [];
 
+    public ObservableCollection<ProfileShipRuleEditorViewModel> ShipRules { get; } = [];
+
     public ObservableCollection<ProfileSquadOptionViewModel> SquadOptions { get; } = [];
+
+    public ObservableCollection<string> ObservedShipTypes { get; } = [];
 
     public ObservableCollection<string> UnresolvedRosterEntries { get; } = [];
 
@@ -647,10 +656,17 @@ public partial class ProfilesViewModel : ObservableObject
                 return;
             }
 
-            var plan = FleetPlanner.Build(profile, liveResult.Snapshot);
+            UpdateObservedShipTypes(liveResult.Snapshot);
+            var resolution = ShipRuleResolver.Resolve(profile, liveResult.Snapshot);
+            lastPreparedProfile = resolution.EffectiveProfile;
+            lastShipRuleMatchCount = resolution.Matches.Count;
+            var plan = FleetPlanner.Build(resolution.EffectiveProfile, liveResult.Snapshot);
             ApplyDryRun(plan, liveResult.Snapshot.ConfirmedAtUtc);
             StatusMessage = plan.BlockingIssues == 0
-                ? $"Dry run ready: {plan.TotalChanges} proposed change{(plan.TotalChanges == 1 ? string.Empty : "s")}."
+                ? $"Preview ready: {plan.TotalChanges} proposed change{(plan.TotalChanges == 1 ? string.Empty : "s")}" +
+                    (lastShipRuleMatchCount == 0
+                        ? "."
+                        : $"; {lastShipRuleMatchCount} live character{(lastShipRuleMatchCount == 1 ? string.Empty : "s")} matched by ship type.")
                 : $"Dry run found {plan.BlockingIssues} blocking issue{(plan.BlockingIssues == 1 ? string.Empty : "s")}.";
         }
         catch (Exception exception)
@@ -671,7 +687,8 @@ public partial class ProfilesViewModel : ObservableObject
     private async Task StartOperationAsync()
     {
         var reviewedPlan = lastDryRunPlan;
-        if (!CanEdit || reviewedPlan is null)
+        var preparedProfile = lastPreparedProfile;
+        if (!CanEdit || reviewedPlan is null || preparedProfile is null)
         {
             StatusMessage = "Generate and review a current dry run before starting.";
             return;
@@ -704,7 +721,7 @@ public partial class ProfilesViewModel : ObservableObject
         try
         {
             var result = await operationService.StartAsync(
-                BuildCurrentProfile(),
+                preparedProfile,
                 reviewedPlan);
             ApplyDryRun(result.CurrentPlan, DateTimeOffset.UtcNow);
             if (!result.Started || result.Operation is null)
@@ -738,6 +755,22 @@ public partial class ProfilesViewModel : ObservableObject
         await RunOperationActionAsync(
             () => operationService.ContinueAsync(operation.Id),
             "Checking accepted invitations and current placements…");
+    }
+
+    public async Task AutoContinueOperationAsync()
+    {
+        var operation = currentOperation;
+        if (IsBusy ||
+            operation is null ||
+            operation.IsTerminal ||
+            operation.State != OperationState.AwaitAcceptance)
+        {
+            return;
+        }
+
+        await RunOperationActionAsync(
+            () => operationService.ContinueAsync(operation.Id),
+            "Automatically checking for accepted invitations…");
     }
 
     [RelayCommand]
@@ -940,9 +973,10 @@ public partial class ProfilesViewModel : ObservableObject
         }
 
         var squadIds = wing.Squads.Select(squad => squad.Id).ToHashSet();
-        if (Assignments.Any(assignment => squadIds.Contains(assignment.TargetSquadId)))
+        if (Assignments.Any(assignment => squadIds.Contains(assignment.TargetSquadId)) ||
+            ShipRules.Any(rule => squadIds.Contains(rule.TargetSquadId)))
         {
-            StatusMessage = "Move or remove characters assigned to this wing before deleting it.";
+            StatusMessage = "Move or remove characters and ship rules assigned to this wing before deleting it.";
             return;
         }
 
@@ -963,9 +997,10 @@ public partial class ProfilesViewModel : ObservableObject
             return;
         }
 
-        if (Assignments.Any(assignment => assignment.TargetSquadId == squad.Id))
+        if (Assignments.Any(assignment => assignment.TargetSquadId == squad.Id) ||
+            ShipRules.Any(rule => rule.TargetSquadId == squad.Id))
         {
-            StatusMessage = "Move or remove characters assigned to this squad before deleting it.";
+            StatusMessage = "Move or remove characters and ship rules assigned to this squad before deleting it.";
             return;
         }
 
@@ -975,6 +1010,80 @@ public partial class ProfilesViewModel : ObservableObject
         MarkEditorDirty();
         RefreshValidation();
         InvalidateDryRun();
+    }
+
+    [RelayCommand]
+    private void AddShipRule()
+    {
+        if (!CanEdit || SquadOptions.Count == 0)
+        {
+            StatusMessage = "Add a squad before creating a ship placement rule.";
+            return;
+        }
+
+        var rule = new ProfileShipRuleEditorViewModel(
+            Guid.NewGuid(),
+            string.Empty,
+            SquadOptions[0].Id);
+        HookShipRule(rule);
+        ShipRules.Add(rule);
+        MarkEditorDirty();
+        RefreshValidation();
+        InvalidateDryRun();
+        StatusMessage = "Choose an exact EVE ship type and its destination squad.";
+    }
+
+    [RelayCommand]
+    private void DeleteShipRule(ProfileShipRuleEditorViewModel? rule)
+    {
+        if (!CanEdit || rule is null)
+        {
+            return;
+        }
+
+        UnhookShipRule(rule);
+        ShipRules.Remove(rule);
+        MarkEditorDirty();
+        RefreshValidation();
+        InvalidateDryRun();
+        StatusMessage = "Ship placement rule removed from this local profile.";
+    }
+
+    public void MoveAssignmentsToSquad(Guid squadId, long draggedCharacterId)
+    {
+        if (!CanEdit || !SquadOptions.Any(option => option.Id == squadId))
+        {
+            return;
+        }
+
+        var dragged = Assignments.FirstOrDefault(
+            assignment => assignment.CharacterId == draggedCharacterId);
+        if (dragged is null)
+        {
+            return;
+        }
+
+        if (!dragged.IsSelected)
+        {
+            foreach (var assignment in Assignments)
+            {
+                assignment.IsSelected = false;
+            }
+
+            dragged.IsSelected = true;
+        }
+
+        var selected = Assignments
+            .Where(assignment => assignment.IsSelected)
+            .ToArray();
+        foreach (var assignment in selected)
+        {
+            assignment.TargetSquadId = squadId;
+        }
+
+        var squadName = SquadOptions.First(option => option.Id == squadId).DisplayName;
+        StatusMessage = $"Moved {selected.Length} character{(selected.Length == 1 ? string.Empty : "s")} to {squadName}. Save when the layout looks right.";
+        RefreshSquadCards();
     }
 
     [RelayCommand]
@@ -1138,6 +1247,16 @@ public partial class ProfilesViewModel : ObservableObject
             Assignments.Add(editor);
         }
 
+        foreach (var rule in profile.ShipRules.OrderBy(rule => rule.SortOrder))
+        {
+            var editor = new ProfileShipRuleEditorViewModel(
+                rule.Id,
+                rule.ShipTypeName,
+                rule.TargetSquadId);
+            HookShipRule(editor);
+            ShipRules.Add(editor);
+        }
+
         UnresolvedRosterEntries.Clear();
         RosterPasteText = string.Empty;
         IsEditorActive = true;
@@ -1146,6 +1265,7 @@ public partial class ProfilesViewModel : ObservableObject
         HasUnsavedChanges = false;
         FilteredAssignments.Refresh();
         RefreshAssignmentSummary();
+        RefreshSquadCards();
         RefreshValidation();
     }
 
@@ -1158,6 +1278,7 @@ public partial class ProfilesViewModel : ObservableObject
         ProfileName = string.Empty;
         IsEditorActive = false;
         SquadOptions.Clear();
+        ObservedShipTypes.Clear();
         UnresolvedRosterEntries.Clear();
         ValidationSummary = "No profile selected.";
         isLoadingEditor = false;
@@ -1178,12 +1299,18 @@ public partial class ProfilesViewModel : ObservableObject
             UnhookAssignment(assignment);
         }
 
+        foreach (var rule in ShipRules)
+        {
+            UnhookShipRule(rule);
+        }
+
         Wings.Clear();
         Assignments.Clear();
+        ShipRules.Clear();
     }
 
     private FleetProfile BuildCurrentProfile() =>
-        new(
+        new FleetProfile(
             EditingProfileId,
             ProfileName.Trim(),
             Wings.Select((wing, wingIndex) => new ProfileWing(
@@ -1201,7 +1328,14 @@ public partial class ProfilesViewModel : ObservableObject
                 assignment.DesiredRole)
             {
                 Tags = ParseTags(assignment.TagsText),
-            }).ToArray());
+            }).ToArray())
+        {
+            ShipRules = ShipRules.Select((rule, ruleIndex) => new ProfileShipRule(
+                rule.Id,
+                rule.ShipTypeName.Trim(),
+                rule.TargetSquadId,
+                ruleIndex)).ToArray(),
+        };
 
     private void RefreshValidation()
     {
@@ -1212,7 +1346,7 @@ public partial class ProfilesViewModel : ObservableObject
 
         var errors = ProfileValidator.Validate(BuildCurrentProfile());
         ValidationSummary = errors.Count == 0
-            ? $"Valid profile • {Assignments.Count} characters • {Wings.Count} wings • {SquadOptions.Count} squads"
+            ? $"Ready • {Assignments.Count} exact characters • {ShipRules.Count} ship rules • {SquadOptions.Count} squads"
             : FormatValidation(errors);
     }
 
@@ -1234,6 +1368,7 @@ public partial class ProfilesViewModel : ObservableObject
             SquadOptions.Any(option => option.Id == previousId)
                 ? previousId
                 : SquadOptions.FirstOrDefault()?.Id;
+        RefreshSquadCards();
     }
 
     private void HookWing(ProfileWingEditorViewModel wing)
@@ -1274,6 +1409,16 @@ public partial class ProfilesViewModel : ObservableObject
         assignment.PropertyChanged -= OnAssignmentPropertyChanged;
     }
 
+    private void HookShipRule(ProfileShipRuleEditorViewModel rule)
+    {
+        rule.PropertyChanged += OnShipRulePropertyChanged;
+    }
+
+    private void UnhookShipRule(ProfileShipRuleEditorViewModel rule)
+    {
+        rule.PropertyChanged -= OnShipRulePropertyChanged;
+    }
+
     private void OnHierarchyPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         _ = sender;
@@ -1297,8 +1442,22 @@ public partial class ProfilesViewModel : ObservableObject
         {
             MarkEditorDirty();
             FilteredAssignments.Refresh();
+            if (string.Equals(e.PropertyName, nameof(ProfileAssignmentEditorViewModel.TargetSquadId), StringComparison.Ordinal))
+            {
+                RefreshSquadCards();
+            }
+
             InvalidateDryRun();
         }
+    }
+
+    private void OnShipRulePropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        _ = sender;
+        _ = e;
+        MarkEditorDirty();
+        RefreshValidation();
+        InvalidateDryRun();
     }
 
     private bool FilterProfile(object item)
@@ -1337,8 +1496,47 @@ public partial class ProfilesViewModel : ObservableObject
         }
     }
 
-    private void RefreshAssignmentSummary() =>
+    private void RefreshAssignmentSummary()
+    {
         OnPropertyChanged(nameof(AssignmentSearchSummary));
+        RefreshSquadCards();
+    }
+
+    private void RefreshSquadCards()
+    {
+        foreach (var squad in Wings.SelectMany(wing => wing.Squads))
+        {
+            var assigned = Assignments
+                .Where(assignment => assignment.TargetSquadId == squad.Id)
+                .OrderBy(assignment => assignment.CharacterName, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            squad.AssignmentCount = assigned.Length;
+            squad.CharacterPreview = assigned.Length == 0
+                ? "Drop characters here"
+                : string.Join(", ", assigned.Take(4).Select(assignment => assignment.CharacterName)) +
+                    (assigned.Length > 4 ? $" +{assigned.Length - 4}" : string.Empty);
+        }
+    }
+
+    private void UpdateObservedShipTypes(LiveFleetSnapshot snapshot)
+    {
+        var selectedShipNames = ShipRules
+            .Select(rule => rule.ShipTypeName.Trim())
+            .Where(name => name.Length > 0);
+        var names = snapshot.Members
+            .Select(member => member.ShipTypeName.Trim())
+            .Concat(selectedShipNames)
+            .Where(name => name.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        ObservedShipTypes.Clear();
+        foreach (var name in names)
+        {
+            ObservedShipTypes.Add(name);
+        }
+    }
 
     private void MoveWing(ProfileWingEditorViewModel? wing, int offset)
     {
@@ -1348,6 +1546,7 @@ public partial class ProfilesViewModel : ObservableObject
         }
 
         MoveItem(Wings, wing, offset);
+        UpdateSquadOptions();
         MarkEditorDirty();
         RefreshValidation();
         InvalidateDryRun();
@@ -1501,12 +1700,15 @@ public partial class ProfilesViewModel : ObservableObject
     private void InvalidateDryRun()
     {
         lastDryRunPlan = null;
+        lastPreparedProfile = null;
+        lastShipRuleMatchCount = 0;
         DryRunItems.Clear();
         HasDryRun = false;
         DryRunTitle = "No comparison generated.";
         DryRunSummary = string.Empty;
         DryRunSafetyMessage = string.Empty;
         DryRunPrimaryMessage = "Choose a profile and check the live fleet.";
+        ShipRuleMatchSummary = string.Empty;
     }
 
     private void ApplyDryRun(FleetDryRunPlan plan, DateTimeOffset confirmedAtUtc)
@@ -1516,6 +1718,11 @@ public partial class ProfilesViewModel : ObservableObject
             $"'{plan.ProfileName}' compared with fleet {plan.FleetId} • live state confirmed {confirmedAtUtc.ToLocalTime():t}";
         DryRunSummary = BuildDryRunSummary(plan);
         DryRunSafetyMessage = BuildDryRunSafetyMessage(plan);
+        ShipRuleMatchSummary = lastShipRuleMatchCount == 0
+            ? ShipRules.Count == 0
+                ? "No automatic ship placement rules are enabled."
+                : "No current live characters matched the saved ship rules."
+            : $"{lastShipRuleMatchCount} live character{(lastShipRuleMatchCount == 1 ? string.Empty : "s")} added to this preview by ship type.";
         DryRunPrimaryMessage = plan.BlockingIssues > 0
             ? "This run needs attention before it can start"
             : plan.TotalChanges == 0
@@ -1593,7 +1800,7 @@ public partial class ProfilesViewModel : ObservableObject
     private static string GetOperationNextAction(OperationState state) => state switch
     {
         OperationState.AwaitAcceptance =>
-            "Accept the invitations in EVE, then choose Check accepted characters.",
+            "Accept the invitations in EVE. Fleet Desk checks every 30 seconds while open; use Check now if you do not want to wait.",
         OperationState.NeedsAttention =>
             "Open the technical steps below, then retry or skip the failed item.",
         OperationState.Complete =>

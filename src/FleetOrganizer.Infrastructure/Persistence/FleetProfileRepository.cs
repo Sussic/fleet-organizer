@@ -27,6 +27,7 @@ internal sealed class FleetProfileRepository(
         {
             await LoadHierarchyAsync(connection, profile, cancellationToken).ConfigureAwait(false);
             await LoadAssignmentsAsync(connection, profile, cancellationToken).ConfigureAwait(false);
+            await LoadShipRulesAsync(connection, profile, cancellationToken).ConfigureAwait(false);
         }
 
         return profiles
@@ -67,6 +68,8 @@ internal sealed class FleetProfileRepository(
             profile,
             nowText,
             cancellationToken).ConfigureAwait(false);
+        await InsertShipRulesAsync(connection, transaction, profile, cancellationToken)
+            .ConfigureAwait(false);
 
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
     }
@@ -220,6 +223,28 @@ internal sealed class FleetProfileRepository(
         }
     }
 
+    private static async Task LoadShipRulesAsync(
+        SqliteConnection connection,
+        ProfileBuilder profile,
+        CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText =
+            "SELECT id, ship_type_name, target_squad_id, sort_order FROM profile_ship_rules WHERE profile_id = $profileId ORDER BY sort_order, ship_type_name COLLATE NOCASE;";
+        command.Parameters.AddWithValue("$profileId", profile.Id.ToString("D"));
+        await using var reader = await command
+            .ExecuteReaderAsync(cancellationToken)
+            .ConfigureAwait(false);
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            profile.ShipRules.Add(new ProfileShipRule(
+                Guid.Parse(reader.GetString(0)),
+                reader.GetString(1),
+                Guid.Parse(reader.GetString(2)),
+                reader.GetInt32(3)));
+        }
+    }
+
     private static async Task UpsertProfileAsync(
         SqliteConnection connection,
         SqliteTransaction transaction,
@@ -254,6 +279,7 @@ internal sealed class FleetProfileRepository(
         command.Transaction = transaction;
         command.CommandText =
             """
+            DELETE FROM profile_ship_rules WHERE profile_id = $profileId;
             DELETE FROM profile_assignments WHERE profile_id = $profileId;
             DELETE FROM profile_wings WHERE profile_id = $profileId;
             """;
@@ -335,6 +361,36 @@ internal sealed class FleetProfileRepository(
         }
     }
 
+    private static async Task InsertShipRulesAsync(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        FleetProfile profile,
+        CancellationToken cancellationToken)
+    {
+        for (var ruleIndex = 0; ruleIndex < profile.ShipRules.Count; ruleIndex++)
+        {
+            var rule = profile.ShipRules[ruleIndex];
+            await using var command = connection.CreateCommand();
+            command.Transaction = transaction;
+            command.CommandText =
+                """
+                INSERT INTO profile_ship_rules (
+                    id,
+                    profile_id,
+                    ship_type_name,
+                    target_squad_id,
+                    sort_order)
+                VALUES ($id, $profileId, $shipTypeName, $targetSquadId, $sortOrder);
+                """;
+            command.Parameters.AddWithValue("$id", rule.Id.ToString("D"));
+            command.Parameters.AddWithValue("$profileId", profile.Id.ToString("D"));
+            command.Parameters.AddWithValue("$shipTypeName", rule.ShipTypeName.Trim());
+            command.Parameters.AddWithValue("$targetSquadId", rule.TargetSquadId.ToString("D"));
+            command.Parameters.AddWithValue("$sortOrder", ruleIndex);
+            await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        }
+    }
+
     private static async Task UpsertRosterCharacterAsync(
         SqliteConnection connection,
         SqliteTransaction transaction,
@@ -388,11 +444,16 @@ internal sealed class FleetProfileRepository(
 
         public List<ProfileAssignment> Assignments { get; } = [];
 
-        public FleetProfile Build() => new(
+        public List<ProfileShipRule> ShipRules { get; } = [];
+
+        public FleetProfile Build() => new FleetProfile(
             Id,
             Name,
             Wings.Select(wing => wing.Build()).ToArray(),
-            Assignments.ToArray());
+            Assignments.ToArray())
+        {
+            ShipRules = ShipRules.ToArray(),
+        };
     }
 
     private sealed class WingBuilder(Guid id, string name, int sortOrder)

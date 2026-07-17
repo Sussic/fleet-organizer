@@ -101,7 +101,19 @@ public static class FleetProfileFactory
             })
             .ToArray();
 
-        return new FleetProfile(Guid.NewGuid(), name.Trim(), wings, assignments);
+        var shipRules = source.ShipRules
+            .Where(rule => squadIdMap.ContainsKey(rule.TargetSquadId))
+            .Select(rule => new ProfileShipRule(
+                Guid.NewGuid(),
+                rule.ShipTypeName,
+                squadIdMap[rule.TargetSquadId],
+                rule.SortOrder))
+            .ToArray();
+
+        return new FleetProfile(Guid.NewGuid(), name.Trim(), wings, assignments)
+        {
+            ShipRules = shipRules,
+        };
     }
 
     private static Guid? GetTargetSquadId(

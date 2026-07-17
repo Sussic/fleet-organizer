@@ -21,15 +21,16 @@
   </Window.InputBindings>
   <Grid>
     <Grid.ColumnDefinitions>
-      <ColumnDefinition Width="220" />
+      <ColumnDefinition Width="232" />
       <ColumnDefinition Width="*" />
     </Grid.ColumnDefinitions>
 
     <Border Grid.Column="0"
             Padding="16"
             BorderThickness="0,0,1,0"
-            BorderBrush="{DynamicResource {x:Static SystemColors.ActiveBorderBrushKey}}"
-            Background="{DynamicResource {x:Static SystemColors.WindowBrushKey}}">
+            BorderBrush="#243044"
+            Background="{StaticResource SidebarBrush}"
+            TextElement.Foreground="#E7ECF4">
       <Grid>
         <Grid.RowDefinitions>
           <RowDefinition Height="Auto" />
@@ -39,32 +40,32 @@
         </Grid.RowDefinitions>
 
         <StackPanel Grid.Row="0" Margin="4,8,4,22">
-          <TextBlock Text="FLEET ORGANIZER"
+          <TextBlock Text="FLEET DESK"
                      FontWeight="SemiBold"
                      FontSize="17" />
-          <TextBlock Text="Personal EVE fleet utility"
+          <TextBlock Text="Build it once. Run it quickly."
                      Margin="0,5,0,0"
                      Opacity="0.65" />
         </StackPanel>
 
         <StackPanel Grid.Row="1">
-          <Button Style="{StaticResource NavigationButtonStyle}"
+          <Button Style="{StaticResource HomeNavigationButtonStyle}"
                   Content="Home"
                   Command="{Binding NavigateCommand}"
                   CommandParameter="Home" />
-          <Button Style="{StaticResource NavigationButtonStyle}"
-                  Content="Profiles"
+          <Button Style="{StaticResource ProfilesNavigationButtonStyle}"
+                  Content="Fleet templates"
                   Command="{Binding NavigateCommand}"
                   CommandParameter="Profiles" />
-          <Button Style="{StaticResource NavigationButtonStyle}"
+          <Button Style="{StaticResource FleetNavigationButtonStyle}"
                   Content="Live Fleet"
                   Command="{Binding NavigateCommand}"
                   CommandParameter="Live Fleet" />
-          <Button Style="{StaticResource NavigationButtonStyle}"
+          <Button Style="{StaticResource ActivityNavigationButtonStyle}"
                   Content="Activity"
                   Command="{Binding NavigateCommand}"
                   CommandParameter="Activity" />
-          <Button Style="{StaticResource NavigationButtonStyle}"
+          <Button Style="{StaticResource SettingsNavigationButtonStyle}"
                   Content="Settings"
                   Command="{Binding NavigateCommand}"
                   CommandParameter="Settings" />
@@ -84,6 +85,7 @@
           <Button Margin="0,12,0,0"
                   Padding="10,7"
                   Content="Open data folder"
+                  Foreground="{StaticResource TextPrimaryBrush}"
                   Command="{Binding OpenDataFolderCommand}" />
         </StackPanel>
       </Grid>
@@ -103,12 +105,12 @@
                 CornerRadius="12"
                 BorderThickness="1"
                 BorderBrush="{DynamicResource {x:Static SystemColors.ActiveBorderBrushKey}}">
-          <TextBlock Text="Milestone 6 • quick fleet workflow"
+          <TextBlock Text="Fleet Desk • safe automation"
                      FontSize="12"
                      FontWeight="SemiBold" />
         </Border>
         <StackPanel>
-          <TextBlock Text="{Binding SelectedPage}"
+          <TextBlock Text="{Binding PageTitle}"
                      FontSize="30"
                      FontWeight="SemiBold" />
           <TextBlock Text="{Binding PageSubtitle}"
@@ -175,10 +177,10 @@
 
             <Border Grid.Column="0" Style="{StaticResource CardStyle}">
               <StackPanel>
-                <TextBlock Text="1. Choose your fleet profile"
+                <TextBlock Text="1. Choose a fleet template"
                            FontSize="20"
                            FontWeight="SemiBold" />
-                <TextBlock Text="Pick the saved layout you want. Nothing is sent to EVE until after the review and confirmation."
+                <TextBlock Text="Pick a saved setup. The preview is read-only and shows exactly what Fleet Desk would change."
                            Margin="0,6,0,14"
                            TextWrapping="Wrap"
                            Opacity="0.68" />
@@ -200,14 +202,15 @@
                            Foreground="{StaticResource WarningBrush}"
                            Visibility="{Binding Profiles.HasUnsavedChanges, Converter={StaticResource BooleanToVisibilityConverter}}" />
                 <Button Margin="0,18,0,0"
+                        Style="{StaticResource PrimaryButtonStyle}"
                         MinHeight="48"
                         Padding="18,12"
-                        Content="Check fleet &amp; review changes"
+                        Content="Preview fleet changes"
                         IsEnabled="{Binding Profiles.CanPrepareFleet}"
                         Command="{Binding Profiles.PrepareFleetCommand}"
                         FontSize="16"
                         FontWeight="SemiBold" />
-                <TextBlock Text="This first button is read-only. You will see the exact invites, moves, structure, and role changes before the guarded run starts."
+                <TextBlock Text="Nothing is written yet. You will review every invite, move, structure edit, role change, and ship-rule match first."
                            Margin="0,8,0,0"
                            TextWrapping="Wrap"
                            FontSize="12"
@@ -260,7 +263,7 @@
                 <ColumnDefinition Width="Auto" />
               </Grid.ColumnDefinitions>
               <StackPanel>
-                <TextBlock Text="2. Review the result"
+                <TextBlock Text="2. Review and organise"
                            FontSize="20"
                            FontWeight="SemiBold" />
                 <TextBlock Text="{Binding Profiles.DryRunPrimaryMessage}"
@@ -277,7 +280,8 @@
               </StackPanel>
               <StackPanel Grid.Column="1" MinWidth="180" VerticalAlignment="Center">
                 <Button Padding="16,11"
-                        Content="Start guarded run"
+                        Style="{StaticResource PrimaryButtonStyle}"
+                        Content="Organise fleet now"
                         IsEnabled="{Binding Profiles.CanEdit}"
                         Command="{Binding Profiles.StartOperationCommand}"
                         FontWeight="SemiBold" />
@@ -317,9 +321,15 @@
               </StackPanel>
               <StackPanel Grid.Column="1" MinWidth="190" VerticalAlignment="Center">
                 <Button Padding="14,10"
-                        Content="Check accepted characters"
+                        Style="{StaticResource PrimaryButtonStyle}"
+                        Content="Check now"
                         IsEnabled="{Binding Profiles.CanOperate}"
                         Command="{Binding Profiles.ContinueOperationCommand}" />
+                <TextBlock Margin="0,7,0,0"
+                           Text="Also checks automatically every 30 seconds while the app is open."
+                           FontSize="11"
+                           TextWrapping="Wrap"
+                           Opacity="0.62" />
                 <Button Margin="0,8,0,0"
                         Padding="12,8"
                         Content="Open run details"
@@ -373,9 +383,15 @@
               </StackPanel>
               <StackPanel Grid.Column="1" MinWidth="205" VerticalAlignment="Center">
                 <Button Padding="14,10"
-                        Content="Check accepted characters"
+                        Style="{StaticResource PrimaryButtonStyle}"
+                        Content="Check now"
                         IsEnabled="{Binding Profiles.CanOperate}"
                         Command="{Binding Profiles.ContinueOperationCommand}" />
+                <TextBlock Margin="0,7,0,0"
+                           Text="Waiting runs also check automatically every 30 seconds while open."
+                           FontSize="11"
+                           TextWrapping="Wrap"
+                           Opacity="0.62" />
                 <Button Margin="0,8,0,0"
                         Padding="12,8"
                         Content="Cancel safely"
@@ -483,7 +499,7 @@
                 <ColumnDefinition Width="Auto" />
               </Grid.ColumnDefinitions>
               <StackPanel>
-                <TextBlock Text="Saved fleet profiles"
+                <TextBlock Text="Fleet templates"
                            FontSize="20"
                            FontWeight="SemiBold" />
                 <TextBlock Text="{Binding Profiles.StatusMessage}"
@@ -494,11 +510,11 @@
               <WrapPanel Grid.Column="1" VerticalAlignment="Center">
                 <CheckBox Margin="4,0,12,0"
                           VerticalAlignment="Center"
-                          Content="Advanced editor"
+                          Content="Edit wings &amp; squads"
                           IsChecked="{Binding Profiles.IsAdvancedMode}" />
                 <Button Margin="4,0"
                         Padding="12,8"
-                        Content="New profile"
+                        Content="New template"
                         Command="{Binding Profiles.NewProfileCommand}" />
                 <Button Margin="4,0"
                         Padding="12,8"
@@ -522,7 +538,7 @@
 
             <Border Grid.Column="0" Style="{StaticResource CardStyle}">
               <StackPanel>
-                <TextBlock Text="Profiles"
+                <TextBlock Text="Templates"
                            FontSize="17"
                            FontWeight="SemiBold" />
                 <TextBlock Text="Saved only on this PC"
@@ -563,10 +579,10 @@
 
             <Border Grid.Column="2" Style="{StaticResource CardStyle}">
               <StackPanel>
-                <TextBlock Text="Profile details"
+                <TextBlock Text="Template details"
                            FontSize="17"
                            FontWeight="SemiBold" />
-                <TextBlock Text="Choose a profile on the left, or create a new one."
+                <TextBlock Text="Choose a reusable setup on the left, or create a new one."
                            Margin="0,5,0,0"
                            TextWrapping="Wrap"
                            Opacity="0.62" />
@@ -574,7 +590,7 @@
                 <StackPanel Margin="0,16,0,0"
                             IsEnabled="{Binding Profiles.CanEdit}"
                             Visibility="{Binding Profiles.IsEditorActive, Converter={StaticResource BooleanToVisibilityConverter}}">
-                  <TextBlock Text="Profile name"
+                  <TextBlock Text="Template name"
                              FontWeight="SemiBold" />
                   <TextBox Text="{Binding Profiles.ProfileName, UpdateSourceTrigger=PropertyChanged}"
                            Margin="0,6,0,0"
@@ -582,6 +598,7 @@
                            MaxLength="100" />
                   <WrapPanel Margin="0,12,0,0">
                     <Button Margin="0,0,8,0"
+                            Style="{StaticResource PrimaryButtonStyle}"
                             Padding="12,8"
                             Content="Save changes"
                             Command="{Binding Profiles.SaveProfileCommand}" />
@@ -591,7 +608,7 @@
                             Command="{Binding Profiles.DuplicateProfileCommand}" />
                     <Button Margin="0,0,8,0"
                             Padding="12,8"
-                            Content="Compare to live"
+                            Content="Preview with live fleet"
                             ToolTip="Build a read-only desired-versus-live dry run"
                             Command="{Binding Profiles.CompareCurrentProfileCommand}" />
                     <Button Margin="0,0,8,0"
@@ -738,6 +755,66 @@
                   Style="{StaticResource CardStyle}"
                   Visibility="{Binding Profiles.IsEditorActive, Converter={StaticResource BooleanToVisibilityConverter}}">
             <StackPanel IsEnabled="{Binding Profiles.CanEdit}">
+              <DockPanel>
+                <Button DockPanel.Dock="Right"
+                        Margin="12,0,0,0"
+                        Content="Add ship rule"
+                        Command="{Binding Profiles.AddShipRuleCommand}" />
+                <StackPanel>
+                  <TextBlock Text="Automatic ship placement"
+                             FontSize="17"
+                             FontWeight="SemiBold" />
+                  <TextBlock Text="Optional: put live fleet members into a squad by exact ship type. Exact character assignments always win, the fleet boss is ignored, and rules never promote commanders."
+                             Margin="0,5,18,0"
+                             TextWrapping="Wrap"
+                             Opacity="0.64" />
+                </StackPanel>
+              </DockPanel>
+
+              <ItemsControl ItemsSource="{Binding Profiles.ShipRules}" Margin="0,14,0,0">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <Grid Margin="0,4">
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="2*" />
+                        <ColumnDefinition Width="14" />
+                        <ColumnDefinition Width="2*" />
+                        <ColumnDefinition Width="Auto" />
+                      </Grid.ColumnDefinitions>
+                      <ComboBox IsEditable="True"
+                                IsTextSearchEnabled="True"
+                                StaysOpenOnEdit="True"
+                                ItemsSource="{Binding DataContext.Profiles.ObservedShipTypes, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                                Text="{Binding ShipTypeName, UpdateSourceTrigger=PropertyChanged}"
+                                ToolTip="Exact EVE ship type, for example Hulk or Basilisk" />
+                      <ComboBox Grid.Column="2"
+                                ItemsSource="{Binding DataContext.Profiles.SquadOptions, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                                DisplayMemberPath="DisplayName"
+                                SelectedValuePath="Id"
+                                SelectedValue="{Binding TargetSquadId, UpdateSourceTrigger=PropertyChanged}"
+                                ToolTip="Destination squad" />
+                      <Button Grid.Column="3"
+                              Margin="10,0,0,0"
+                              Style="{StaticResource DangerButtonStyle}"
+                              Content="Remove"
+                              Command="{Binding DataContext.Profiles.DeleteShipRuleCommand, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                              CommandParameter="{Binding}" />
+                    </Grid>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <TextBlock Margin="0,10,0,0"
+                         Text="Tip: preview once to load ship types seen in the current fleet, or type an exact ship name yourself."
+                         FontSize="12"
+                         Foreground="{StaticResource TextMutedBrush}"
+                         TextWrapping="Wrap" />
+            </StackPanel>
+          </Border>
+
+          <Border Margin="0,18,0,0"
+                  Style="{StaticResource CardStyle}"
+                  Visibility="{Binding Profiles.IsEditorActive, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <StackPanel IsEnabled="{Binding Profiles.CanEdit}">
               <TextBlock Text="Add characters"
                          FontSize="17"
                          FontWeight="SemiBold" />
@@ -780,13 +857,68 @@
                   Style="{StaticResource CardStyle}"
                   Visibility="{Binding Profiles.IsEditorActive, Converter={StaticResource BooleanToVisibilityConverter}}">
             <StackPanel IsEnabled="{Binding Profiles.CanEdit}">
-              <TextBlock Text="Roster and placement"
+              <TextBlock Text="Characters and placement"
                          FontSize="17"
                          FontWeight="SemiBold" />
-              <TextBlock Text="Select characters for quick bulk changes, or edit a single row. Tags are local notes such as logi, scout, or booster."
+              <TextBlock Text="Drag a character row onto a squad card. Tick several rows first to move them together, or use the bulk controls below."
                          Margin="0,5,0,0"
                          TextWrapping="Wrap"
                          Opacity="0.62" />
+
+              <ItemsControl ItemsSource="{Binding Profiles.Wings}" Margin="0,14,0,4">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <Border Margin="0,0,0,10"
+                            Padding="13"
+                            Background="{StaticResource SurfaceAltBrush}"
+                            BorderBrush="{StaticResource BorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="9">
+                      <StackPanel>
+                        <TextBlock Text="{Binding Name}"
+                                   FontWeight="SemiBold"
+                                   FontSize="14" />
+                        <ItemsControl ItemsSource="{Binding Squads}" Margin="0,8,0,0">
+                          <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                              <WrapPanel />
+                            </ItemsPanelTemplate>
+                          </ItemsControl.ItemsPanel>
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                              <Border Width="250"
+                                      MinHeight="82"
+                                      Margin="0,0,9,9"
+                                      Style="{StaticResource DropCardStyle}"
+                                      AllowDrop="True"
+                                      DragOver="OnSquadDragOver"
+                                      Drop="OnSquadDrop"
+                                      ToolTip="Drop one selected character, or every ticked character, into this squad">
+                                <StackPanel>
+                                  <DockPanel>
+                                    <TextBlock DockPanel.Dock="Right"
+                                               Text="{Binding AssignmentCountText}"
+                                               FontSize="11"
+                                               Foreground="{StaticResource TextMutedBrush}" />
+                                    <TextBlock Text="{Binding Name}"
+                                               Margin="0,0,8,0"
+                                               FontWeight="SemiBold" />
+                                  </DockPanel>
+                                  <TextBlock Text="{Binding CharacterPreview}"
+                                             Margin="0,9,0,0"
+                                             TextWrapping="Wrap"
+                                             FontSize="12"
+                                             Foreground="{StaticResource TextMutedBrush}" />
+                                </StackPanel>
+                              </Border>
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                      </StackPanel>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
 
               <Grid Margin="0,12,0,4">
                 <Grid.ColumnDefinitions>
@@ -835,7 +967,10 @@
                         Command="{Binding Profiles.RemoveSelectedAssignmentsCommand}" />
               </WrapPanel>
 
-              <DataGrid ItemsSource="{Binding Profiles.FilteredAssignments}"
+              <DataGrid x:Name="AssignmentGrid"
+                        ItemsSource="{Binding Profiles.FilteredAssignments}"
+                        PreviewMouseLeftButtonDown="OnRosterPreviewMouseLeftButtonDown"
+                        MouseMove="OnRosterMouseMove"
                         AutoGenerateColumns="False"
                         CanUserAddRows="False"
                         CanUserDeleteRows="False"
@@ -853,7 +988,7 @@
                                           Header="Use"
                                           Binding="{Binding IsSelected, UpdateSourceTrigger=PropertyChanged}" />
                   <DataGridTextColumn Width="180"
-                                      Header="Character"
+                                      Header="Character (drag me)"
                                       IsReadOnly="True"
                                       Binding="{Binding CharacterName}" />
                   <DataGridTemplateColumn Width="220" Header="Target squad">
@@ -895,7 +1030,7 @@
                   <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <StackPanel>
-                  <TextBlock Text="Dry-run comparison"
+                  <TextBlock Text="Fleet change preview"
                              FontSize="17"
                              FontWeight="SemiBold" />
                   <TextBlock Text="{Binding Profiles.DryRunTitle}"
@@ -905,8 +1040,9 @@
                 </StackPanel>
                 <WrapPanel Grid.Column="1" VerticalAlignment="Center">
                   <Button Margin="0,0,8,0"
+                          Style="{StaticResource PrimaryButtonStyle}"
                           Padding="11,7"
-                          Content="Repair &amp; organise"
+                          Content="Organise fleet now"
                           IsEnabled="{Binding Profiles.CanEdit}"
                           Command="{Binding Profiles.StartOperationCommand}" />
                   <Button Margin="0,0,8,0"
@@ -924,6 +1060,10 @@
                          Margin="0,14,0,0"
                          TextWrapping="Wrap"
                          FontWeight="SemiBold" />
+              <TextBlock Text="{Binding Profiles.ShipRuleMatchSummary}"
+                         Margin="0,7,0,0"
+                         TextWrapping="Wrap"
+                         Foreground="{StaticResource TextMutedBrush}" />
               <TextBlock Text="{Binding Profiles.DryRunSafetyMessage}"
                          Margin="0,7,0,0"
                          TextWrapping="Wrap"
@@ -988,7 +1128,7 @@
                   <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <StackPanel>
-                  <TextBlock Text="Guarded operation"
+                  <TextBlock Text="Fleet run"
                              FontSize="17"
                              FontWeight="SemiBold" />
                   <TextBlock Text="{Binding Profiles.OperationTitle}"
@@ -999,7 +1139,7 @@
                 <WrapPanel Grid.Column="1" VerticalAlignment="Center">
                   <Button Margin="0,0,8,0"
                           Padding="11,7"
-                          Content="Refresh &amp; continue"
+                          Content="Check now"
                           Command="{Binding Profiles.ContinueOperationCommand}">
                     <Button.Style>
                       <Style TargetType="Button">

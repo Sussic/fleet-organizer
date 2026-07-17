@@ -26,9 +26,9 @@ public sealed class MainWindowXamlTests
     {
         var xaml = ReadMainWindowXaml();
 
-        Assert.Contains("Check fleet &amp; review changes", xaml, StringComparison.Ordinal);
-        Assert.Contains("Start guarded run", xaml, StringComparison.Ordinal);
-        Assert.Contains("Check accepted characters", xaml, StringComparison.Ordinal);
+        Assert.Contains("Preview fleet changes", xaml, StringComparison.Ordinal);
+        Assert.Contains("Organise fleet now", xaml, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Check now\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Value=\"Activity\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Text=\"Run details\"", xaml, StringComparison.Ordinal);
         Assert.DoesNotContain("This page is the next product milestone", xaml, StringComparison.Ordinal);
@@ -61,6 +61,19 @@ public sealed class MainWindowXamlTests
         Assert.Contains("Key=\"Escape\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Profiles.IsAdvancedMode", xaml, StringComparison.Ordinal);
         Assert.Contains("Text=\"Fleet hierarchy\"", xaml, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void FleetDeskSupportsDragPlacementAndShipRules()
+    {
+        var xaml = ReadMainWindowXaml();
+
+        Assert.Contains("Text=\"Automatic ship placement\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Profiles.ObservedShipTypes", xaml, StringComparison.Ordinal);
+        Assert.Contains("Profiles.AddShipRuleCommand", xaml, StringComparison.Ordinal);
+        Assert.Contains("DragOver=\"OnSquadDragOver\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Drop=\"OnSquadDrop\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("MouseMove=\"OnRosterMouseMove\"", xaml, StringComparison.Ordinal);
     }
 
     private static string ReadMainWindowXaml()

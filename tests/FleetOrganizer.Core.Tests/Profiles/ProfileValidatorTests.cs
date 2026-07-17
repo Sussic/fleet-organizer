@@ -92,4 +92,39 @@ public sealed class ProfileValidatorTests
 
         Assert.Empty(errors);
     }
+
+    [Fact]
+    public void DuplicateShipPlacementRulesAreRejectedCaseInsensitively()
+    {
+        var squadId = Guid.NewGuid();
+        var profile = new FleetProfile(
+            Guid.NewGuid(),
+            "Mining",
+            [new(Guid.NewGuid(), "Main", 0, [new(squadId, "Barges", 0)])],
+            [])
+        {
+            ShipRules =
+            [
+                new(Guid.NewGuid(), "Hulk", squadId, 0),
+                new(Guid.NewGuid(), "hulk", squadId, 1),
+            ],
+        };
+
+        var errors = ProfileValidator.Validate(profile);
+
+        Assert.Contains(errors, error => error.Code == "ship_rule.ship.duplicate");
+    }
+
+    [Fact]
+    public void ShipPlacementRuleToMissingSquadIsRejected()
+    {
+        var profile = FleetProfile.Create("Mining") with
+        {
+            ShipRules = [new(Guid.NewGuid(), "Hulk", Guid.NewGuid(), 0)],
+        };
+
+        var errors = ProfileValidator.Validate(profile);
+
+        Assert.Contains(errors, error => error.Code == "ship_rule.squad.missing");
+    }
 }
