@@ -105,7 +105,7 @@ public partial class MainWindow : Window
         DragDrop.DoDragDrop(element, data, DragDropEffects.Move);
     }
 
-    private static void OnLiveSquadDragOver(object sender, DragEventArgs e)
+    private void OnLiveSquadDragOver(object sender, DragEventArgs e)
     {
         e.Effects = sender is FrameworkElement { DataContext: LiveFleetBoardSquadViewModel } &&
             e.Data.GetDataPresent(LiveMemberDragFormat)

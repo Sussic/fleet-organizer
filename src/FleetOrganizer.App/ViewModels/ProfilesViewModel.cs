@@ -1064,7 +1064,7 @@ public partial class ProfilesViewModel : ObservableObject, IDisposable
             return Task.FromResult(false);
         }
 
-        if (stagedMoves.Count == 0)
+        if (stagedMoves.Length == 0)
         {
             StatusMessage = "Drag at least one ordinary squad member to a target squad first.";
             return Task.FromResult(false);
@@ -1106,7 +1106,7 @@ public partial class ProfilesViewModel : ObservableObject, IDisposable
             FleetPlanner.Build(profile, snapshot),
             FleetRunMode.PlacePresent);
         ApplyDryRun(plan, snapshot.ConfirmedAtUtc);
-        DryRunTitle = $"{stagedMoves.Count} staged live move{(stagedMoves.Count == 1 ? string.Empty : "s")} • fleet {snapshot.FleetId}";
+        DryRunTitle = $"{stagedMoves.Length} staged live move{(stagedMoves.Length == 1 ? string.Empty : "s")} • fleet {snapshot.FleetId}";
         DryRunSafetyMessage +=
             " This quick run can place ordinary squad members only; commanders and invitations are excluded.";
         StatusMessage = "Staged move preview ready. One final confirmation remains before any ESI write.";
