@@ -1,12 +1,12 @@
 # Fleet Organizer — Technical Specification
 
 **Status:** Approved implementation baseline
-**Revision:** 1.2
-**Reviewed:** 16 July 2026
+**Revision:** 1.6
+**Reviewed:** 17 July 2026
 **Target:** Windows 11, local single-user desktop application
 **Working title:** Fleet Organizer (name can change without affecting the architecture)
 
-### Implementation checkpoint — Milestone 2
+### Implementation checkpoint — Milestone 6 usability slice
 
 Implemented and tested in the current repository:
 
@@ -17,8 +17,27 @@ Implemented and tested in the current repository:
 - Newline/comma/tab and structured roster paste with exact public `POST /universe/ids` resolution in batches of 500.
 - Per-character desired squad, desired role, local tags, and bulk editing.
 - Versioned profile JSON import/export and validation before persistence.
+- Deterministic desired-versus-live comparison ordered as structure, invites, moves, and role changes.
+- Explicit already-correct and unmanaged-live-member counts, with no-op entries hidden by default.
+- Hard blockers for lost fleet-boss access, ambiguous hierarchy targets, fleet-boss transfer, and fleet-boss demotion.
+- Automatic stale-preview invalidation whenever the current profile hierarchy or assignment data changes.
+- Guarded `POST /fleets/{fleet_id}/members` invitation writes and `PUT /fleets/{fleet_id}/members/{member_id}` ordinary squad-member placement.
+- Fresh same-fleet and fleet-boss verification immediately before execution, with forced re-review when the live plan differs from the reviewed plan.
+- SQLite schema v2 durable operations, typed step payloads, initial live snapshots, attempts, failures, and retry timestamps.
+- Crash-safe invite handling: an in-progress invitation with an unknown outcome is never blindly replayed; the live roster is checked before an explicit retry.
+- Per-character pending/waiting/confirmed/failed/skipped progress plus resume, check accepted, retry, skip, cancel, and terminal-run hide controls.
+- Explicit CSPA guidance for rejected invitations and `Retry-After` persistence for fleet rate limiting.
+- Guarded `POST /fleets/{fleet_id}/wings` and `POST /fleets/{fleet_id}/wings/{wing_id}/squads` creation with returned-ID propagation into durable dependent steps.
+- Separate verified wing/squad rename steps using the current 10-character ESI contract.
+- Deterministic repair-layout matching: exact names first, then ordered reuse only for unmatched nodes that contain no unmanaged member; otherwise create without deleting extras.
+- Managed commander staging through ordinary squad-member positions followed by serialized squad/wing commander transitions and a fresh read before each promotion.
+- Unmanaged commander occupancy is a hard blocker; fleet-boss transfer/demotion, hierarchy deletion, and kicks remain outside the operation boundary.
+- Final live hierarchy/member/role drift verification before a clean completion state.
+- Global WPF dispatcher exception capture with a visible failure message and timestamped local crash report; operation state remains durable across restart.
 
-No ESI fleet write route is enabled at this checkpoint. Milestone 3 begins with desired-versus-live planning and a user-visible dry run before any guarded write implementation.
+Milestone 5 keeps the complete write queue serialized. Structure create results are persisted before dependent naming/placement steps, interrupted creates are reconciled against the initial snapshot, and ambiguous outcomes require attention instead of blind duplication. Rename and commander writes are also verified from fresh live state.
+
+The first Milestone 6 slice adds the repetitive-use interface around that engine: a guided Home launcher, plain-language review and operation phases, a real Activity page, profile/roster filtering, recycling virtualization for growing tables, filtered bulk selection, simple-versus-advanced profile editing, unsaved-change status, and keyboard shortcuts. Snapshot restore preview, chronological history, and redacted diagnostic export remain separate recovery slices; this UI checkpoint does not widen the ESI write boundary.
 
 ## 1. Executive decision
 
@@ -267,7 +286,7 @@ Raw response bodies may be included only in debug logs after redaction and size 
 | 429 | Honor `Retry-After` and rate headers | Visible throttled state and automatic resume |
 | 5xx/network | Exponential backoff with jitter, maximum 3 attempts | Step remains retryable; other independent characters may continue |
 
-`EsiRateGate` tracks rate group, limit, remaining, and used headers. Write operations use a bounded queue. Default concurrency is 3 for independent invitations/member placements; hierarchy mutations and commander transitions are serialized.
+`EsiRateGate` tracks rate group, limit, remaining, and used headers. Write operations use a bounded queue. Milestone 4 deliberately uses concurrency 1; a later soak-tested release may raise independent invitations/member placements to a maximum of 3. Hierarchy mutations and commander transitions remain serialized.
 
 ## 8. Domain model and persistence
 
@@ -653,22 +672,32 @@ No Rust, Node.js, database server, Docker, IIS, or cloud account is required.
 - Profile schema/repository, hierarchy editor, paste parser, bulk name resolution, assignments, tags, validation, and import-current-fleet.
 - **Exit:** profiles can be created, edited, duplicated, exported/imported, and validated without ESI writes.
 
-### Milestone 3 — invite and place
+### Milestone 3 — desired-versus-live dry run
+
+- Pure deterministic planner for hierarchy matching, missing invitations, placements, commander roles, and no-op detection.
+- User-visible ordered preview, summary counts, unmanaged-member boundary, and blocking safety issues.
+- **Exit:** a profile can be compared with a live fleet and produces a stable, explainable zero-write plan.
+
+### Milestone 4 — invite and place
 
 - Pure diff planner, durable operation state machine, invite queue, acceptance detection, ordinary member placement, resume/cancel, and per-character progress.
 - **Exit:** one button invites a 15-character saved roster and places accepted characters idempotently.
 
-### Milestone 4 — hierarchy and commanders
+**Implemented:** guarded start/re-review, durable steps and snapshot, serialized invite queue, acceptance checks, ordinary placement, restart resume, retry/skip/cancel, CSPA guidance, and rate-pause timestamps. A routine run continues with **Refresh & continue** after invitations are accepted; unattended background polling remains a later quality-of-life option.
+
+### Milestone 5 — hierarchy and commanders
 
 - Create/rename structure, role transition planner, serialized commander changes, drift verification, and repair-layout action.
 - **Exit:** full profile reconciliation including commanders with no automatic delete/kick behavior.
 
-### Milestone 5 — quality-of-life and recovery
+**Implemented:** exact/ordered-safe structure matching, durable create-ID propagation, separate verified renames, ordinary-member commander staging, serialized promotions, unmanaged-slot blockers, restart reconciliation, and final live drift verification. Normal runs still never delete hierarchy, kick a member, or transfer fleet boss.
+
+### Milestone 6 — quality-of-life and recovery
 
 - Multi-select drag/drop, snapshots, restore preview, activity history, diagnostic export, keyboard flows, tray behavior, sounds, and stale-state badges.
 - **Exit:** routine repeated use requires only profile choice, one click, and invite acceptance.
 
-### Milestone 6 — release hardening
+### Milestone 7 — release hardening
 
 - Clean-machine package test, performance/accessibility pass, rate/network soak tests, ESI contract review, documentation, checksum, and release workflow.
 - **Exit:** self-contained Windows release meets all acceptance criteria.
@@ -706,7 +735,7 @@ The MVP is complete when all statements below are true:
 - Whether ship rules enter MVP or the first follow-up release; the architecture supports them either way.
 - Optional completion sounds and minimize-to-tray defaults.
 
-None of these changes the selected stack or core operation engine. Coding can start with Milestone 0 immediately.
+None of these changes the selected stack or core operation engine. They can be decided independently while Milestone 6 is implemented.
 
 ## 19. Research sources
 
@@ -723,6 +752,6 @@ None of these changes the selected stack or core operation engine. Coding can st
 - [.NET single-file deployment](https://learn.microsoft.com/en-us/dotnet/core/deploying/single-file/overview)
 - [GongSolutions WPF DragDrop](https://github.com/punker76/gong-wpf-dragdrop)
 
-## 20. Build authorization checkpoint
+## 20. Current build checkpoint
 
-This specification deliberately stops before repository scaffolding or live ESI writes. The next step is to create Milestone 0: solution structure, tests, local configuration contract, application shell, and secure EVE SSO authentication.
+Milestones 0–5 and the first Milestone 6 usability slice are implemented in the repository. The current live-write boundary includes safe structure creation/renaming, invitations, managed-member staging, and serialized squad/wing commander transitions with final verification. Remaining Milestone 6 recovery slices are snapshot/restore preview, chronological activity history, and redacted diagnostics.

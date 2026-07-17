@@ -1,6 +1,8 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using FleetOrganizer.Core.Domain;
+using FleetOrganizer.Core.Operations;
+using FleetOrganizer.Core.Planning;
 
 namespace FleetOrganizer.App.ViewModels;
 
@@ -63,3 +65,97 @@ public sealed partial class ProfileAssignmentEditorViewModel(
 public sealed record ProfileSquadOptionViewModel(Guid Id, string DisplayName);
 
 public sealed record DesiredRoleOptionViewModel(DesiredFleetRole Value, string DisplayName);
+
+public sealed record FleetPlanItemViewModel(FleetPlanItem Item)
+{
+    public string Badge => Item.Kind switch
+    {
+        FleetPlanItemKind.CreateWing => "CREATE WING",
+        FleetPlanItemKind.RenameWing => "RENAME WING",
+        FleetPlanItemKind.CreateSquad => "CREATE SQUAD",
+        FleetPlanItemKind.RenameSquad => "RENAME SQUAD",
+        FleetPlanItemKind.InviteCharacter => "INVITE",
+        FleetPlanItemKind.MoveCharacter => "MOVE",
+        FleetPlanItemKind.ChangeRole => "ROLE",
+        FleetPlanItemKind.AlreadyCorrect => "READY",
+        FleetPlanItemKind.Blocked => "BLOCKED",
+        _ => "PLAN",
+    };
+
+    public string Title => Item.Title;
+
+    public string Detail => Item.Detail;
+
+    public bool IsAlreadyCorrect => Item.Kind == FleetPlanItemKind.AlreadyCorrect;
+
+    public bool IsBlocked => Item.Kind == FleetPlanItemKind.Blocked;
+}
+
+public sealed record FleetOperationStepViewModel(FleetOperationStep Step)
+{
+    public string StepKey => Step.StepKey;
+
+    public string Badge => Step.Type switch
+    {
+        FleetOperationStepType.CreateWing => "CREATE WING",
+        FleetOperationStepType.RenameWing => "RENAME WING",
+        FleetOperationStepType.CreateSquad => "CREATE SQUAD",
+        FleetOperationStepType.RenameSquad => "RENAME SQUAD",
+        FleetOperationStepType.Invite => "INVITE",
+        FleetOperationStepType.Place => "PLACE",
+        FleetOperationStepType.PromoteCommander => "COMMAND",
+        FleetOperationStepType.DeferredCommander => "DEFERRED",
+        _ => "STEP",
+    };
+
+    public string Title => Step.Type switch
+    {
+        FleetOperationStepType.CreateWing => $"Create wing for {Step.Target.WingName}",
+        FleetOperationStepType.RenameWing => $"Name wing {Step.Target.WingName}",
+        FleetOperationStepType.CreateSquad =>
+            $"Create squad for {Step.Target.WingName} / {Step.Target.SquadName}",
+        FleetOperationStepType.RenameSquad =>
+            $"Name squad {Step.Target.WingName} / {Step.Target.SquadName}",
+        FleetOperationStepType.Invite => $"Invite {Step.Target.CharacterName}",
+        FleetOperationStepType.Place =>
+            $"Place {Step.Target.CharacterName} in {Step.Target.WingName} / {Step.Target.SquadName}",
+        FleetOperationStepType.DeferredCommander =>
+            $"Commander work for {Step.Target.CharacterName}",
+        FleetOperationStepType.PromoteCommander =>
+            $"Promote {Step.Target.CharacterName} to {GetRoleLabel(Step.Target.DesiredRole)}",
+        _ => Step.Target.CharacterName,
+    };
+
+    public string StateText => Step.State switch
+    {
+        FleetOperationStepState.Pending when Step.RetryAfterUtc is DateTimeOffset retryAfter =>
+            $"Paused until {retryAfter.ToLocalTime():T}",
+        FleetOperationStepState.Pending => "Pending",
+        FleetOperationStepState.Running => "Write in progress",
+        FleetOperationStepState.Waiting => "Waiting",
+        FleetOperationStepState.Succeeded => "Confirmed",
+        FleetOperationStepState.Failed => "Needs attention",
+        FleetOperationStepState.Skipped => "Skipped",
+        _ => Step.State.ToString(),
+    };
+
+    public string Detail => Step.Message ?? string.Empty;
+
+    public string AttemptsText => Step.Attempts == 0
+        ? string.Empty
+        : $" • {Step.Attempts} attempt{(Step.Attempts == 1 ? string.Empty : "s")}";
+
+    public bool IsFailed => Step.State == FleetOperationStepState.Failed;
+
+    public bool CanRetry => IsFailed;
+
+    public bool CanSkip => Step.Type != FleetOperationStepType.DeferredCommander &&
+        Step.State is not FleetOperationStepState.Succeeded and not FleetOperationStepState.Skipped;
+
+    private static string GetRoleLabel(DesiredFleetRole role) => role switch
+    {
+        DesiredFleetRole.SquadCommander => "Squad Commander",
+        DesiredFleetRole.WingCommander => "Wing Commander",
+        _ => role.ToString(),
+    };
+}

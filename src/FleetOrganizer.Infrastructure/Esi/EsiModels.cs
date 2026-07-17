@@ -44,6 +44,8 @@ internal sealed record EsiResult<T>(
     public bool IsSuccess => FailureKind == EsiFailureKind.None && Value is not null;
 }
 
+internal sealed record EsiEmptyResponse;
+
 #pragma warning disable CA1812 // System.Text.Json creates these internal OpenAPI contract records.
 internal sealed record CharacterFleetResponse(
     [property: JsonPropertyName("fleet_boss_id")] long FleetBossId,
@@ -90,4 +92,26 @@ internal sealed record UniverseIdNameResponse(
 
 internal sealed record UniverseIdsResponse(
     [property: JsonPropertyName("characters")] UniverseIdNameResponse[]? Characters);
+
+internal sealed record InviteFleetMemberRequest(
+    [property: JsonPropertyName("character_id")] long CharacterId,
+    [property: JsonPropertyName("role")] string Role,
+    [property: JsonPropertyName("squad_id")] long SquadId,
+    [property: JsonPropertyName("wing_id")] long WingId);
+
+internal sealed record CreatedFleetWingResponse(
+    [property: JsonPropertyName("wing_id")] long WingId);
+
+internal sealed record CreatedFleetSquadResponse(
+    [property: JsonPropertyName("squad_id")] long SquadId);
+
+internal sealed record RenameFleetStructureRequest(
+    [property: JsonPropertyName("name")] string Name);
+
+internal sealed record MoveFleetMemberRequest(
+    [property: JsonPropertyName("role")] string Role,
+    [property: JsonPropertyName("squad_id")]
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] long? SquadId,
+    [property: JsonPropertyName("wing_id")]
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] long? WingId);
 #pragma warning restore CA1812

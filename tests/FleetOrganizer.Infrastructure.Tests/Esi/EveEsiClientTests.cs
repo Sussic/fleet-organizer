@@ -149,6 +149,130 @@ public sealed class EveEsiClientTests
     }
 
     [Fact]
+    public async Task FleetInvitationUsesAuthenticatedCurrentOpenApiContract()
+    {
+        string? requestBody = null;
+        string? authorization = null;
+        using var httpClient = new HttpClient(new AsyncDelegateHandler(async (
+            request,
+            cancellationToken) =>
+        {
+            Assert.Equal(HttpMethod.Post, request.Method);
+            Assert.Equal("/fleets/7001/members", request.RequestUri?.AbsolutePath);
+            authorization = request.Headers.Authorization?.ToString();
+            requestBody = await request.Content!.ReadAsStringAsync(cancellationToken);
+            return CreateEmptyResponse(HttpStatusCode.NoContent);
+        }));
+        using var client = CreateClient(httpClient, new TestAuthenticationService());
+
+        var result = await client.InviteFleetMemberAsync(
+            7001,
+            new InviteFleetMemberRequest(9002, "squad_member", 20, 10),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Bearer access-token", authorization);
+        var body = Assert.IsType<string>(requestBody);
+        Assert.Contains("\"character_id\":9002", body, StringComparison.Ordinal);
+        Assert.Contains("\"role\":\"squad_member\"", body, StringComparison.Ordinal);
+        Assert.Contains("\"squad_id\":20", body, StringComparison.Ordinal);
+        Assert.Contains("\"wing_id\":10", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task FleetPlacementHonorsRateLimitRetryAfter()
+    {
+        using var httpClient = new HttpClient(new DelegateHandler(request =>
+        {
+            Assert.Equal(HttpMethod.Put, request.Method);
+            Assert.Equal("/fleets/7001/members/9002", request.RequestUri?.AbsolutePath);
+            var response = CreateJsonResponse(
+                HttpStatusCode.TooManyRequests,
+                "{\"error\":\"rate limited\"}");
+            response.Headers.RetryAfter = new RetryConditionHeaderValue(TimeSpan.FromSeconds(12));
+            return response;
+        }));
+        using var client = CreateClient(httpClient, new TestAuthenticationService());
+
+        var result = await client.MoveFleetMemberAsync(
+            7001,
+            9002,
+            new MoveFleetMemberRequest("squad_member", 20, 10),
+            CancellationToken.None);
+
+        Assert.Equal(EsiFailureKind.RateLimited, result.FailureKind);
+        Assert.Equal(TimeSpan.FromSeconds(12), result.RetryAfter);
+    }
+
+    [Fact]
+    public async Task FleetWingCreationReadsReturnedIdWithoutAutomaticReplay()
+    {
+        var requestCount = 0;
+        using var httpClient = new HttpClient(new DelegateHandler(request =>
+        {
+            requestCount++;
+            Assert.Equal(HttpMethod.Post, request.Method);
+            Assert.Equal("/fleets/7001/wings", request.RequestUri?.AbsolutePath);
+            return CreateJsonResponse(HttpStatusCode.Created, "{\"wing_id\":44}");
+        }));
+        using var client = CreateClient(httpClient, new TestAuthenticationService());
+
+        var result = await client.CreateFleetWingAsync(7001, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(44, result.Value!.WingId);
+        Assert.Equal(1, requestCount);
+    }
+
+    [Fact]
+    public async Task WingCommanderRequestOmitsSquadIdPerOpenApiContract()
+    {
+        string? requestBody = null;
+        using var httpClient = new HttpClient(new AsyncDelegateHandler(async (
+            request,
+            cancellationToken) =>
+        {
+            requestBody = await request.Content!.ReadAsStringAsync(cancellationToken);
+            return CreateEmptyResponse(HttpStatusCode.NoContent);
+        }));
+        using var client = CreateClient(httpClient, new TestAuthenticationService());
+
+        var result = await client.MoveFleetMemberAsync(
+            7001,
+            9002,
+            new MoveFleetMemberRequest("wing_commander", SquadId: null, WingId: 10),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var body = Assert.IsType<string>(requestBody);
+        Assert.Contains("\"role\":\"wing_commander\"", body, StringComparison.Ordinal);
+        Assert.Contains("\"wing_id\":10", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("squad_id", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task FleetInvitationDoesNotAutomaticallyReplayServerFailure()
+    {
+        var requestCount = 0;
+        using var httpClient = new HttpClient(new DelegateHandler(_ =>
+        {
+            requestCount++;
+            return CreateJsonResponse(
+                HttpStatusCode.ServiceUnavailable,
+                "{\"error\":\"unavailable\"}");
+        }));
+        using var client = CreateClient(httpClient, new TestAuthenticationService());
+
+        var result = await client.InviteFleetMemberAsync(
+            7001,
+            new InviteFleetMemberRequest(9002, "squad_member", 20, 10),
+            CancellationToken.None);
+
+        Assert.Equal(EsiFailureKind.Server, result.FailureKind);
+        Assert.Equal(1, requestCount);
+    }
+
+    [Fact]
     public async Task FleetServiceBuildsNamedReadOnlySnapshotFromCurrentOpenApiContracts()
     {
         using var httpClient = new HttpClient(new DelegateHandler(request =>
@@ -229,6 +353,16 @@ public sealed class EveEsiClientTests
         };
         response.Content.Headers.Expires = DateTimeOffset.UtcNow.AddMinutes(1);
         response.Headers.ETag = new EntityTagHeaderValue("\"test-etag\"");
+        response.Headers.Add("X-Ratelimit-Group", "fleet");
+        response.Headers.Add("X-Ratelimit-Limit", "1800/15m");
+        response.Headers.Add("X-Ratelimit-Remaining", "1798");
+        response.Headers.Add("X-Ratelimit-Used", "2");
+        return response;
+    }
+
+    private static HttpResponseMessage CreateEmptyResponse(HttpStatusCode statusCode)
+    {
+        var response = new HttpResponseMessage(statusCode);
         response.Headers.Add("X-Ratelimit-Group", "fleet");
         response.Headers.Add("X-Ratelimit-Limit", "1800/15m");
         response.Headers.Add("X-Ratelimit-Remaining", "1798");

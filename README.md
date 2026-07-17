@@ -2,7 +2,7 @@
 
 Fleet Organizer is a local Windows 11 utility for repeatedly creating the same useful EVE Online fleet layout. It is designed for one player managing their own fleets and alts.
 
-This repository currently contains **Milestone 2**: the secure sign-in and read-only Live Fleet foundation plus a complete local profile editor. It can capture the current fleet, build reusable wing/squad layouts, resolve pasted character names, assign desired roles and tags, duplicate profiles, and import/export portable JSON. It does not write to live fleet state yet.
+This repository currently contains the **Milestone 6 usability slice** on top of the guarded Milestone 5 fleet engine. Home now provides a guided choose → check → review → run workflow, Profiles has searchable/virtualized profile and roster views with a simple default and optional advanced hierarchy editor, and Activity explains the current durable operation in plain language before showing technical per-step recovery controls. The existing fresh-fleet checks, explicit confirmation, persistence, and no-kick/no-delete safety boundary are unchanged.
 
 ## Requirements
 
@@ -79,6 +79,41 @@ Wing and squad names can be edited inline, reordered, duplicated, and removed. P
 
 Use the checkboxes and bulk controls to assign several characters to a squad, desired role, or local tags. Choose **Save changes** when the validation line says the profile is valid. Profile edits are not sent to EVE.
 
+The normal Profiles view keeps routine roster work visible and hides the denser hierarchy controls. Enable **Advanced editor** when you need to add, copy, rename, reorder, or delete wings and squads. Profile and roster searches update as you type; **Select all** applies only to the currently filtered roster rows.
+
+## Quick routine workflow
+
+1. Open **Home** and choose a saved profile.
+2. Choose **Check fleet & review changes**. This is a read-only comparison.
+3. Read the plain summary, then choose **Start guarded run** and confirm the exact action counts.
+4. Accept invitations in EVE.
+5. Choose **Check accepted characters** until the run reports **Fleet ready**.
+
+Open **Activity** for the current/recovered run, its phase, next action, progress, and virtualized per-step recovery table. `Ctrl+Enter` prepares the selected profile, `F5` refreshes the live fleet when available, and `Esc` closes the current dry-run preview.
+
+## Preview a profile against the live fleet
+
+1. Sign in as the current fleet boss and select a profile.
+2. Choose **Compare to live** in the profile details card.
+3. Review the ordered dry run: missing wings/squads, invitations, moves, role changes, blockers, and the already-correct count.
+4. Enable **Show characters already in the correct place** when you want the full no-op detail.
+
+The preview uses the current editor state, so it is useful before saving. Any hierarchy or assignment edit invalidates the old comparison rather than leaving a stale plan on screen. Duplicate live names, loss of fleet-boss access, fleet-boss transfer, and fleet-boss demotion are blocking issues. Characters present in the live fleet but absent from the selected profile are counted and explicitly left untouched.
+
+## Run guarded repair and organisation
+
+1. Generate **Compare to live** and review every proposed create, rename, invitation, move, and role change.
+2. Choose **Repair & organise**, then confirm the fleet ID and exact action counts.
+3. Accept invitations on the target EVE clients.
+4. Choose **Refresh & continue** after accepted characters appear; the app stages managed characters as ordinary members before serialized commander promotion.
+5. Continue until the operation reports that final live verification is complete.
+
+The app re-reads the live fleet before the first write. If the plan changed after review, it sends nothing and asks you to review again. Each step is persisted around external writes, so a restart resumes from confirmed live state rather than replaying an assumed success. A failed character can be retried or skipped individually; cancelling stops future steps but does not undo writes ESI already accepted.
+
+An unexpected WPF UI exception is shown before shutdown and written to `%LOCALAPPDATA%\FleetOrganizer\logs\crash-*.log`; the active operation remains persisted for reconciliation after reopening. Inspect a crash log before sharing it because automatic redacted diagnostic export remains a later Milestone 6 recovery slice.
+
+For a missing name, Milestone 5 first reuses the next unmatched live wing/squad only when that node contains no unmanaged member; otherwise it creates a new node. Every rename is shown in the dry run. Extra live structure is left alone. A desired commander slot occupied by a character absent from the profile is a blocker rather than an implicit demotion. An invite can still be rejected by EVE when the target character has a CSPA charge enabled; target characters do not need to sign in to Fleet Organizer, but they must accept the invite in EVE.
+
 ## Useful commands
 
 ```bat
@@ -110,4 +145,4 @@ The EVE client ID is public but kept in `appsettings.Local.json` so each develop
 
 ## Current safety boundary
 
-Live fleet reads, public name/ID resolution, and local saved-profile editing are present. Invitations, moves, role changes, kicks, and hierarchy writes are not. Write actions remain disabled until the persisted operation engine and its safety checks are implemented.
+The Milestone 6 interface uses the Milestone 5 guarded engine for ESI wing/squad creation and naming, invitations, ordinary staging, and serialized squad/wing commander transitions. Every run requires a reviewed dry run, explicit confirmation, fresh same-fleet/fleet-boss checks, durable per-write state, and final live verification. Fleet-boss transfer, hierarchy deletion, kicks, unmanaged-commander demotion, and automatic cleanup remain disabled.

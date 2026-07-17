@@ -3,11 +3,14 @@ using System.ComponentModel;
 using System.IO;
 using System.Text;
 using System.Windows;
+using System.Windows.Data;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using FleetOrganizer.Core.Abstractions;
 using FleetOrganizer.Core.Domain;
 using FleetOrganizer.Core.Fleets;
+using FleetOrganizer.Core.Operations;
+using FleetOrganizer.Core.Planning;
 using FleetOrganizer.Core.Profiles;
 using Microsoft.Win32;
 
@@ -20,9 +23,14 @@ public partial class ProfilesViewModel : ObservableObject
     private readonly IFleetProfileRepository repository;
     private readonly ICharacterNameResolver characterNameResolver;
     private readonly ILiveFleetService liveFleetService;
+    private readonly IFleetOperationService operationService;
     private bool isLoadingEditor;
+    private FleetDryRunPlan? lastDryRunPlan;
+    private FleetOperation? currentOperation;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanPrepareFleet))]
+    [NotifyPropertyChangedFor(nameof(SelectedProfileQuickSummary))]
     public partial ProfileListItemViewModel? SelectedProfile { get; set; }
 
     [ObservableProperty]
@@ -33,11 +41,28 @@ public partial class ProfilesViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanEdit))]
+    [NotifyPropertyChangedFor(nameof(CanPrepareFleet))]
     public partial bool IsEditorActive { get; set; }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanEdit))]
+    [NotifyPropertyChangedFor(nameof(CanOperate))]
+    [NotifyPropertyChangedFor(nameof(CanPrepareFleet))]
     public partial bool IsBusy { get; set; }
+
+    [ObservableProperty]
+    public partial string ProfileSearchText { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial string AssignmentSearchText { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial bool IsAdvancedMode { get; set; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(EditorStateText))]
+    [NotifyPropertyChangedFor(nameof(CanPrepareFleet))]
+    public partial bool HasUnsavedChanges { get; set; }
 
     [ObservableProperty]
     public partial string StatusMessage { get; set; } =
@@ -59,18 +84,80 @@ public partial class ProfilesViewModel : ObservableObject
     [ObservableProperty]
     public partial string BulkTagsText { get; set; } = string.Empty;
 
+    [ObservableProperty]
+    public partial bool HasDryRun { get; set; }
+
+    [ObservableProperty]
+    public partial string DryRunTitle { get; set; } = "No comparison generated.";
+
+    [ObservableProperty]
+    public partial string DryRunSummary { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial string DryRunSafetyMessage { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial string DryRunPrimaryMessage { get; set; } =
+        "Choose a profile and check the live fleet.";
+
+    [ObservableProperty]
+    public partial bool ShowAlreadyCorrect { get; set; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanEdit))]
+    [NotifyPropertyChangedFor(nameof(CanOperate))]
+    public partial bool HasOperation { get; set; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanEdit))]
+    [NotifyPropertyChangedFor(nameof(CanPrepareFleet))]
+    public partial bool HasActiveOperation { get; set; }
+
+    [ObservableProperty]
+    public partial string OperationTitle { get; set; } = "No saved operation.";
+
+    [ObservableProperty]
+    public partial string OperationSummary { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial string OperationStatusMessage { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial bool OperationIsTerminal { get; set; }
+
+    [ObservableProperty]
+    public partial string OperationPhaseTitle { get; set; } = "No fleet run is active";
+
+    [ObservableProperty]
+    public partial string OperationNextAction { get; set; } =
+        "Choose a profile on Home to prepare a run.";
+
+    [ObservableProperty]
+    public partial string OperationProgressText { get; set; } = "0 of 0 steps finished";
+
+    [ObservableProperty]
+    public partial double OperationProgressPercent { get; set; }
+
     public ProfilesViewModel(
         IFleetProfileRepository repository,
         ICharacterNameResolver characterNameResolver,
-        ILiveFleetService liveFleetService)
+        ILiveFleetService liveFleetService,
+        IFleetOperationService operationService)
     {
         ArgumentNullException.ThrowIfNull(repository);
         ArgumentNullException.ThrowIfNull(characterNameResolver);
         ArgumentNullException.ThrowIfNull(liveFleetService);
+        ArgumentNullException.ThrowIfNull(operationService);
 
         this.repository = repository;
         this.characterNameResolver = characterNameResolver;
         this.liveFleetService = liveFleetService;
+        this.operationService = operationService;
+
+        FilteredProfileItems = CollectionViewSource.GetDefaultView(ProfileItems);
+        FilteredProfileItems.Filter = FilterProfile;
+        FilteredAssignments = CollectionViewSource.GetDefaultView(Assignments);
+        FilteredAssignments.Filter = FilterAssignment;
     }
 
     public ObservableCollection<ProfileListItemViewModel> ProfileItems { get; } = [];
@@ -83,6 +170,14 @@ public partial class ProfilesViewModel : ObservableObject
 
     public ObservableCollection<string> UnresolvedRosterEntries { get; } = [];
 
+    public ObservableCollection<FleetPlanItemViewModel> DryRunItems { get; } = [];
+
+    public ObservableCollection<FleetOperationStepViewModel> OperationItems { get; } = [];
+
+    public ICollectionView FilteredProfileItems { get; }
+
+    public ICollectionView FilteredAssignments { get; }
+
     public DesiredRoleOptionViewModel[] RoleOptions { get; } =
     [
         new(DesiredFleetRole.SquadMember, "Squad member"),
@@ -91,13 +186,45 @@ public partial class ProfilesViewModel : ObservableObject
         new(DesiredFleetRole.FleetCommander, "Fleet commander"),
     ];
 
-    public bool CanEdit => IsEditorActive && !IsBusy;
+    public bool CanEdit => IsEditorActive && !IsBusy && !HasActiveOperation;
+
+    public bool CanOperate => HasOperation && !IsBusy;
+
+    public bool CanPrepareFleet =>
+        IsEditorActive && !IsBusy && !HasActiveOperation && !HasUnsavedChanges;
+
+    public string SelectedProfileQuickSummary => SelectedProfile is null
+        ? "No profile selected"
+        : $"{SelectedProfile.Summary} • saved on this PC";
+
+    public string ProfileSearchSummary =>
+        $"{FilteredProfileItems.Cast<object>().Count()} of {ProfileItems.Count} profiles";
+
+    public string AssignmentSearchSummary
+    {
+        get
+        {
+            var selectedCount = Assignments.Count(assignment => assignment.IsSelected);
+            var visibleCount = FilteredAssignments.Cast<object>().Count();
+            return $"Showing {visibleCount} of {Assignments.Count} characters • {selectedCount} selected";
+        }
+    }
+
+    public string EditorStateText => HasUnsavedChanges
+        ? "Unsaved local changes"
+        : "All changes saved locally";
 
     public async Task InitializeAsync()
     {
         try
         {
             await ReloadProfilesAsync(null);
+            var resumableOperation = await operationService.LoadLatestResumableAsync();
+            if (resumableOperation is not null)
+            {
+                ShowOperation(resumableOperation);
+            }
+
             StatusMessage = ProfileItems.Count == 0
                 ? "No saved profiles yet. Create one or capture the current live fleet."
                 : $"Loaded {ProfileItems.Count} saved profile{(ProfileItems.Count == 1 ? string.Empty : "s")}.";
@@ -107,6 +234,31 @@ public partial class ProfilesViewModel : ObservableObject
             StatusMessage = $"Profiles could not be loaded: {exception.Message}";
         }
     }
+
+    [RelayCommand]
+    private async Task PrepareFleetAsync()
+    {
+        if (!CanPrepareFleet)
+        {
+            StatusMessage = SelectedProfile is null
+                ? "Choose or create a saved profile first."
+                : HasUnsavedChanges
+                    ? "Save the local profile changes before checking the live fleet."
+                    : "Finish or cancel the active fleet run before preparing another one.";
+            return;
+        }
+
+        await CompareCurrentProfileAsync();
+    }
+
+    [RelayCommand]
+    private void ClearProfileSearch() => ProfileSearchText = string.Empty;
+
+    [RelayCommand]
+    private void ClearAssignmentSearch() => AssignmentSearchText = string.Empty;
+
+    [RelayCommand]
+    private void ShowAdvancedEditor() => IsAdvancedMode = true;
 
     [RelayCommand]
     private async Task NewProfileAsync()
@@ -446,7 +598,15 @@ public partial class ProfilesViewModel : ObservableObject
                 : string.Join(Environment.NewLine, result.UnresolvedNames);
             StatusMessage = result.UserMessage ??
                 $"Added {addedCount}; skipped {duplicateCount} already assigned; {result.UnresolvedNames.Length} unresolved.";
+            if (addedCount > 0)
+            {
+                MarkEditorDirty();
+                FilteredAssignments.Refresh();
+                RefreshAssignmentSummary();
+            }
+
             RefreshValidation();
+            InvalidateDryRun();
         }
         catch (Exception exception)
         {
@@ -456,6 +616,215 @@ public partial class ProfilesViewModel : ObservableObject
         {
             IsBusy = false;
         }
+    }
+
+    [RelayCommand]
+    private async Task CompareCurrentProfileAsync()
+    {
+        if (!CanEdit)
+        {
+            return;
+        }
+
+        var profile = BuildCurrentProfile();
+        var errors = ProfileValidator.Validate(profile);
+        if (errors.Count > 0)
+        {
+            ValidationSummary = FormatValidation(errors);
+            StatusMessage = "Fix the validation errors before comparing this profile.";
+            return;
+        }
+
+        IsBusy = true;
+        StatusMessage = "Reading the current fleet and building a dry run…";
+        try
+        {
+            var liveResult = await liveFleetService.LoadCurrentAsync();
+            if (liveResult.Status != LiveFleetLoadStatus.Ready || liveResult.Snapshot is null)
+            {
+                InvalidateDryRun();
+                StatusMessage = liveResult.UserMessage;
+                return;
+            }
+
+            var plan = FleetPlanner.Build(profile, liveResult.Snapshot);
+            ApplyDryRun(plan, liveResult.Snapshot.ConfirmedAtUtc);
+            StatusMessage = plan.BlockingIssues == 0
+                ? $"Dry run ready: {plan.TotalChanges} proposed change{(plan.TotalChanges == 1 ? string.Empty : "s")}."
+                : $"Dry run found {plan.BlockingIssues} blocking issue{(plan.BlockingIssues == 1 ? string.Empty : "s")}.";
+        }
+        catch (Exception exception)
+        {
+            InvalidateDryRun();
+            StatusMessage = $"Dry run could not be built: {exception.Message}";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    [RelayCommand]
+    private void HideDryRun() => InvalidateDryRun();
+
+    [RelayCommand]
+    private async Task StartOperationAsync()
+    {
+        var reviewedPlan = lastDryRunPlan;
+        if (!CanEdit || reviewedPlan is null)
+        {
+            StatusMessage = "Generate and review a current dry run before starting.";
+            return;
+        }
+
+        if (!reviewedPlan.CanExecute)
+        {
+            StatusMessage = "Resolve the dry-run safety blockers before starting.";
+            return;
+        }
+
+        var answer = MessageBox.Show(
+            $"Start a guarded fleet operation for '{reviewedPlan.ProfileName}'?\n\n" +
+            $"Fleet: {reviewedPlan.FleetId}\n" +
+            $"Structure creates: {reviewedPlan.StructureCreates}\n" +
+            $"Structure renames: {reviewedPlan.StructureRenames}\n" +
+            $"Invitations: {reviewedPlan.CharacterInvites}\n" +
+            $"Planned moves/role differences: {reviewedPlan.CharacterMoves + reviewedPlan.RoleChanges}\n\n" +
+            "The app will re-check the live fleet and fleet boss before writing. Structure and commander changes are serialized. It will not delete hierarchy, kick members, transfer fleet boss, or demote unmanaged commanders. Invitations must still be accepted in EVE.",
+            "Start guarded operation",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
+        if (answer != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        IsBusy = true;
+        StatusMessage = "Re-checking the reviewed plan before the first write…";
+        try
+        {
+            var result = await operationService.StartAsync(
+                BuildCurrentProfile(),
+                reviewedPlan);
+            ApplyDryRun(result.CurrentPlan, DateTimeOffset.UtcNow);
+            if (!result.Started || result.Operation is null)
+            {
+                StatusMessage = result.UserMessage;
+                return;
+            }
+
+            ShowOperation(result.Operation);
+            StatusMessage = result.UserMessage;
+        }
+        catch (Exception exception)
+        {
+            StatusMessage = $"Operation could not start: {exception.Message}";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    [RelayCommand]
+    private async Task ContinueOperationAsync()
+    {
+        var operation = currentOperation;
+        if (!CanOperate || operation is null || operation.IsTerminal)
+        {
+            return;
+        }
+
+        await RunOperationActionAsync(
+            () => operationService.ContinueAsync(operation.Id),
+            "Checking accepted invitations and current placements…");
+    }
+
+    [RelayCommand]
+    private async Task RetryOperationStepAsync(FleetOperationStepViewModel? item)
+    {
+        var operation = currentOperation;
+        if (!CanOperate || operation is null || item is null || !item.CanRetry)
+        {
+            return;
+        }
+
+        await RunOperationActionAsync(
+            () => operationService.RetryStepAsync(operation.Id, item.StepKey),
+            $"Re-checking {item.Title} before retry…");
+    }
+
+    [RelayCommand]
+    private async Task SkipOperationStepAsync(FleetOperationStepViewModel? item)
+    {
+        var operation = currentOperation;
+        if (!CanOperate || operation is null || item is null || !item.CanSkip)
+        {
+            return;
+        }
+
+        var answer = MessageBox.Show(
+            $"Skip this operation step?\n\n{item.Title}\n\nNo further write will be sent for it during this run.",
+            "Skip operation step",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
+        if (answer != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        await RunOperationActionAsync(
+            () => operationService.SkipStepAsync(operation.Id, item.StepKey),
+            $"Skipping {item.Title}…");
+    }
+
+    [RelayCommand]
+    private async Task CancelOperationAsync()
+    {
+        var operation = currentOperation;
+        if (!CanOperate || operation is null || operation.IsTerminal)
+        {
+            return;
+        }
+
+        var answer = MessageBox.Show(
+            "Cancel this saved operation?\n\nAlready accepted ESI writes are not undone. Pending steps will stop and the run will not resume automatically.",
+            "Cancel operation",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
+        if (answer != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        await RunOperationActionAsync(
+            () => operationService.CancelAsync(
+                operation.Id,
+                "Cancelled by the user. Already accepted writes were not undone."),
+            "Cancelling the saved operation…");
+    }
+
+    [RelayCommand]
+    private void HideOperation()
+    {
+        if (currentOperation is not null && !currentOperation.IsTerminal)
+        {
+            StatusMessage = "Complete or cancel the active operation before hiding it.";
+            return;
+        }
+
+        currentOperation = null;
+        OperationItems.Clear();
+        HasOperation = false;
+        HasActiveOperation = false;
+        OperationIsTerminal = false;
+        OperationTitle = "No saved operation.";
+        OperationSummary = string.Empty;
+        OperationStatusMessage = string.Empty;
+        OperationPhaseTitle = "No fleet run is active";
+        OperationNextAction = "Choose a profile on Home to prepare a run.";
+        OperationProgressText = "0 of 0 steps finished";
+        OperationProgressPercent = 0;
     }
 
     [RelayCommand]
@@ -476,7 +845,9 @@ public partial class ProfilesViewModel : ObservableObject
         HookWing(wing);
         Wings.Add(wing);
         UpdateSquadOptions();
+        MarkEditorDirty();
         RefreshValidation();
+        InvalidateDryRun();
     }
 
     [RelayCommand]
@@ -495,7 +866,9 @@ public partial class ProfilesViewModel : ObservableObject
         HookSquad(squad);
         wing.Squads.Add(squad);
         UpdateSquadOptions();
+        MarkEditorDirty();
         RefreshValidation();
+        InvalidateDryRun();
     }
 
     [RelayCommand]
@@ -519,7 +892,9 @@ public partial class ProfilesViewModel : ObservableObject
         HookWing(copy);
         Wings.Insert(Wings.IndexOf(wing) + 1, copy);
         UpdateSquadOptions();
+        MarkEditorDirty();
         RefreshValidation();
+        InvalidateDryRun();
     }
 
     [RelayCommand]
@@ -539,7 +914,9 @@ public partial class ProfilesViewModel : ObservableObject
         HookSquad(copy);
         wing.Squads.Insert(wing.Squads.IndexOf(squad) + 1, copy);
         UpdateSquadOptions();
+        MarkEditorDirty();
         RefreshValidation();
+        InvalidateDryRun();
     }
 
     [RelayCommand]
@@ -572,7 +949,9 @@ public partial class ProfilesViewModel : ObservableObject
         UnhookWing(wing);
         Wings.Remove(wing);
         UpdateSquadOptions();
+        MarkEditorDirty();
         RefreshValidation();
+        InvalidateDryRun();
     }
 
     [RelayCommand]
@@ -593,16 +972,20 @@ public partial class ProfilesViewModel : ObservableObject
         UnhookSquad(squad);
         wing.Squads.Remove(squad);
         UpdateSquadOptions();
+        MarkEditorDirty();
         RefreshValidation();
+        InvalidateDryRun();
     }
 
     [RelayCommand]
     private void SelectAllAssignments()
     {
-        foreach (var assignment in Assignments)
+        foreach (var assignment in FilteredAssignments.Cast<ProfileAssignmentEditorViewModel>())
         {
             assignment.IsSelected = true;
         }
+
+        RefreshAssignmentSummary();
     }
 
     [RelayCommand]
@@ -612,6 +995,8 @@ public partial class ProfilesViewModel : ObservableObject
         {
             assignment.IsSelected = false;
         }
+
+        RefreshAssignmentSummary();
     }
 
     [RelayCommand]
@@ -651,6 +1036,13 @@ public partial class ProfilesViewModel : ObservableObject
             ? "Select at least one character first."
             : $"Removed {selected.Length} character{(selected.Length == 1 ? string.Empty : "s")} from this local profile.";
         RefreshValidation();
+        if (selected.Length > 0)
+        {
+            MarkEditorDirty();
+            FilteredAssignments.Refresh();
+            RefreshAssignmentSummary();
+            InvalidateDryRun();
+        }
     }
 
     partial void OnSelectedProfileChanged(ProfileListItemViewModel? value)
@@ -664,10 +1056,32 @@ public partial class ProfilesViewModel : ObservableObject
         LoadEditor(value.Profile);
     }
 
+    partial void OnProfileSearchTextChanged(string value)
+    {
+        _ = value;
+        FilteredProfileItems.Refresh();
+        OnPropertyChanged(nameof(ProfileSearchSummary));
+    }
+
+    partial void OnAssignmentSearchTextChanged(string value)
+    {
+        _ = value;
+        FilteredAssignments.Refresh();
+        OnPropertyChanged(nameof(AssignmentSearchSummary));
+    }
+
     partial void OnProfileNameChanged(string value)
     {
         _ = value;
+        MarkEditorDirty();
         RefreshValidation();
+        InvalidateDryRun();
+    }
+
+    partial void OnShowAlreadyCorrectChanged(bool value)
+    {
+        _ = value;
+        RefreshVisibleDryRunItems();
     }
 
     private async Task ReloadProfilesAsync(Guid? selectedProfileId)
@@ -678,6 +1092,9 @@ public partial class ProfilesViewModel : ObservableObject
         {
             ProfileItems.Add(new ProfileListItemViewModel(profile));
         }
+
+        FilteredProfileItems.Refresh();
+        OnPropertyChanged(nameof(ProfileSearchSummary));
 
         SelectedProfile = selectedProfileId is Guid id
             ? ProfileItems.FirstOrDefault(item => item.Id == id)
@@ -690,6 +1107,7 @@ public partial class ProfilesViewModel : ObservableObject
 
     private void LoadEditor(FleetProfile profile)
     {
+        InvalidateDryRun();
         isLoadingEditor = true;
         ClearEditorCollections();
         EditingProfileId = profile.Id;
@@ -725,11 +1143,15 @@ public partial class ProfilesViewModel : ObservableObject
         IsEditorActive = true;
         UpdateSquadOptions();
         isLoadingEditor = false;
+        HasUnsavedChanges = false;
+        FilteredAssignments.Refresh();
+        RefreshAssignmentSummary();
         RefreshValidation();
     }
 
     private void ClearEditor()
     {
+        InvalidateDryRun();
         isLoadingEditor = true;
         ClearEditorCollections();
         EditingProfileId = Guid.Empty;
@@ -739,6 +1161,9 @@ public partial class ProfilesViewModel : ObservableObject
         UnresolvedRosterEntries.Clear();
         ValidationSummary = "No profile selected.";
         isLoadingEditor = false;
+        HasUnsavedChanges = false;
+        FilteredAssignments.Refresh();
+        RefreshAssignmentSummary();
     }
 
     private void ClearEditorCollections()
@@ -857,15 +1282,63 @@ public partial class ProfilesViewModel : ObservableObject
             UpdateSquadOptions();
         }
 
+        MarkEditorDirty();
+        FilteredAssignments.Refresh();
         RefreshValidation();
+        InvalidateDryRun();
     }
 
     private void OnAssignmentPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         _ = sender;
-        _ = e;
+        RefreshAssignmentSummary();
         RefreshValidation();
+        if (!string.Equals(e.PropertyName, nameof(ProfileAssignmentEditorViewModel.IsSelected), StringComparison.Ordinal))
+        {
+            MarkEditorDirty();
+            FilteredAssignments.Refresh();
+            InvalidateDryRun();
+        }
     }
+
+    private bool FilterProfile(object item)
+    {
+        if (item is not ProfileListItemViewModel profile || string.IsNullOrWhiteSpace(ProfileSearchText))
+        {
+            return true;
+        }
+
+        return profile.Name.Contains(ProfileSearchText.Trim(), StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool FilterAssignment(object item)
+    {
+        if (item is not ProfileAssignmentEditorViewModel assignment ||
+            string.IsNullOrWhiteSpace(AssignmentSearchText))
+        {
+            return true;
+        }
+
+        var search = AssignmentSearchText.Trim();
+        var squadName = SquadOptions
+            .FirstOrDefault(option => option.Id == assignment.TargetSquadId)
+            ?.DisplayName;
+        return assignment.CharacterName.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+            assignment.TagsText.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+            (squadName?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false) ||
+            assignment.DesiredRole.ToString().Contains(search, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void MarkEditorDirty()
+    {
+        if (!isLoadingEditor && IsEditorActive)
+        {
+            HasUnsavedChanges = true;
+        }
+    }
+
+    private void RefreshAssignmentSummary() =>
+        OnPropertyChanged(nameof(AssignmentSearchSummary));
 
     private void MoveWing(ProfileWingEditorViewModel? wing, int offset)
     {
@@ -875,7 +1348,9 @@ public partial class ProfilesViewModel : ObservableObject
         }
 
         MoveItem(Wings, wing, offset);
+        MarkEditorDirty();
         RefreshValidation();
+        InvalidateDryRun();
     }
 
     private void MoveSquad(ProfileSquadEditorViewModel? squad, int offset)
@@ -888,7 +1363,9 @@ public partial class ProfilesViewModel : ObservableObject
 
         MoveItem(wing.Squads, squad, offset);
         UpdateSquadOptions();
+        MarkEditorDirty();
         RefreshValidation();
+        InvalidateDryRun();
     }
 
     private ProfileWingEditorViewModel? FindParentWing(ProfileSquadEditorViewModel? squad) =>
@@ -1020,6 +1497,160 @@ public partial class ProfilesViewModel : ObservableObject
 
     private static string FormatValidation(IReadOnlyList<ProfileValidationError> errors) =>
         string.Join(" • ", errors.Take(3).Select(error => error.Message));
+
+    private void InvalidateDryRun()
+    {
+        lastDryRunPlan = null;
+        DryRunItems.Clear();
+        HasDryRun = false;
+        DryRunTitle = "No comparison generated.";
+        DryRunSummary = string.Empty;
+        DryRunSafetyMessage = string.Empty;
+        DryRunPrimaryMessage = "Choose a profile and check the live fleet.";
+    }
+
+    private void ApplyDryRun(FleetDryRunPlan plan, DateTimeOffset confirmedAtUtc)
+    {
+        lastDryRunPlan = plan;
+        DryRunTitle =
+            $"'{plan.ProfileName}' compared with fleet {plan.FleetId} • live state confirmed {confirmedAtUtc.ToLocalTime():t}";
+        DryRunSummary = BuildDryRunSummary(plan);
+        DryRunSafetyMessage = BuildDryRunSafetyMessage(plan);
+        DryRunPrimaryMessage = plan.BlockingIssues > 0
+            ? "This run needs attention before it can start"
+            : plan.TotalChanges == 0
+                ? "Fleet is already organised"
+                : "Ready for your confirmation";
+        HasDryRun = true;
+        RefreshVisibleDryRunItems();
+    }
+
+    private async Task RunOperationActionAsync(
+        Func<Task<FleetOperation>> action,
+        string progressMessage)
+    {
+        IsBusy = true;
+        StatusMessage = progressMessage;
+        try
+        {
+            var operation = await action();
+            ShowOperation(operation);
+            StatusMessage = operation.Message ?? "Operation updated.";
+        }
+        catch (Exception exception)
+        {
+            StatusMessage = $"Operation could not continue: {exception.Message}";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private void ShowOperation(FleetOperation operation)
+    {
+        currentOperation = operation;
+        OperationItems.Clear();
+        foreach (var step in operation.Steps.OrderBy(step => step.SortOrder))
+        {
+            OperationItems.Add(new FleetOperationStepViewModel(step));
+        }
+
+        HasOperation = true;
+        HasActiveOperation = !operation.IsTerminal;
+        OperationIsTerminal = operation.IsTerminal;
+        OperationTitle =
+            $"{operation.ProfileName} • fleet {operation.FleetId} • {HumanizeOperationState(operation.State)}";
+        OperationSummary =
+            $"{operation.SucceededSteps} confirmed • {operation.WaitingSteps} waiting • " +
+            $"{operation.PendingSteps} pending • {operation.FailedSteps} failed • {operation.SkippedSteps} skipped";
+        OperationStatusMessage = operation.Message ?? string.Empty;
+        OperationPhaseTitle = GetOperationPhaseTitle(operation.State);
+        OperationNextAction = GetOperationNextAction(operation.State);
+        var finishedSteps = operation.SucceededSteps + operation.FailedSteps + operation.SkippedSteps;
+        var totalSteps = operation.Steps.Length;
+        OperationProgressText =
+            $"{finishedSteps} of {totalSteps} steps finished";
+        OperationProgressPercent = totalSteps == 0
+            ? operation.IsTerminal ? 100 : 0
+            : Math.Clamp((double)finishedSteps / totalSteps * 100, 0, 100);
+    }
+
+    private static string GetOperationPhaseTitle(OperationState state) => state switch
+    {
+        OperationState.EnsureStructure => "1. Preparing wings and squads",
+        OperationState.InviteMissing => "2. Sending invitations",
+        OperationState.AwaitAcceptance => "3. Waiting for characters to accept",
+        OperationState.PlaceMembers => "4. Placing characters",
+        OperationState.AssignCommanders => "5. Assigning commanders",
+        OperationState.Verify => "6. Checking the finished fleet",
+        OperationState.NeedsAttention => "Action needed",
+        OperationState.Complete => "Fleet ready",
+        OperationState.Cancelled => "Run cancelled safely",
+        _ => "Preparing the fleet run",
+    };
+
+    private static string GetOperationNextAction(OperationState state) => state switch
+    {
+        OperationState.AwaitAcceptance =>
+            "Accept the invitations in EVE, then choose Check accepted characters.",
+        OperationState.NeedsAttention =>
+            "Open the technical steps below, then retry or skip the failed item.",
+        OperationState.Complete =>
+            "The requested layout was confirmed against the live fleet.",
+        OperationState.Cancelled =>
+            "No more writes will be sent. Writes already accepted by EVE were left in place.",
+        _ => "Fleet Organizer will perform one guarded step at a time.",
+    };
+
+    private static string HumanizeOperationState(OperationState state) => state switch
+    {
+        OperationState.InviteMissing => "inviting",
+        OperationState.EnsureStructure => "repairing structure",
+        OperationState.AwaitAcceptance => "awaiting acceptance",
+        OperationState.PlaceMembers => "placing members",
+        OperationState.AssignCommanders => "assigning commanders",
+        OperationState.Verify => "verifying",
+        OperationState.NeedsAttention => "needs attention",
+        OperationState.Complete => "complete",
+        OperationState.Cancelled => "cancelled",
+        _ => state.ToString(),
+    };
+
+    private void RefreshVisibleDryRunItems()
+    {
+        DryRunItems.Clear();
+        if (lastDryRunPlan is null)
+        {
+            return;
+        }
+
+        foreach (var item in lastDryRunPlan.Items)
+        {
+            var viewModel = new FleetPlanItemViewModel(item);
+            if (ShowAlreadyCorrect || !viewModel.IsAlreadyCorrect)
+            {
+                DryRunItems.Add(viewModel);
+            }
+        }
+    }
+
+    private static string BuildDryRunSummary(FleetDryRunPlan plan) =>
+        $"{plan.StructureChanges} structure • {plan.CharacterInvites} invites • " +
+        $"{plan.CharacterMoves} moves • {plan.RoleChanges} role changes • " +
+        $"{plan.AlreadyCorrect} already correct • {plan.IgnoredLiveMembers} live members left untouched";
+
+    private static string BuildDryRunSafetyMessage(FleetDryRunPlan plan)
+    {
+        if (plan.BlockingIssues > 0)
+        {
+            return $"Blocked: resolve {plan.BlockingIssues} safety issue{(plan.BlockingIssues == 1 ? string.Empty : "s")} before an operation could start.";
+        }
+
+        return plan.TotalChanges == 0
+            ? "The saved assignments already match the live fleet. No changes are needed."
+            : "Milestone 5 can repair shown structure, invite/place members, and apply serialized squad/wing commander roles after one final confirmation. No hierarchy is deleted and unmanaged live members remain untouched.";
+    }
 
     private static string GetSafeFileName(string value)
     {

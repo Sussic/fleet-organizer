@@ -20,4 +20,9 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
   </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\src\FleetOrganizer.App\MainWindow.xaml"
+          Link="Fixtures\MainWindow.xaml"
+          CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

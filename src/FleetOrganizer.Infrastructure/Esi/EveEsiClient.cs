@@ -77,6 +77,102 @@ internal sealed class EveEsiClient : IDisposable
             LiveFleetCacheDuration,
             cancellationToken);
 
+    public Task<EsiResult<EsiEmptyResponse>> InviteFleetMemberAsync(
+        long fleetId,
+        InviteFleetMemberRequest invitation,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(invitation);
+
+        return SendWriteAsync(
+            () => new HttpRequestMessage(
+                HttpMethod.Post,
+                new Uri(EsiBaseUri, $"fleets/{fleetId}/members"))
+            {
+                Content = JsonContent.Create(invitation, options: SerializerOptions),
+            },
+            fleetId,
+            cancellationToken);
+    }
+
+    public Task<EsiResult<EsiEmptyResponse>> MoveFleetMemberAsync(
+        long fleetId,
+        long characterId,
+        MoveFleetMemberRequest placement,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(placement);
+
+        return SendWriteAsync(
+            () => new HttpRequestMessage(
+                HttpMethod.Put,
+                new Uri(EsiBaseUri, $"fleets/{fleetId}/members/{characterId}"))
+            {
+                Content = JsonContent.Create(placement, options: SerializerOptions),
+            },
+            fleetId,
+            cancellationToken);
+    }
+
+    public Task<EsiResult<CreatedFleetWingResponse>> CreateFleetWingAsync(
+        long fleetId,
+        CancellationToken cancellationToken) =>
+        SendWriteWithResponseAsync<CreatedFleetWingResponse>(
+            () => new HttpRequestMessage(
+                HttpMethod.Post,
+                new Uri(EsiBaseUri, $"fleets/{fleetId}/wings")),
+            fleetId,
+            cancellationToken);
+
+    public Task<EsiResult<EsiEmptyResponse>> RenameFleetWingAsync(
+        long fleetId,
+        long wingId,
+        RenameFleetStructureRequest request,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        return SendWriteAsync(
+            () => new HttpRequestMessage(
+                HttpMethod.Put,
+                new Uri(EsiBaseUri, $"fleets/{fleetId}/wings/{wingId}"))
+            {
+                Content = JsonContent.Create(request, options: SerializerOptions),
+            },
+            fleetId,
+            cancellationToken);
+    }
+
+    public Task<EsiResult<CreatedFleetSquadResponse>> CreateFleetSquadAsync(
+        long fleetId,
+        long wingId,
+        CancellationToken cancellationToken) =>
+        SendWriteWithResponseAsync<CreatedFleetSquadResponse>(
+            () => new HttpRequestMessage(
+                HttpMethod.Post,
+                new Uri(EsiBaseUri, $"fleets/{fleetId}/wings/{wingId}/squads")),
+            fleetId,
+            cancellationToken);
+
+    public Task<EsiResult<EsiEmptyResponse>> RenameFleetSquadAsync(
+        long fleetId,
+        long squadId,
+        RenameFleetStructureRequest request,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        return SendWriteAsync(
+            () => new HttpRequestMessage(
+                HttpMethod.Put,
+                new Uri(EsiBaseUri, $"fleets/{fleetId}/squads/{squadId}"))
+            {
+                Content = JsonContent.Create(request, options: SerializerOptions),
+            },
+            fleetId,
+            cancellationToken);
+    }
+
     public async Task<EsiResult<UniverseNameResponse[]>> PostUniverseNamesAsync(
         long[] ids,
         CancellationToken cancellationToken)
@@ -101,6 +197,7 @@ internal sealed class EveEsiClient : IDisposable
                 authenticated: false,
                 cachedEntry: null,
                 fallbackCacheDuration: TimeSpan.Zero,
+                allowAutomaticRetry: true,
                 cancellationToken).ConfigureAwait(false);
         }
         finally
@@ -140,6 +237,7 @@ internal sealed class EveEsiClient : IDisposable
                 authenticated: false,
                 cachedEntry: null,
                 fallbackCacheDuration: TimeSpan.Zero,
+                allowAutomaticRetry: true,
                 cancellationToken).ConfigureAwait(false);
         }
         finally
@@ -153,6 +251,20 @@ internal sealed class EveEsiClient : IDisposable
         var path = $"characters/{characterId}/fleet";
         cache.Remove(path);
         failureCache.Remove(path);
+    }
+
+    public void InvalidateLiveFleet(long fleetId)
+    {
+        foreach (var path in new[]
+        {
+            $"fleets/{fleetId}",
+            $"fleets/{fleetId}/members",
+            $"fleets/{fleetId}/wings",
+        })
+        {
+            cache.Remove(path);
+            failureCache.Remove(path);
+        }
     }
 
     public void Dispose()
@@ -185,6 +297,7 @@ internal sealed class EveEsiClient : IDisposable
                 authenticated: true,
                 cachedEntry,
                 fallbackCacheDuration,
+                allowAutomaticRetry: true,
                 cancellationToken).ConfigureAwait(false);
 
             if (result.IsSuccess && result.Value is not null)
@@ -213,17 +326,56 @@ internal sealed class EveEsiClient : IDisposable
         }
     }
 
+    private async Task<EsiResult<EsiEmptyResponse>> SendWriteAsync(
+        Func<HttpRequestMessage> requestFactory,
+        long fleetId,
+        CancellationToken cancellationToken) =>
+        await SendWriteWithResponseAsync<EsiEmptyResponse>(
+            requestFactory,
+            fleetId,
+            cancellationToken).ConfigureAwait(false);
+
+    private async Task<EsiResult<T>> SendWriteWithResponseAsync<T>(
+        Func<HttpRequestMessage> requestFactory,
+        long fleetId,
+        CancellationToken cancellationToken)
+    {
+        await requestGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            var result = await SendAsync<T>(
+                requestFactory,
+                authenticated: true,
+                cachedEntry: null,
+                fallbackCacheDuration: TimeSpan.Zero,
+                allowAutomaticRetry: false,
+                cancellationToken).ConfigureAwait(false);
+            if (result.IsSuccess)
+            {
+                InvalidateLiveFleet(fleetId);
+            }
+
+            return result;
+        }
+        finally
+        {
+            requestGate.Release();
+        }
+    }
+
     private async Task<EsiResult<T>> SendAsync<T>(
         Func<HttpRequestMessage> requestFactory,
         bool authenticated,
         EsiCacheEntry? cachedEntry,
         TimeSpan fallbackCacheDuration,
+        bool allowAutomaticRetry,
         CancellationToken cancellationToken)
     {
         string? refreshedAccessToken = null;
         var hasRefreshedAuthorization = false;
+        var maximumAttempts = allowAutomaticRetry ? 3 : 1;
 
-        for (var attempt = 1; attempt <= 3; attempt++)
+        for (var attempt = 1; attempt <= maximumAttempts; attempt++)
         {
             var pausedResult = CreatePausedResult<T>();
             if (pausedResult is not null)
@@ -259,13 +411,13 @@ internal sealed class EveEsiClient : IDisposable
                     .SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
                     .ConfigureAwait(false);
             }
-            catch (HttpRequestException) when (attempt < 3)
+            catch (HttpRequestException) when (attempt < maximumAttempts)
             {
                 await DelayBeforeRetryAsync(attempt, cancellationToken).ConfigureAwait(false);
                 continue;
             }
             catch (OperationCanceledException) when (
-                !cancellationToken.IsCancellationRequested && attempt < 3)
+                !cancellationToken.IsCancellationRequested && attempt < maximumAttempts)
             {
                 await DelayBeforeRetryAsync(attempt, cancellationToken).ConfigureAwait(false);
                 continue;
@@ -273,12 +425,16 @@ internal sealed class EveEsiClient : IDisposable
             catch (HttpRequestException)
             {
                 return CreateTransportFailure<T>(
-                    "ESI could not be reached after three attempts. Check your connection and try again.");
+                    allowAutomaticRetry
+                        ? "ESI could not be reached after three attempts. Check your connection and try again."
+                        : "ESI could not be reached. This write was not automatically replayed because its outcome may be unknown; refresh the live fleet before retrying.");
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
                 return CreateTransportFailure<T>(
-                    "ESI timed out after three attempts. Try again shortly.");
+                    allowAutomaticRetry
+                        ? "ESI timed out after three attempts. Try again shortly."
+                        : "The ESI write timed out and was not automatically replayed. Refresh the live fleet before retrying.");
             }
 
             using (response)
@@ -303,7 +459,7 @@ internal sealed class EveEsiClient : IDisposable
                     continue;
                 }
 
-                if ((int)response.StatusCode >= 500 && attempt < 3)
+                if ((int)response.StatusCode >= 500 && attempt < maximumAttempts)
                 {
                     await DelayBeforeRetryAsync(attempt, cancellationToken).ConfigureAwait(false);
                     continue;
@@ -339,6 +495,23 @@ internal sealed class EveEsiClient : IDisposable
 
                 try
                 {
+                    if (typeof(T) == typeof(EsiEmptyResponse))
+                    {
+                        return new EsiResult<T>(
+                            (T)(object)new EsiEmptyResponse(),
+                            response.StatusCode,
+                            EsiFailureKind.None,
+                            null,
+                            GetRequestId(response),
+                            now,
+                            expiresAtUtc,
+                            response.Headers.ETag?.Tag,
+                            response.Content.Headers.LastModified,
+                            null,
+                            rateState,
+                            FromCache: false);
+                    }
+
                     await using var contentStream = await response.Content
                         .ReadAsStreamAsync(cancellationToken)
                         .ConfigureAwait(false);
@@ -372,7 +545,10 @@ internal sealed class EveEsiClient : IDisposable
             }
         }
 
-        return CreateTransportFailure<T>("ESI request failed after three attempts.");
+        return CreateTransportFailure<T>(
+            allowAutomaticRetry
+                ? "ESI request failed after three attempts."
+                : "The ESI write failed without an automatic replay.");
     }
 
     private static HttpRequestMessage CreateGetRequest(
@@ -602,7 +778,7 @@ internal sealed class EveEsiClient : IDisposable
             EsiFailureKind.Unauthorized =>
                 "EVE authorization expired and could not be refreshed. Sign in again.",
             EsiFailureKind.Forbidden =>
-                "EVE denied this fleet read. Confirm this character is fleet boss and approved both fleet permissions.",
+                "EVE denied this fleet request. Confirm this character is fleet boss and approved both fleet permissions.",
             EsiFailureKind.NotFound =>
                 "The fleet was not found. It may have changed or ended.",
             EsiFailureKind.ErrorLimited =>

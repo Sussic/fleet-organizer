@@ -53,6 +53,44 @@ internal sealed class EveFleetService : ILiveFleetService, IDisposable
         }
     }
 
+    public async Task<LiveFleetLoadResult> RefreshCurrentAsync(
+        CancellationToken cancellationToken = default)
+    {
+        await loadGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            var character = authenticationService.CurrentCharacter;
+            if (character is null)
+            {
+                return new LiveFleetLoadResult(
+                    LiveFleetLoadStatus.SignedOut,
+                    null,
+                    "Sign in with the character that will be fleet boss.",
+                    null,
+                    null);
+            }
+
+            esiClient.InvalidateCharacterFleet(character.CharacterId);
+            var detection = await esiClient
+                .GetCharacterFleetAsync(character.CharacterId, cancellationToken)
+                .ConfigureAwait(false);
+            if (detection.IsSuccess && detection.Value is not null)
+            {
+                esiClient.InvalidateLiveFleet(detection.Value.FleetId);
+            }
+
+            nameCache[character.CharacterId] = character.CharacterName;
+            return await LoadCurrentCoreAsync(
+                character,
+                allowFleetRedetection: true,
+                cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            loadGate.Release();
+        }
+    }
+
     public void Dispose()
     {
         loadGate.Dispose();

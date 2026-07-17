@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.Json;
 using FleetOrganizer.Core.Abstractions;
 using FleetOrganizer.Core.Domain;
+using FleetOrganizer.Core.Operations;
 using FleetOrganizer.Core.Profiles;
 using Microsoft.Data.Sqlite;
 
@@ -77,10 +78,23 @@ internal sealed class FleetProfileRepository(
         await using var connection = CreateConnection();
         await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
         await EnableForeignKeysAsync(connection, cancellationToken).ConfigureAwait(false);
+        await using var transaction = (SqliteTransaction)await connection
+            .BeginTransactionAsync(cancellationToken)
+            .ConfigureAwait(false);
         await using var command = connection.CreateCommand();
-        command.CommandText = "DELETE FROM fleet_profiles WHERE id = $id;";
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            DELETE FROM active_operations
+            WHERE profile_id = $id AND state IN ($complete, $cancelled);
+
+            DELETE FROM fleet_profiles WHERE id = $id;
+            """;
         command.Parameters.AddWithValue("$id", profileId.ToString("D"));
+        command.Parameters.AddWithValue("$complete", (int)OperationState.Complete);
+        command.Parameters.AddWithValue("$cancelled", (int)OperationState.Cancelled);
         await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
     }
 
     private SqliteConnection CreateConnection()

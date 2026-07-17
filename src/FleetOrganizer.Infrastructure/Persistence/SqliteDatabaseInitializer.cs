@@ -8,7 +8,7 @@ public sealed partial class SqliteDatabaseInitializer(
     IAppDataPaths paths,
     ILogger<SqliteDatabaseInitializer> logger)
 {
-    private const long CurrentSchemaVersion = 1;
+    private const long CurrentSchemaVersion = 2;
 
     static SqliteDatabaseInitializer()
     {
@@ -58,6 +58,12 @@ public sealed partial class SqliteDatabaseInitializer(
             LogMigrationApplied(logger, 1);
         }
 
+        if (currentVersion < 2)
+        {
+            ApplyVersionTwo(connection);
+            LogMigrationApplied(logger, 2);
+        }
+
         LogDatabaseReady(logger, CurrentSchemaVersion);
     }
 
@@ -96,6 +102,27 @@ public sealed partial class SqliteDatabaseInitializer(
         migrationCommand.CommandText =
             "INSERT INTO schema_migrations (version, applied_utc) VALUES ($version, $appliedUtc);";
         migrationCommand.Parameters.AddWithValue("$version", 1);
+        migrationCommand.Parameters.AddWithValue(
+            "$appliedUtc",
+            DateTimeOffset.UtcNow.ToString("O", System.Globalization.CultureInfo.InvariantCulture));
+        migrationCommand.ExecuteNonQuery();
+
+        transaction.Commit();
+    }
+
+    private static void ApplyVersionTwo(SqliteConnection connection)
+    {
+        using var transaction = connection.BeginTransaction();
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = VersionTwoSql;
+        command.ExecuteNonQuery();
+
+        using var migrationCommand = connection.CreateCommand();
+        migrationCommand.Transaction = transaction;
+        migrationCommand.CommandText =
+            "INSERT INTO schema_migrations (version, applied_utc) VALUES ($version, $appliedUtc);";
+        migrationCommand.Parameters.AddWithValue("$version", 2);
         migrationCommand.Parameters.AddWithValue(
             "$appliedUtc",
             DateTimeOffset.UtcNow.ToString("O", System.Globalization.CultureInfo.InvariantCulture));
@@ -226,5 +253,20 @@ public sealed partial class SqliteDatabaseInitializer(
             ON profile_squads(wing_id, sort_order);
         CREATE INDEX ix_operation_steps_state
             ON operation_steps(operation_id, state);
+        """;
+
+    private const string VersionTwoSql =
+        """
+        ALTER TABLE operation_steps
+            ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0;
+
+        ALTER TABLE operation_steps
+            ADD COLUMN payload_json TEXT NOT NULL DEFAULT '{}';
+
+        ALTER TABLE operation_steps
+            ADD COLUMN retry_after_utc TEXT NULL;
+
+        CREATE INDEX ix_active_operations_updated
+            ON active_operations(updated_utc DESC);
         """;
 }

@@ -1,4 +1,7 @@
+using System.Globalization;
+using System.IO;
 using System.Windows;
+using System.Windows.Threading;
 using FleetOrganizer.App.ViewModels;
 using FleetOrganizer.Infrastructure;
 using FleetOrganizer.Infrastructure.Persistence;
@@ -12,9 +15,11 @@ namespace FleetOrganizer.App;
 public partial class App : Application
 {
     private IHost? host;
+    private bool isHandlingUnhandledException;
 
     protected override async void OnStartup(StartupEventArgs e)
     {
+        DispatcherUnhandledException += OnDispatcherUnhandledException;
         base.OnStartup(e);
 
         host = Host.CreateDefaultBuilder()
@@ -72,5 +77,60 @@ public partial class App : Application
         }
 
         base.OnExit(e);
+    }
+
+    private void OnDispatcherUnhandledException(
+        object _,
+        DispatcherUnhandledExceptionEventArgs e)
+    {
+        if (isHandlingUnhandledException)
+        {
+            return;
+        }
+
+        isHandlingUnhandledException = true;
+        e.Handled = true;
+
+        var crashLogPath = TryWriteCrashLog(e.Exception);
+        var logMessage = crashLogPath is null
+            ? "Fleet Organizer could not save a crash report."
+            : $"A crash report was saved to:\n{crashLogPath}";
+        MessageBox.Show(
+            "Fleet Organizer encountered an unexpected error and must close.\n\n" +
+            $"{e.Exception.Message}\n\n{logMessage}\n\n" +
+            "Any active fleet operation remains saved and can be resumed after reopening.",
+            "Fleet Organizer error",
+            MessageBoxButton.OK,
+            MessageBoxImage.Error);
+        Shutdown(-1);
+    }
+
+    private static string? TryWriteCrashLog(Exception exception)
+    {
+        try
+        {
+            var now = DateTimeOffset.UtcNow;
+            var logsDirectory = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "FleetOrganizer",
+                "logs");
+            Directory.CreateDirectory(logsDirectory);
+            var path = Path.Combine(
+                logsDirectory,
+                $"crash-{now.ToUnixTimeMilliseconds()}.log");
+            File.WriteAllText(
+                path,
+                $"Fleet Organizer unhandled UI exception{Environment.NewLine}" +
+                $"UTC: {now.ToString("O", CultureInfo.InvariantCulture)}" +
+                $"{Environment.NewLine}{Environment.NewLine}" +
+                exception.ToString());
+            return path;
+        }
+        catch (Exception loggingException) when (
+            loggingException is not OutOfMemoryException and
+            not StackOverflowException)
+        {
+            return null;
+        }
     }
 }

@@ -10,6 +10,15 @@
         WindowStartupLocation="CenterScreen"
         UseLayoutRounding="True"
         SnapsToDevicePixels="True">
+  <Window.InputBindings>
+    <KeyBinding Key="Enter"
+                Modifiers="Control"
+                Command="{Binding Profiles.PrepareFleetCommand}" />
+    <KeyBinding Key="F5"
+                Command="{Binding RefreshFleetCommand}" />
+    <KeyBinding Key="Escape"
+                Command="{Binding Profiles.HideDryRunCommand}" />
+  </Window.InputBindings>
   <Grid>
     <Grid.ColumnDefinitions>
       <ColumnDefinition Width="220" />
@@ -94,7 +103,7 @@
                 CornerRadius="12"
                 BorderThickness="1"
                 BorderBrush="{DynamicResource {x:Static SystemColors.ActiveBorderBrushKey}}">
-          <TextBlock Text="Milestone 2 • local planning"
+          <TextBlock Text="Milestone 6 • quick fleet workflow"
                      FontSize="12"
                      FontWeight="SemiBold" />
         </Border>
@@ -143,9 +152,10 @@
         </Grid>
       </Border>
 
-      <Grid Grid.Row="2">
-        <Grid.Style>
-          <Style TargetType="Grid">
+      <ScrollViewer Grid.Row="2"
+                    VerticalScrollBarVisibility="Auto">
+        <ScrollViewer.Style>
+          <Style TargetType="ScrollViewer">
             <Setter Property="Visibility" Value="Collapsed" />
             <Style.Triggers>
               <DataTrigger Binding="{Binding SelectedPage}" Value="Home">
@@ -153,46 +163,302 @@
               </DataTrigger>
             </Style.Triggers>
           </Style>
-        </Grid.Style>
-        <Grid.ColumnDefinitions>
-          <ColumnDefinition Width="*" />
-          <ColumnDefinition Width="18" />
-          <ColumnDefinition Width="*" />
-        </Grid.ColumnDefinitions>
+        </ScrollViewer.Style>
 
-        <Border Grid.Column="0" Style="{StaticResource CardStyle}">
-          <StackPanel>
-            <TextBlock Text="Ready in this foundation"
-                       FontSize="17"
-                       FontWeight="SemiBold" />
-            <TextBlock Margin="0,16,0,7" Text="✓ Windows WPF shell and local SQLite storage" />
-            <TextBlock Margin="0,7" Text="✓ EVE SSO Authorization Code + PKCE" />
-            <TextBlock Margin="0,7" Text="✓ JWT, audience, and scope validation" />
-            <TextBlock Margin="0,7" Text="✓ DPAPI-encrypted remembered authorization" />
-            <TextBlock Margin="0,7" Text="✓ Cache and rate-aware live fleet reads" />
-            <TextBlock Margin="0,7" Text="✓ Saved profiles, hierarchy, roster, roles, and tags" />
-            <TextBlock Margin="0,7" Text="✓ Exact public EVE character-name resolution" />
-            <TextBlock Margin="0,7" Text="✓ Profile validation and JSON portability" />
-          </StackPanel>
-        </Border>
+        <StackPanel>
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="3*" />
+              <ColumnDefinition Width="18" />
+              <ColumnDefinition Width="2*" />
+            </Grid.ColumnDefinitions>
 
-        <Border Grid.Column="2" Style="{StaticResource CardStyle}">
-          <StackPanel>
-            <TextBlock Text="Next implementation slice"
-                       FontSize="17"
-                       FontWeight="SemiBold" />
-            <TextBlock Margin="0,16,0,7" Text="1. Desired-versus-live preview" />
-            <TextBlock Margin="0,7" Text="2. Invite dry run and safety review" />
-            <TextBlock Margin="0,7" Text="3. Durable invite and placement operations" />
-            <TextBlock Margin="0,7" Text="4. Per-character outcomes and retry" />
-            <TextBlock Margin="0,7" Text="5. Explicit, guarded ESI write actions" />
-            <TextBlock Margin="0,16,0,0"
-                       Text="No fleet writes are enabled yet."
-                       FontWeight="SemiBold"
-                       Foreground="{StaticResource WarningBrush}" />
-          </StackPanel>
-        </Border>
-      </Grid>
+            <Border Grid.Column="0" Style="{StaticResource CardStyle}">
+              <StackPanel>
+                <TextBlock Text="1. Choose your fleet profile"
+                           FontSize="20"
+                           FontWeight="SemiBold" />
+                <TextBlock Text="Pick the saved layout you want. Nothing is sent to EVE until after the review and confirmation."
+                           Margin="0,6,0,14"
+                           TextWrapping="Wrap"
+                           Opacity="0.68" />
+                <TextBox Padding="10,7"
+                         Text="{Binding Profiles.ProfileSearchText, UpdateSourceTrigger=PropertyChanged}"
+                         ToolTip="Search saved profiles by name" />
+                <ComboBox Margin="0,8,0,0"
+                          Padding="10,7"
+                          ItemsSource="{Binding Profiles.FilteredProfileItems}"
+                          SelectedItem="{Binding Profiles.SelectedProfile}"
+                          DisplayMemberPath="Name" />
+                <TextBlock Text="{Binding Profiles.SelectedProfileQuickSummary}"
+                           Margin="0,8,0,0"
+                           FontSize="12"
+                           Opacity="0.65" />
+                <TextBlock Text="{Binding Profiles.EditorStateText}"
+                           Margin="0,4,0,0"
+                           FontSize="12"
+                           Foreground="{StaticResource WarningBrush}"
+                           Visibility="{Binding Profiles.HasUnsavedChanges, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                <Button Margin="0,18,0,0"
+                        MinHeight="48"
+                        Padding="18,12"
+                        Content="Check fleet &amp; review changes"
+                        IsEnabled="{Binding Profiles.CanPrepareFleet}"
+                        Command="{Binding Profiles.PrepareFleetCommand}"
+                        FontSize="16"
+                        FontWeight="SemiBold" />
+                <TextBlock Text="This first button is read-only. You will see the exact invites, moves, structure, and role changes before the guarded run starts."
+                           Margin="0,8,0,0"
+                           TextWrapping="Wrap"
+                           FontSize="12"
+                           Opacity="0.62" />
+              </StackPanel>
+            </Border>
+
+            <Border Grid.Column="2" Style="{StaticResource CardStyle}">
+              <StackPanel>
+                <TextBlock Text="Before you start"
+                           FontSize="17"
+                           FontWeight="SemiBold" />
+                <TextBlock Text="1. Create the fleet in EVE."
+                           Margin="0,15,0,6" />
+                <TextBlock Text="2. Make the signed-in character fleet boss."
+                           Margin="0,6" TextWrapping="Wrap" />
+                <TextBlock Text="3. Accept invites on your other clients when asked."
+                           Margin="0,6" TextWrapping="Wrap" />
+                <Separator Margin="0,13" />
+                <TextBlock Text="Signed-in character" FontSize="12" Opacity="0.62" />
+                <TextBlock Text="{Binding SignedInCharacter}"
+                           Margin="0,4,0,0"
+                           FontWeight="SemiBold" />
+                <TextBlock Text="Live fleet" Margin="0,12,0,0" FontSize="12" Opacity="0.62" />
+                <TextBlock Text="{Binding LiveFleetStatusTitle}"
+                           Margin="0,4,0,0"
+                           FontWeight="SemiBold"
+                           TextWrapping="Wrap" />
+                <WrapPanel Margin="0,15,0,0">
+                  <Button Margin="0,0,8,0"
+                          Padding="10,7"
+                          Content="Open live fleet"
+                          Command="{Binding NavigateCommand}"
+                          CommandParameter="Live Fleet" />
+                  <Button Padding="10,7"
+                          Content="Edit profiles"
+                          Command="{Binding NavigateCommand}"
+                          CommandParameter="Profiles" />
+                </WrapPanel>
+              </StackPanel>
+            </Border>
+          </Grid>
+
+          <Border Margin="0,18,0,0"
+                  Style="{StaticResource CardStyle}"
+                  Visibility="{Binding Profiles.HasDryRun, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <StackPanel>
+                <TextBlock Text="2. Review the result"
+                           FontSize="20"
+                           FontWeight="SemiBold" />
+                <TextBlock Text="{Binding Profiles.DryRunPrimaryMessage}"
+                           Margin="0,9,20,0"
+                           FontSize="17"
+                           FontWeight="SemiBold" />
+                <TextBlock Text="{Binding Profiles.DryRunSummary}"
+                           Margin="0,7,20,0"
+                           TextWrapping="Wrap" />
+                <TextBlock Text="{Binding Profiles.DryRunSafetyMessage}"
+                           Margin="0,7,20,0"
+                           TextWrapping="Wrap"
+                           Foreground="{StaticResource WarningBrush}" />
+              </StackPanel>
+              <StackPanel Grid.Column="1" MinWidth="180" VerticalAlignment="Center">
+                <Button Padding="16,11"
+                        Content="Start guarded run"
+                        IsEnabled="{Binding Profiles.CanEdit}"
+                        Command="{Binding Profiles.StartOperationCommand}"
+                        FontWeight="SemiBold" />
+                <Button Margin="0,8,0,0"
+                        Padding="12,8"
+                        Content="Show every change"
+                        Command="{Binding NavigateCommand}"
+                        CommandParameter="Profiles" />
+              </StackPanel>
+            </Grid>
+          </Border>
+
+          <Border Margin="0,18,0,0"
+                  Style="{StaticResource CardStyle}"
+                  Visibility="{Binding Profiles.HasOperation, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <StackPanel>
+                <TextBlock Text="{Binding Profiles.OperationPhaseTitle}"
+                           FontSize="20"
+                           FontWeight="SemiBold" />
+                <TextBlock Text="{Binding Profiles.OperationNextAction}"
+                           Margin="0,7,22,0"
+                           TextWrapping="Wrap" />
+                <ProgressBar Margin="0,16,22,0"
+                             Height="12"
+                             Minimum="0"
+                             Maximum="100"
+                             Value="{Binding Profiles.OperationProgressPercent}" />
+                <TextBlock Text="{Binding Profiles.OperationProgressText}"
+                           Margin="0,6,0,0"
+                           FontSize="12"
+                           Opacity="0.65" />
+              </StackPanel>
+              <StackPanel Grid.Column="1" MinWidth="190" VerticalAlignment="Center">
+                <Button Padding="14,10"
+                        Content="Check accepted characters"
+                        IsEnabled="{Binding Profiles.CanOperate}"
+                        Command="{Binding Profiles.ContinueOperationCommand}" />
+                <Button Margin="0,8,0,0"
+                        Padding="12,8"
+                        Content="Open run details"
+                        Command="{Binding NavigateCommand}"
+                        CommandParameter="Activity" />
+              </StackPanel>
+            </Grid>
+          </Border>
+        </StackPanel>
+      </ScrollViewer>
+
+      <ScrollViewer Grid.Row="1"
+                    Grid.RowSpan="2"
+                    Margin="0,28,0,0"
+                    VerticalScrollBarVisibility="Auto">
+        <ScrollViewer.Style>
+          <Style TargetType="ScrollViewer">
+            <Setter Property="Visibility" Value="Collapsed" />
+            <Style.Triggers>
+              <DataTrigger Binding="{Binding SelectedPage}" Value="Activity">
+                <Setter Property="Visibility" Value="Visible" />
+              </DataTrigger>
+            </Style.Triggers>
+          </Style>
+        </ScrollViewer.Style>
+
+        <StackPanel>
+          <Border Style="{StaticResource CardStyle}">
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <StackPanel>
+                <TextBlock Text="{Binding Profiles.OperationPhaseTitle}"
+                           FontSize="22"
+                           FontWeight="SemiBold" />
+                <TextBlock Text="{Binding Profiles.OperationNextAction}"
+                           Margin="0,7,24,0"
+                           TextWrapping="Wrap"
+                           FontSize="15" />
+                <ProgressBar Margin="0,16,24,0"
+                             Height="14"
+                             Minimum="0"
+                             Maximum="100"
+                             Value="{Binding Profiles.OperationProgressPercent}" />
+                <TextBlock Text="{Binding Profiles.OperationProgressText}"
+                           Margin="0,7,0,0"
+                           FontSize="12"
+                           Opacity="0.65" />
+              </StackPanel>
+              <StackPanel Grid.Column="1" MinWidth="205" VerticalAlignment="Center">
+                <Button Padding="14,10"
+                        Content="Check accepted characters"
+                        IsEnabled="{Binding Profiles.CanOperate}"
+                        Command="{Binding Profiles.ContinueOperationCommand}" />
+                <Button Margin="0,8,0,0"
+                        Padding="12,8"
+                        Content="Cancel safely"
+                        IsEnabled="{Binding Profiles.CanOperate}"
+                        Command="{Binding Profiles.CancelOperationCommand}" />
+                <Button Margin="0,8,0,0"
+                        Padding="12,8"
+                        Content="Hide completed run"
+                        Command="{Binding Profiles.HideOperationCommand}"
+                        Visibility="{Binding Profiles.OperationIsTerminal, Converter={StaticResource BooleanToVisibilityConverter}}" />
+              </StackPanel>
+            </Grid>
+          </Border>
+
+          <Border Margin="0,18,0,0"
+                  Style="{StaticResource CardStyle}"
+                  Visibility="{Binding Profiles.HasOperation, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <StackPanel>
+              <TextBlock Text="Run details"
+                         FontSize="17"
+                         FontWeight="SemiBold" />
+              <TextBlock Text="{Binding Profiles.OperationTitle}"
+                         Margin="0,5,0,0"
+                         TextWrapping="Wrap"
+                         Opacity="0.7" />
+              <TextBlock Text="{Binding Profiles.OperationSummary}"
+                         Margin="0,10,0,0"
+                         FontWeight="SemiBold"
+                         TextWrapping="Wrap" />
+              <TextBlock Text="{Binding Profiles.OperationStatusMessage}"
+                         Margin="0,6,0,10"
+                         Foreground="{StaticResource WarningBrush}"
+                         TextWrapping="Wrap" />
+
+              <DataGrid ItemsSource="{Binding Profiles.OperationItems}"
+                        AutoGenerateColumns="False"
+                        CanUserAddRows="False"
+                        CanUserDeleteRows="False"
+                        IsReadOnly="True"
+                        HeadersVisibility="Column"
+                        MinHeight="180"
+                        MaxHeight="430"
+                        EnableRowVirtualization="True"
+                        EnableColumnVirtualization="True"
+                        ScrollViewer.CanContentScroll="True"
+                        VirtualizingPanel.IsVirtualizing="True"
+                        VirtualizingPanel.VirtualizationMode="Recycling">
+                <DataGrid.Columns>
+                  <DataGridTextColumn Width="105" Header="Action" Binding="{Binding Badge}" />
+                  <DataGridTextColumn Width="135" Header="Status" Binding="{Binding StateText}" />
+                  <DataGridTextColumn Width="240" Header="Character / target" Binding="{Binding Title}" />
+                  <DataGridTextColumn Width="*" MinWidth="180" Header="What happened" Binding="{Binding Detail, Mode=OneWay}" />
+                  <DataGridTemplateColumn Width="150" Header="Recovery">
+                    <DataGridTemplateColumn.CellTemplate>
+                      <DataTemplate>
+                        <WrapPanel>
+                          <Button Margin="0,0,6,0"
+                                  Padding="8,4"
+                                  Content="Retry"
+                                  Command="{Binding DataContext.Profiles.RetryOperationStepCommand, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                                  CommandParameter="{Binding}"
+                                  Visibility="{Binding CanRetry, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                          <Button Padding="8,4"
+                                  Content="Skip"
+                                  Command="{Binding DataContext.Profiles.SkipOperationStepCommand, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                                  CommandParameter="{Binding}"
+                                  Visibility="{Binding CanSkip, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                        </WrapPanel>
+                      </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                  </DataGridTemplateColumn>
+                </DataGrid.Columns>
+              </DataGrid>
+            </StackPanel>
+          </Border>
+
+          <Border Margin="0,18,0,0" Style="{StaticResource CardStyle}">
+            <TextBlock Text="Plain-language progress is shown first. The table is the durable per-step record used for retry and recovery after a restart. Already accepted EVE writes are never silently rolled back or replayed."
+                       TextWrapping="Wrap"
+                       Opacity="0.7" />
+          </Border>
+        </StackPanel>
+      </ScrollViewer>
 
       <ScrollViewer Grid.Row="1"
                     Grid.RowSpan="2"
@@ -226,6 +492,10 @@
                            Opacity="0.72" />
               </StackPanel>
               <WrapPanel Grid.Column="1" VerticalAlignment="Center">
+                <CheckBox Margin="4,0,12,0"
+                          VerticalAlignment="Center"
+                          Content="Advanced editor"
+                          IsChecked="{Binding Profiles.IsAdvancedMode}" />
                 <Button Margin="4,0"
                         Padding="12,8"
                         Content="New profile"
@@ -259,11 +529,21 @@
                            Margin="0,4,0,12"
                            FontSize="12"
                            Opacity="0.62" />
-                <ListBox ItemsSource="{Binding Profiles.ProfileItems}"
+                <TextBox Padding="8,6"
+                         Text="{Binding Profiles.ProfileSearchText, UpdateSourceTrigger=PropertyChanged}"
+                         ToolTip="Search profiles by name" />
+                <TextBlock Text="{Binding Profiles.ProfileSearchSummary}"
+                           Margin="0,5,0,8"
+                           FontSize="11"
+                           Opacity="0.6" />
+                <ListBox ItemsSource="{Binding Profiles.FilteredProfileItems}"
                          SelectedItem="{Binding Profiles.SelectedProfile}"
                          MinHeight="150"
                          MaxHeight="310"
-                         ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         ScrollViewer.CanContentScroll="True"
+                         VirtualizingPanel.IsVirtualizing="True"
+                         VirtualizingPanel.VirtualizationMode="Recycling">
                   <ListBox.ItemTemplate>
                     <DataTemplate>
                       <StackPanel Margin="4,6">
@@ -311,6 +591,11 @@
                             Command="{Binding Profiles.DuplicateProfileCommand}" />
                     <Button Margin="0,0,8,0"
                             Padding="12,8"
+                            Content="Compare to live"
+                            ToolTip="Build a read-only desired-versus-live dry run"
+                            Command="{Binding Profiles.CompareCurrentProfileCommand}" />
+                    <Button Margin="0,0,8,0"
+                            Padding="12,8"
                             Content="Export JSON"
                             Command="{Binding Profiles.ExportProfileCommand}" />
                     <Button Padding="12,8"
@@ -322,14 +607,42 @@
                              TextWrapping="Wrap"
                              FontSize="12"
                              Opacity="0.72" />
+                  <TextBlock Text="{Binding Profiles.EditorStateText}"
+                             Margin="0,5,0,0"
+                             FontSize="12"
+                             FontWeight="SemiBold">
+                    <TextBlock.Style>
+                      <Style TargetType="TextBlock">
+                        <Setter Property="Opacity" Value="0.62" />
+                        <Style.Triggers>
+                          <DataTrigger Binding="{Binding Profiles.HasUnsavedChanges}" Value="True">
+                            <Setter Property="Foreground" Value="{StaticResource WarningBrush}" />
+                            <Setter Property="Opacity" Value="1" />
+                          </DataTrigger>
+                        </Style.Triggers>
+                      </Style>
+                    </TextBlock.Style>
+                  </TextBlock>
                 </StackPanel>
               </StackPanel>
             </Border>
           </Grid>
 
-          <Border Margin="0,18,0,0"
-                  Style="{StaticResource CardStyle}"
-                  Visibility="{Binding Profiles.IsEditorActive, Converter={StaticResource BooleanToVisibilityConverter}}">
+          <Border Margin="0,18,0,0">
+            <Border.Style>
+              <Style TargetType="Border" BasedOn="{StaticResource CardStyle}">
+                <Setter Property="Visibility" Value="Collapsed" />
+                <Style.Triggers>
+                  <MultiDataTrigger>
+                    <MultiDataTrigger.Conditions>
+                      <Condition Binding="{Binding Profiles.IsEditorActive}" Value="True" />
+                      <Condition Binding="{Binding Profiles.IsAdvancedMode}" Value="True" />
+                    </MultiDataTrigger.Conditions>
+                    <Setter Property="Visibility" Value="Visible" />
+                  </MultiDataTrigger>
+                </Style.Triggers>
+              </Style>
+            </Border.Style>
             <StackPanel IsEnabled="{Binding Profiles.CanEdit}">
               <DockPanel>
                 <Button DockPanel.Dock="Right"
@@ -475,6 +788,25 @@
                          TextWrapping="Wrap"
                          Opacity="0.62" />
 
+              <Grid Margin="0,12,0,4">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBox Padding="9,6"
+                         Text="{Binding Profiles.AssignmentSearchText, UpdateSourceTrigger=PropertyChanged}"
+                         ToolTip="Search by character, squad, role, or tag" />
+                <Button Grid.Column="1"
+                        Margin="8,0,0,0"
+                        Padding="10,6"
+                        Content="Clear search"
+                        Command="{Binding Profiles.ClearAssignmentSearchCommand}" />
+              </Grid>
+              <TextBlock Text="{Binding Profiles.AssignmentSearchSummary}"
+                         Margin="0,2,0,0"
+                         FontSize="12"
+                         Opacity="0.62" />
+
               <WrapPanel Margin="0,12,0,8">
                 <Button Margin="0,0,6,6" Padding="9,6" Content="Select all"
                         Command="{Binding Profiles.SelectAllAssignmentsCommand}" />
@@ -503,7 +835,7 @@
                         Command="{Binding Profiles.RemoveSelectedAssignmentsCommand}" />
               </WrapPanel>
 
-              <DataGrid ItemsSource="{Binding Profiles.Assignments}"
+              <DataGrid ItemsSource="{Binding Profiles.FilteredAssignments}"
                         AutoGenerateColumns="False"
                         CanUserAddRows="False"
                         CanUserDeleteRows="False"
@@ -511,7 +843,11 @@
                         MinHeight="120"
                         MaxHeight="360"
                         SelectionMode="Single"
-                        EnableRowVirtualization="True">
+                        EnableRowVirtualization="True"
+                        EnableColumnVirtualization="True"
+                        ScrollViewer.CanContentScroll="True"
+                        VirtualizingPanel.IsVirtualizing="True"
+                        VirtualizingPanel.VirtualizationMode="Recycling">
                 <DataGrid.Columns>
                   <DataGridCheckBoxColumn Width="42"
                                           Header="Use"
@@ -549,8 +885,222 @@
             </StackPanel>
           </Border>
 
+          <Border Margin="0,18,0,0"
+                  Style="{StaticResource CardStyle}"
+                  Visibility="{Binding Profiles.HasDryRun, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <StackPanel>
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel>
+                  <TextBlock Text="Dry-run comparison"
+                             FontSize="17"
+                             FontWeight="SemiBold" />
+                  <TextBlock Text="{Binding Profiles.DryRunTitle}"
+                             Margin="0,5,18,0"
+                             TextWrapping="Wrap"
+                             Opacity="0.72" />
+                </StackPanel>
+                <WrapPanel Grid.Column="1" VerticalAlignment="Center">
+                  <Button Margin="0,0,8,0"
+                          Padding="11,7"
+                          Content="Repair &amp; organise"
+                          IsEnabled="{Binding Profiles.CanEdit}"
+                          Command="{Binding Profiles.StartOperationCommand}" />
+                  <Button Margin="0,0,8,0"
+                          Padding="11,7"
+                          Content="Refresh"
+                          IsEnabled="{Binding Profiles.CanEdit}"
+                          Command="{Binding Profiles.CompareCurrentProfileCommand}" />
+                  <Button Padding="11,7"
+                          Content="Hide"
+                          Command="{Binding Profiles.HideDryRunCommand}" />
+                </WrapPanel>
+              </Grid>
+
+              <TextBlock Text="{Binding Profiles.DryRunSummary}"
+                         Margin="0,14,0,0"
+                         TextWrapping="Wrap"
+                         FontWeight="SemiBold" />
+              <TextBlock Text="{Binding Profiles.DryRunSafetyMessage}"
+                         Margin="0,7,0,0"
+                         TextWrapping="Wrap"
+                         Foreground="{StaticResource WarningBrush}"
+                         FontWeight="SemiBold" />
+              <CheckBox Margin="0,12,0,8"
+                        Content="Show characters already in the correct place"
+                        IsChecked="{Binding Profiles.ShowAlreadyCorrect}" />
+
+              <ItemsControl ItemsSource="{Binding Profiles.DryRunItems}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <Border Margin="0,4"
+                            Padding="11,9"
+                            BorderThickness="1"
+                            BorderBrush="{DynamicResource {x:Static SystemColors.ActiveBorderBrushKey}}"
+                            CornerRadius="5">
+                      <Grid>
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="105" />
+                          <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="{Binding Badge}"
+                                   Margin="0,2,12,0"
+                                   FontSize="11"
+                                   FontWeight="Bold">
+                          <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                              <Setter Property="Foreground" Value="{StaticResource EveAccentBrush}" />
+                              <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsBlocked}" Value="True">
+                                  <Setter Property="Foreground" Value="{StaticResource WarningBrush}" />
+                                </DataTrigger>
+                              </Style.Triggers>
+                            </Style>
+                          </TextBlock.Style>
+                        </TextBlock>
+                        <StackPanel Grid.Column="1">
+                          <TextBlock Text="{Binding Title}"
+                                     FontWeight="SemiBold"
+                                     TextWrapping="Wrap" />
+                          <TextBlock Text="{Binding Detail}"
+                                     Margin="0,3,0,0"
+                                     TextWrapping="Wrap"
+                                     Opacity="0.66" />
+                        </StackPanel>
+                      </Grid>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+          </Border>
+
+          <Border Margin="0,18,0,0"
+                  Style="{StaticResource CardStyle}"
+                  Visibility="{Binding Profiles.HasOperation, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <StackPanel>
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel>
+                  <TextBlock Text="Guarded operation"
+                             FontSize="17"
+                             FontWeight="SemiBold" />
+                  <TextBlock Text="{Binding Profiles.OperationTitle}"
+                             Margin="0,5,18,0"
+                             TextWrapping="Wrap"
+                             Opacity="0.72" />
+                </StackPanel>
+                <WrapPanel Grid.Column="1" VerticalAlignment="Center">
+                  <Button Margin="0,0,8,0"
+                          Padding="11,7"
+                          Content="Refresh &amp; continue"
+                          Command="{Binding Profiles.ContinueOperationCommand}">
+                    <Button.Style>
+                      <Style TargetType="Button">
+                        <Setter Property="IsEnabled" Value="{Binding Profiles.CanOperate}" />
+                        <Style.Triggers>
+                          <DataTrigger Binding="{Binding Profiles.OperationIsTerminal}" Value="True">
+                            <Setter Property="IsEnabled" Value="False" />
+                          </DataTrigger>
+                        </Style.Triggers>
+                      </Style>
+                    </Button.Style>
+                  </Button>
+                  <Button Margin="0,0,8,0"
+                          Padding="11,7"
+                          Content="Cancel run"
+                          Command="{Binding Profiles.CancelOperationCommand}">
+                    <Button.Style>
+                      <Style TargetType="Button">
+                        <Setter Property="IsEnabled" Value="{Binding Profiles.CanOperate}" />
+                        <Style.Triggers>
+                          <DataTrigger Binding="{Binding Profiles.OperationIsTerminal}" Value="True">
+                            <Setter Property="IsEnabled" Value="False" />
+                          </DataTrigger>
+                        </Style.Triggers>
+                      </Style>
+                    </Button.Style>
+                  </Button>
+                  <Button Padding="11,7"
+                          Content="Hide"
+                          Command="{Binding Profiles.HideOperationCommand}"
+                          Visibility="{Binding Profiles.OperationIsTerminal, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                </WrapPanel>
+              </Grid>
+
+              <TextBlock Text="{Binding Profiles.OperationSummary}"
+                         Margin="0,14,0,0"
+                         TextWrapping="Wrap"
+                         FontWeight="SemiBold" />
+              <TextBlock Text="{Binding Profiles.OperationStatusMessage}"
+                         Margin="0,7,0,8"
+                         TextWrapping="Wrap"
+                         Foreground="{StaticResource WarningBrush}"
+                         FontWeight="SemiBold" />
+
+              <ItemsControl ItemsSource="{Binding Profiles.OperationItems}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <Border Margin="0,4"
+                            Padding="11,9"
+                            BorderThickness="1"
+                            BorderBrush="{DynamicResource {x:Static SystemColors.ActiveBorderBrushKey}}"
+                            CornerRadius="5">
+                      <Grid>
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="90" />
+                          <ColumnDefinition Width="*" />
+                          <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                          <TextBlock Text="{Binding Badge}"
+                                     FontSize="11"
+                                     FontWeight="Bold"
+                                     Foreground="{StaticResource EveAccentBrush}" />
+                          <TextBlock Text="{Binding StateText}"
+                                     Margin="0,3,10,0"
+                                     FontSize="11"
+                                     TextWrapping="Wrap"
+                                     Opacity="0.7" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Margin="0,0,12,0">
+                          <TextBlock Text="{Binding Title}"
+                                     FontWeight="SemiBold"
+                                     TextWrapping="Wrap" />
+                          <TextBlock Margin="0,3,0,0" TextWrapping="Wrap" Opacity="0.66">
+                            <Run Text="{Binding Detail, Mode=OneWay}" />
+                            <Run Text="{Binding AttemptsText, Mode=OneWay}" />
+                          </TextBlock>
+                        </StackPanel>
+                        <WrapPanel Grid.Column="2" VerticalAlignment="Center">
+                          <Button Margin="0,0,6,0"
+                                  Padding="9,5"
+                                  Content="Retry"
+                                  Command="{Binding DataContext.Profiles.RetryOperationStepCommand, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                                  CommandParameter="{Binding}"
+                                  Visibility="{Binding CanRetry, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                          <Button Padding="9,5"
+                                  Content="Skip"
+                                  Command="{Binding DataContext.Profiles.SkipOperationStepCommand, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                                  CommandParameter="{Binding}"
+                                  Visibility="{Binding CanSkip, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                        </WrapPanel>
+                      </Grid>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+          </Border>
+
           <Border Margin="0,18,0,0" Style="{StaticResource CardStyle}">
-            <TextBlock Text="Safety boundary: Milestone 2 saves and edits local plans only. Capturing a fleet is read-only. No invitations, moves, promotions, kicks, or hierarchy writes are sent to EVE."
+            <TextBlock Text="Safety boundary: the quick workflow uses the same guarded engine: fresh checks, explicit confirmation, no fleet-boss transfer, no kicks, no hierarchy deletion, and no unmanaged-commander demotion."
                        TextWrapping="Wrap"
                        Foreground="{StaticResource WarningBrush}"
                        FontWeight="SemiBold" />
@@ -680,7 +1230,7 @@
           </Border>
 
           <Border Margin="0,18,0,0" Style="{StaticResource CardStyle}">
-            <TextBlock Text="Safety boundary: this milestone performs GET fleet reads and public ID-to-name resolution only. Invitations, moves, role changes, kicks, and hierarchy changes remain disabled."
+            <TextBlock Text="This Live Fleet page remains read-only. Guarded structure repair, invitations, placement, and commander transitions start only from a reviewed profile comparison. Fleet-boss transfer, kicks, and hierarchy deletion remain disabled."
                        TextWrapping="Wrap"
                        Foreground="{StaticResource WarningBrush}"
                        FontWeight="SemiBold" />
@@ -772,41 +1322,6 @@
         </StackPanel>
       </ScrollViewer>
 
-      <Border Grid.Row="1"
-              Grid.RowSpan="2"
-              Margin="0,28,0,0">
-        <Border.Style>
-          <Style TargetType="Border" BasedOn="{StaticResource CardStyle}">
-            <Setter Property="Visibility" Value="Visible" />
-            <Style.Triggers>
-              <DataTrigger Binding="{Binding SelectedPage}" Value="Home">
-                <Setter Property="Visibility" Value="Collapsed" />
-              </DataTrigger>
-              <DataTrigger Binding="{Binding SelectedPage}" Value="Settings">
-                <Setter Property="Visibility" Value="Collapsed" />
-              </DataTrigger>
-              <DataTrigger Binding="{Binding SelectedPage}" Value="Live Fleet">
-                <Setter Property="Visibility" Value="Collapsed" />
-              </DataTrigger>
-              <DataTrigger Binding="{Binding SelectedPage}" Value="Profiles">
-                <Setter Property="Visibility" Value="Collapsed" />
-              </DataTrigger>
-            </Style.Triggers>
-          </Style>
-        </Border.Style>
-        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-          <TextBlock Text="This page is the next product milestone."
-                     FontSize="20"
-                     FontWeight="SemiBold"
-                     HorizontalAlignment="Center" />
-          <TextBlock Text="Profile planning and live fleet reads are implemented; operation execution follows in the next milestone."
-                     Margin="0,9,0,0"
-                     TextWrapping="Wrap"
-                     TextAlignment="Center"
-                     Opacity="0.68" />
-        </StackPanel>
-      </Border>
-
       <DockPanel Grid.Row="3" Margin="2,18,2,0">
         <TextBlock DockPanel.Dock="Right"
                    Text="{Binding DatabasePath}"
@@ -814,7 +1329,7 @@
                    MaxWidth="520"
                    FontSize="11"
                    Opacity="0.55" />
-        <TextBlock Text="Local-only • no telemetry • no live ESI writes"
+        <TextBlock Text="Local-only • no telemetry • guarded ESI writes only"
                    FontSize="11"
                    Opacity="0.55" />
       </DockPanel>

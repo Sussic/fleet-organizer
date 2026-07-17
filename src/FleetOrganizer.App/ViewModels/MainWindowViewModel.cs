@@ -107,10 +107,10 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
 
     public string PageSubtitle => SelectedPage switch
     {
-        "Home" => "The quick path for inviting and organising a saved fleet.",
-        "Profiles" => "Create reusable wings, squads, assignments, and placement rules.",
+        "Home" => "Choose a saved layout, review the exact changes, then organise the fleet.",
+        "Profiles" => "Manage reusable layouts and rosters. Advanced structure controls are optional.",
         "Live Fleet" => "Read the current EVE fleet hierarchy, roles, ships, and locations.",
-        "Activity" => "Review resumable operations and per-character results.",
+        "Activity" => "See what the current run needs next, then open per-step recovery details.",
         "Settings" => "Configure EVE SSO, storage, polling, and appearance.",
         _ => string.Empty,
     };
@@ -165,7 +165,7 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
             }
 
             return IsAuthenticated
-                ? "Authorization is encrypted for this Windows user. Open Live Fleet to read the current hierarchy; no ESI writes are enabled."
+                ? "Authorization is encrypted for this Windows user. Live Fleet is read-only; reviewed profiles can start guarded repair, invitation, placement, and commander runs."
                 : "Open Settings and choose Sign in with EVE. Authorize the character that will be fleet boss.";
         }
     }
