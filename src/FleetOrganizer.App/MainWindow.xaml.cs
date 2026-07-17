@@ -5,7 +5,11 @@ using System.Windows.Input;
 using System.Windows.Media;
 using FleetOrganizer.App.ViewModels;
 using FleetOrganizer.Core.Profiles;
+using Application = System.Windows.Application;
+using DragEventArgs = System.Windows.DragEventArgs;
 using Forms = System.Windows.Forms;
+using MouseEventArgs = System.Windows.Input.MouseEventArgs;
+using Point = System.Windows.Point;
 
 namespace FleetOrganizer.App;
 
