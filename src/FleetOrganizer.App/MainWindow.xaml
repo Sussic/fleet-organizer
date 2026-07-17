@@ -144,6 +144,11 @@
                        Margin="0,7,20,0"
                        TextWrapping="Wrap"
                        Opacity="0.72" />
+            <TextBlock Text="{Binding FcReadinessSummary}"
+                       Margin="0,11,20,0"
+                       FontWeight="SemiBold"
+                       Foreground="{StaticResource EveAccentBrush}"
+                       TextWrapping="Wrap" />
           </StackPanel>
           <Button Grid.Column="1"
                   MinWidth="150"
@@ -184,6 +189,25 @@
                            Margin="0,6,0,14"
                            TextWrapping="Wrap"
                            Opacity="0.68" />
+                <ItemsControl ItemsSource="{Binding Profiles.PinnedProfiles}"
+                              Margin="0,0,0,10">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                      <Button Margin="0,0,7,7" Padding="10,6"
+                              Command="{Binding DataContext.Profiles.SelectProfileCommand, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                              CommandParameter="{Binding}">
+                        <StackPanel Orientation="Horizontal">
+                          <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                          <TextBlock Text="{Binding StatusText, StringFormat=  {0}}"
+                                     FontSize="10" Foreground="{StaticResource EveAccentBrush}" />
+                        </StackPanel>
+                      </Button>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
                 <TextBox Padding="10,7"
                          Text="{Binding Profiles.ProfileSearchText, UpdateSourceTrigger=PropertyChanged}"
                          ToolTip="Search saved profiles by name" />
@@ -194,6 +218,32 @@
                           DisplayMemberPath="Name" />
                 <TextBlock Text="{Binding Profiles.SelectedProfileQuickSummary}"
                            Margin="0,8,0,0"
+                           FontSize="12"
+                           Opacity="0.65" />
+                <WrapPanel Margin="0,9,0,0">
+                  <Button Padding="9,5"
+                          Margin="0,0,7,0"
+                          Content="Pin / unpin"
+                          Command="{Binding Profiles.TogglePinCommand}"
+                          CommandParameter="{Binding Profiles.SelectedProfile}" />
+                  <Button Padding="9,5"
+                          Content="Make default"
+                          Command="{Binding Profiles.SetDefaultProfileCommand}"
+                          CommandParameter="{Binding Profiles.SelectedProfile}" />
+                </WrapPanel>
+                <TextBlock Text="Run mode"
+                           Margin="0,15,0,5"
+                           FontSize="12"
+                           FontWeight="SemiBold"
+                           Opacity="0.68" />
+                <ComboBox Padding="10,7"
+                          ItemsSource="{Binding Profiles.RunModeOptions}"
+                          DisplayMemberPath="DisplayName"
+                          SelectedValuePath="Value"
+                          SelectedValue="{Binding Profiles.SelectedRunMode}" />
+                <TextBlock Text="{Binding Profiles.SelectedRunModeDescription}"
+                           Margin="0,6,0,0"
+                           TextWrapping="Wrap"
                            FontSize="12"
                            Opacity="0.65" />
                 <TextBlock Text="{Binding Profiles.EditorStateText}"
@@ -239,6 +289,11 @@
                            Margin="0,4,0,0"
                            FontWeight="SemiBold"
                            TextWrapping="Wrap" />
+                <TextBlock Text="Default template" Margin="0,12,0,0" FontSize="12" Opacity="0.62" />
+                <TextBlock Text="{Binding Profiles.DefaultProfileName}"
+                           Margin="0,4,0,0"
+                           FontWeight="SemiBold"
+                           TextWrapping="Wrap" />
                 <WrapPanel Margin="0,15,0,0">
                   <Button Margin="0,0,8,0"
                           Padding="10,7"
@@ -281,7 +336,8 @@
               <StackPanel Grid.Column="1" MinWidth="180" VerticalAlignment="Center">
                 <Button Padding="16,11"
                         Style="{StaticResource PrimaryButtonStyle}"
-                        Content="Organise fleet now"
+                        Content="{Binding Profiles.RunPrimaryActionText}"
+                        ToolTip="Organise fleet now using the reviewed run mode"
                         IsEnabled="{Binding Profiles.CanEdit}"
                         Command="{Binding Profiles.StartOperationCommand}"
                         FontWeight="SemiBold" />
@@ -326,7 +382,7 @@
                         IsEnabled="{Binding Profiles.CanOperate}"
                         Command="{Binding Profiles.ContinueOperationCommand}" />
                 <TextBlock Margin="0,7,0,0"
-                           Text="Also checks automatically every 30 seconds while the app is open."
+                           Text="{Binding AutomaticCheckCountdownText}"
                            FontSize="11"
                            TextWrapping="Wrap"
                            Opacity="0.62" />
@@ -337,6 +393,43 @@
                         CommandParameter="Activity" />
               </StackPanel>
             </Grid>
+          </Border>
+
+          <Border Margin="0,18,0,0"
+                  Style="{StaticResource CardStyle}"
+                  Visibility="{Binding Profiles.IsWaitingForInvites, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <StackPanel>
+              <DockPanel>
+                <TextBlock DockPanel.Dock="Right"
+                           Text="{Binding AutomaticCheckCountdownText}"
+                           FontSize="12"
+                           Foreground="{StaticResource EveAccentBrush}" />
+                <TextBlock Text="Invitation waiting room"
+                           FontSize="18"
+                           FontWeight="SemiBold" />
+              </DockPanel>
+              <TextBlock Text="{Binding Profiles.WaitingRoomSummary}"
+                         Margin="0,6,0,10"
+                         Opacity="0.68" />
+              <ItemsControl ItemsSource="{Binding Profiles.WaitingCharacters}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <Border Margin="0,3" Padding="10,8"
+                            Background="{StaticResource SurfaceAltBrush}"
+                            CornerRadius="7">
+                      <DockPanel>
+                        <TextBlock DockPanel.Dock="Right" Text="{Binding StateText}"
+                                   Foreground="{StaticResource WarningBrush}" />
+                        <StackPanel>
+                          <TextBlock Text="{Binding CharacterName}" FontWeight="SemiBold" />
+                          <TextBlock Text="{Binding Target}" FontSize="12" Opacity="0.62" />
+                        </StackPanel>
+                      </DockPanel>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
           </Border>
         </StackPanel>
       </ScrollViewer>
@@ -388,7 +481,7 @@
                         IsEnabled="{Binding Profiles.CanOperate}"
                         Command="{Binding Profiles.ContinueOperationCommand}" />
                 <TextBlock Margin="0,7,0,0"
-                           Text="Waiting runs also check automatically every 30 seconds while open."
+                           Text="{Binding AutomaticCheckCountdownText}"
                            FontSize="11"
                            TextWrapping="Wrap"
                            Opacity="0.62" />
@@ -402,8 +495,39 @@
                         Content="Hide completed run"
                         Command="{Binding Profiles.HideOperationCommand}"
                         Visibility="{Binding Profiles.OperationIsTerminal, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                <Button Margin="0,8,0,0"
+                        Padding="12,8"
+                        Content="Preview pre-run restore"
+                        IsEnabled="{Binding Profiles.CanPreviewRestore}"
+                        Command="{Binding PreviewRestoreCommand}"
+                        Visibility="{Binding Profiles.OperationIsTerminal, Converter={StaticResource BooleanToVisibilityConverter}}" />
               </StackPanel>
             </Grid>
+          </Border>
+
+          <Border Margin="0,18,0,0"
+                  Style="{StaticResource CardStyle}"
+                  Visibility="{Binding Profiles.IsWaitingForInvites, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <StackPanel>
+              <TextBlock Text="Invitation waiting room" FontSize="17" FontWeight="SemiBold" />
+              <TextBlock Text="{Binding Profiles.WaitingRoomSummary}" Margin="0,6,0,9" Opacity="0.68" />
+              <ItemsControl ItemsSource="{Binding Profiles.WaitingCharacters}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <Grid Margin="0,4">
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="2*" />
+                        <ColumnDefinition Width="2*" />
+                        <ColumnDefinition Width="Auto" />
+                      </Grid.ColumnDefinitions>
+                      <TextBlock Text="{Binding CharacterName}" FontWeight="SemiBold" />
+                      <TextBlock Grid.Column="1" Text="{Binding Target}" Opacity="0.68" />
+                      <TextBlock Grid.Column="2" Text="{Binding StateText}" Foreground="{StaticResource WarningBrush}" />
+                    </Grid>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
           </Border>
 
           <Border Margin="0,18,0,0"
@@ -563,9 +687,13 @@
                   <ListBox.ItemTemplate>
                     <DataTemplate>
                       <StackPanel Margin="4,6">
-                        <TextBlock Text="{Binding Name}"
-                                   FontWeight="SemiBold"
-                                   TextTrimming="CharacterEllipsis" />
+                        <DockPanel>
+                          <TextBlock DockPanel.Dock="Right" Text="{Binding StatusText}"
+                                     FontSize="10" Foreground="{StaticResource EveAccentBrush}" />
+                          <TextBlock Text="{Binding Name}"
+                                     FontWeight="SemiBold"
+                                     TextTrimming="CharacterEllipsis" />
+                        </DockPanel>
                         <TextBlock Text="{Binding Summary}"
                                    Margin="0,3,0,0"
                                    FontSize="11"
@@ -615,10 +743,33 @@
                             Padding="12,8"
                             Content="Export JSON"
                             Command="{Binding Profiles.ExportProfileCommand}" />
+                    <Button Margin="0,0,8,0"
+                            Padding="12,8"
+                            Content="Pin / unpin"
+                            Command="{Binding Profiles.TogglePinCommand}"
+                            CommandParameter="{Binding Profiles.SelectedProfile}" />
+                    <Button Margin="0,0,8,0"
+                            Padding="12,8"
+                            Content="Make default"
+                            Command="{Binding Profiles.SetDefaultProfileCommand}"
+                            CommandParameter="{Binding Profiles.SelectedProfile}" />
                     <Button Padding="12,8"
                             Content="Delete"
                             Command="{Binding Profiles.DeleteProfileCommand}" />
                   </WrapPanel>
+                  <Grid Margin="0,13,0,0">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="180" />
+                      <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <ComboBox ItemsSource="{Binding Profiles.RunModeOptions}"
+                              DisplayMemberPath="DisplayName"
+                              SelectedValuePath="Value"
+                              SelectedValue="{Binding Profiles.SelectedRunMode}" />
+                    <TextBlock Grid.Column="1" Margin="12,0,0,0"
+                               Text="{Binding Profiles.SelectedRunModeDescription}"
+                               TextWrapping="Wrap" Opacity="0.65" />
+                  </Grid>
                   <TextBlock Text="{Binding Profiles.ValidationSummary}"
                              Margin="0,12,0,0"
                              TextWrapping="Wrap"
@@ -1335,7 +1486,110 @@
                   Style="{StaticResource CardStyle}"
                   Visibility="{Binding IsLiveFleetReady, Converter={StaticResource BooleanToVisibilityConverter}}">
             <StackPanel>
-              <TextBlock Text="Live hierarchy"
+              <DockPanel>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                  <Button Padding="12,8"
+                          Margin="0,0,8,0"
+                          Content="Clear pending"
+                          IsEnabled="{Binding HasStagedLiveMoves}"
+                          Command="{Binding ClearStagedLiveMovesCommand}" />
+                  <Button Padding="14,8"
+                          Style="{StaticResource PrimaryButtonStyle}"
+                          Content="Review pending moves"
+                          IsEnabled="{Binding HasStagedLiveMoves}"
+                          Command="{Binding ReviewStagedLiveMovesCommand}" />
+                </StackPanel>
+                <StackPanel>
+                  <TextBlock Text="Live Fleet Board" FontSize="19" FontWeight="SemiBold" />
+                  <TextBlock Text="Drag ordinary squad members between squads. This only stages changes; review and confirm once when the board is ready."
+                             Margin="0,6,22,0" TextWrapping="Wrap" Opacity="0.66" />
+                </StackPanel>
+              </DockPanel>
+
+              <Border Margin="0,14,0,0"
+                      Padding="11,9"
+                      Background="{StaticResource SurfaceAltBrush}"
+                      CornerRadius="8">
+                <TextBlock Text="{Binding StagedLiveMovesSummary}" FontWeight="SemiBold" />
+              </Border>
+              <ItemsControl Margin="0,8,0,0"
+                            ItemsSource="{Binding StagedLiveMoves}"
+                            Visibility="{Binding HasStagedLiveMoves, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <DockPanel Margin="0,3">
+                      <Button DockPanel.Dock="Right" Padding="7,3" Content="Remove"
+                              Command="{Binding DataContext.RemoveStagedLiveMoveCommand, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                              CommandParameter="{Binding}" />
+                      <TextBlock Text="{Binding Summary}" VerticalAlignment="Center" />
+                    </DockPanel>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+
+              <ItemsControl ItemsSource="{Binding FleetBoardWings}" Margin="0,16,0,0">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <StackPanel Margin="0,0,0,16">
+                      <TextBlock Text="{Binding Name}" FontSize="16" FontWeight="SemiBold" />
+                      <ItemsControl ItemsSource="{Binding Squads}" Margin="0,8,0,0">
+                        <ItemsControl.ItemsPanel>
+                          <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate>
+                            <Border Width="280" MinHeight="120" Margin="0,0,10,10"
+                                    Style="{StaticResource DropCardStyle}"
+                                    AllowDrop="True"
+                                    DragOver="OnLiveSquadDragOver"
+                                    Drop="OnLiveSquadDrop">
+                              <StackPanel>
+                                <DockPanel>
+                                  <TextBlock DockPanel.Dock="Right" Text="{Binding MemberCountText}"
+                                             FontSize="11" Opacity="0.6" />
+                                  <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                                </DockPanel>
+                                <ItemsControl ItemsSource="{Binding Members}" Margin="0,8,0,0">
+                                  <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                      <Border Margin="0,2" Padding="8,6"
+                                              Background="{StaticResource SurfaceBrush}"
+                                              CornerRadius="6"
+                                              PreviewMouseLeftButtonDown="OnLiveMemberPreviewMouseLeftButtonDown"
+                                              MouseMove="OnLiveMemberMouseMove">
+                                        <StackPanel>
+                                          <DockPanel>
+                                            <TextBlock Text="{Binding CharacterName}" FontWeight="SemiBold" />
+                                            <TextBlock DockPanel.Dock="Right" Text="DRAG"
+                                                       FontSize="10" Foreground="{StaticResource EveAccentBrush}"
+                                                       Visibility="{Binding CanStage, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                          </DockPanel>
+                                          <TextBlock Text="{Binding Detail}" FontSize="11" Opacity="0.62" />
+                                          <TextBlock Text="{Binding PendingTarget, StringFormat=Pending → {0}}"
+                                                     FontSize="11" Foreground="{StaticResource WarningBrush}"
+                                                     Visibility="{Binding IsStaged, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                        </StackPanel>
+                                      </Border>
+                                    </DataTemplate>
+                                  </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                              </StackPanel>
+                            </Border>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </StackPanel>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+          </Border>
+
+          <Border Margin="0,18,0,0"
+                  Style="{StaticResource CardStyle}"
+                  Visibility="{Binding IsLiveFleetReady, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <StackPanel>
+              <TextBlock Text="Technical hierarchy"
                          FontSize="17"
                          FontWeight="SemiBold" />
               <TextBlock Text="Read-only view from ESI. Character, ship, system, and station IDs are resolved to names in batches."
@@ -1459,6 +1713,19 @@
                          TextWrapping="Wrap" />
             </StackPanel>
           </Border>
+
+          <Border Margin="0,18,0,0" Style="{StaticResource CardStyle}">
+            <StackPanel>
+              <TextBlock Text="Commander attention" FontSize="17" FontWeight="SemiBold" />
+              <CheckBox Margin="0,12,0,0"
+                        Content="Play a Windows sound when invites are accepted, a run completes, or attention is needed"
+                        IsChecked="{Binding Profiles.AttentionSoundsEnabled}" />
+              <TextBlock Margin="0,7,0,0"
+                         Text="Fleet Desk also keeps a visible in-app alert; it never steals focus from EVE."
+                         TextWrapping="Wrap"
+                         Opacity="0.65" />
+            </StackPanel>
+          </Border>
         </StackPanel>
       </ScrollViewer>
 
@@ -1474,5 +1741,30 @@
                    Opacity="0.55" />
       </DockPanel>
     </Grid>
+
+    <Border Grid.Column="1"
+            Panel.ZIndex="50"
+            HorizontalAlignment="Right"
+            VerticalAlignment="Top"
+            Margin="0,88,34,0"
+            Width="430"
+            Padding="14,12"
+            Background="{StaticResource SurfaceBrush}"
+            BorderBrush="{StaticResource EveAccentBrush}"
+            BorderThickness="2"
+            CornerRadius="9"
+            Visibility="{Binding HasAttentionBanner, Converter={StaticResource BooleanToVisibilityConverter}}">
+      <DockPanel>
+        <Button DockPanel.Dock="Right"
+                Margin="14,0,0,0"
+                Padding="8,4"
+                Content="Dismiss"
+                Command="{Binding DismissAttentionCommand}" />
+        <StackPanel>
+          <TextBlock Text="Fleet Desk attention" FontWeight="SemiBold" />
+          <TextBlock Text="{Binding AttentionBannerText}" Margin="0,4,0,0" TextWrapping="Wrap" />
+        </StackPanel>
+      </DockPanel>
+    </Border>
   </Grid>
 </Window>

@@ -2,7 +2,7 @@
 
 Fleet Organizer is a local Windows 11 utility for repeatedly creating the same useful EVE Online fleet layout. It is designed for one player managing their own fleets and alts.
 
-This repository currently contains the **Fleet Desk usability slice** on top of the guarded fleet engine. Home provides a clear choose → preview → organise → monitor workflow; Fleet templates supports visual squad cards, multi-character drag/drop, exact ship-type placement rules, search, bulk editing, and optional hierarchy controls; Current run explains progress before showing technical recovery controls. The existing fresh-fleet checks, explicit confirmation, persistence, and no-kick/no-delete safety boundary are unchanged.
+This repository contains the **FC workflow slice** on top of the guarded fleet engine. Home remembers default and pinned templates, exposes clearly bounded quick-run modes, and shows readiness before the single review/confirm flow. Live Fleet is also a staging board: ordinary squad members can be dragged between squads into a pending tray without writing to EVE. Invitation waiting, recovery, and attention states are presented before technical details. Fresh-fleet checks, explicit confirmation, durable persistence, and the no-kick/no-delete safety boundary remain mandatory.
 
 ## Requirements
 
@@ -58,14 +58,16 @@ Do not paste or commit the EVE client secret. The desktop app uses Authorization
 
 After saving the public client ID, run `run.cmd`, open **Settings**, and choose **Sign in with EVE**. Authorize the character that will act as fleet boss. The refresh token is encrypted with Windows DPAPI for the current Windows user; the access token remains in memory only.
 
-## Use Live Fleet
+## Use Live Fleet and stage quick moves
 
 1. Create or join a fleet in the EVE client.
 2. Make the signed-in character fleet boss.
 3. Open **Live Fleet** in Fleet Organizer.
 4. Use **Refresh now** when you want an immediate cache-aware check.
+5. For a quick repair, drag ordinary squad members between cards on the **Live Fleet Board**.
+6. Inspect the pending tray and choose **Review pending moves**. Nothing is written until the normal dry run and final confirmation.
 
-The view shows fleet command, wings, squads, member roles, ships, and locations. It automatically refreshes every 30 seconds while the page is open and pauses while the app is minimized. ESI's own cache expiry can mean a just-created fleet takes up to roughly one minute to appear.
+The view shows fleet command, wings, squads, member roles, ships, and locations. Commander dragging is deliberately blocked; commander changes go through a saved-template commander run. The page automatically refreshes every 30 seconds while open and pauses while the app is minimized. ESI's cache expiry can mean a just-created fleet takes roughly one minute to appear.
 
 ## Build saved profiles
 
@@ -85,13 +87,13 @@ The normal template view keeps routine roster work visible and hides the denser 
 
 ## Quick routine workflow
 
-1. Open **Home** and choose a saved template.
-2. Choose **Preview fleet changes**. This is a read-only comparison.
-3. Read the plain summary, then choose **Organise fleet now** and confirm the exact action counts.
-4. Accept invitations in EVE.
-5. Leave Fleet Desk open: a waiting run checks accepted invitations every 30 seconds. Use **Check now** for an immediate refresh.
+1. Open **Home**. The default template is selected automatically; pin other frequent templates for quick access.
+2. Choose a safe run mode: **Full organise**, **Invite missing**, **Place joined**, **Fix structure**, or **Assign commanders**.
+3. Choose **Preview fleet changes**. This is a read-only comparison with capacity, ambiguity, ignored-member, and commander safety checks.
+4. Read the plain summary, then use the mode-specific primary action and confirm the exact action counts once.
+5. Accept invitations in EVE. The waiting room shows who is outstanding and the countdown to the next automatic check.
 
-Open **Activity** for the current/recovered run, its phase, next action, progress, and virtualized per-step recovery table. `Ctrl+Enter` prepares the selected profile, `F5` refreshes the live fleet when available, and `Esc` closes the current dry-run preview.
+Open **Activity** for the current/recovered run, its phase, next action, progress, and virtualized per-step recovery table. A completed run can generate a best-effort **pre-run restore preview**; it never starts a rollback automatically. Fleet Desk can play a Windows attention sound for accepted invitations, completion, and failures without stealing focus from EVE. `Ctrl+Enter` prepares the selected profile, `F5` refreshes the live fleet when available, and `Esc` closes the current dry-run preview.
 
 ## Preview a profile against the live fleet
 
@@ -112,7 +114,7 @@ The preview uses the current editor state, so it is useful before saving. Any hi
 
 The app re-reads the live fleet before the first write. If the plan changed after review, it sends nothing and asks you to review again. Each step is persisted around external writes, so a restart resumes from confirmed live state rather than replaying an assumed success. A failed character can be retried or skipped individually; cancelling stops future steps but does not undo writes ESI already accepted.
 
-An unexpected WPF UI exception is shown before shutdown and written to `%LOCALAPPDATA%\FleetOrganizer\logs\crash-*.log`; the active operation remains persisted for reconciliation after reopening. Inspect a crash log before sharing it because automatic redacted diagnostic export remains a later Milestone 6 recovery slice.
+An unexpected WPF UI exception is shown before shutdown and written to `%LOCALAPPDATA%\FleetOrganizer\logs\crash-*.log`; the active operation remains persisted for reconciliation after reopening. Inspect a crash log before sharing it because automatic redacted diagnostic export remains a later recovery slice.
 
 For a missing name, Milestone 5 first reuses the next unmatched live wing/squad only when that node contains no unmanaged member; otherwise it creates a new node. Every rename is shown in the dry run. Extra live structure is left alone. A desired commander slot occupied by a character absent from the profile is a blocker rather than an implicit demotion. An invite can still be rejected by EVE when the target character has a CSPA charge enabled; target characters do not need to sign in to Fleet Organizer, but they must accept the invite in EVE.
 

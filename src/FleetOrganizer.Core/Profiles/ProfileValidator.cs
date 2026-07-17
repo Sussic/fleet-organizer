@@ -5,6 +5,9 @@ namespace FleetOrganizer.Core.Profiles;
 public static class ProfileValidator
 {
     public const int MaximumHierarchyNameLength = 10;
+    public const int MaximumWings = 5;
+    public const int MaximumSquadsPerWing = 5;
+    public const int MaximumCharactersPerSquad = 10;
 
     public static IReadOnlyList<ProfileValidationError> Validate(FleetProfile profile)
     {
@@ -31,12 +34,28 @@ public static class ProfileValidator
         IReadOnlyList<ProfileWing> wings,
         List<ProfileValidationError> errors)
     {
+        if (wings.Count > MaximumWings)
+        {
+            errors.Add(new(
+                "profile.wings.capacity",
+                $"A fleet can have at most {MaximumWings} wings.",
+                "profile.wings"));
+        }
+
         var wingNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         for (var wingIndex = 0; wingIndex < wings.Count; wingIndex++)
         {
             var wing = wings[wingIndex];
             var wingPath = $"profile.wings[{wingIndex}]";
+
+            if (wing.Squads.Count > MaximumSquadsPerWing)
+            {
+                errors.Add(new(
+                    "wing.squads.capacity",
+                    $"Wing '{wing.Name}' can have at most {MaximumSquadsPerWing} squads.",
+                    $"{wingPath}.squads"));
+            }
 
             ValidateHierarchyName(wing.Name, "wing", wingPath, errors);
 
@@ -104,6 +123,7 @@ public static class ProfileValidator
         var squadCommanders = new HashSet<Guid>();
         var wingCommanders = new HashSet<Guid>();
         var fleetCommanderCount = 0;
+        var squadAssignmentCounts = new Dictionary<Guid, int>();
 
         for (var assignmentIndex = 0; assignmentIndex < profile.Assignments.Count; assignmentIndex++)
         {
@@ -133,6 +153,13 @@ public static class ProfileValidator
                     $"Character '{assignment.CharacterName}' targets a squad that is not in this profile.",
                     $"{assignmentPath}.targetSquadId"));
                 continue;
+            }
+
+            if (assignment.DesiredRole is
+                DesiredFleetRole.SquadMember or DesiredFleetRole.SquadCommander)
+            {
+                squadAssignmentCounts.TryGetValue(assignment.TargetSquadId, out var squadCount);
+                squadAssignmentCounts[assignment.TargetSquadId] = squadCount + 1;
             }
 
             switch (assignment.DesiredRole)
@@ -181,6 +208,23 @@ public static class ProfileValidator
                     throw new InvalidOperationException(
                         $"Assignment for character {assignment.CharacterId} has unknown desired fleet role '{assignment.DesiredRole}'.");
             }
+        }
+
+
+        foreach (var (squadId, count) in squadAssignmentCounts)
+        {
+            if (count <= MaximumCharactersPerSquad)
+            {
+                continue;
+            }
+
+            var squad = profile.Wings
+                .SelectMany(wing => wing.Squads.Select(candidate => (Wing: wing, Squad: candidate)))
+                .Single(definition => definition.Squad.Id == squadId);
+            errors.Add(new(
+                "assignment.squad.capacity",
+                $"{squad.Wing.Name} / {squad.Squad.Name} has {count} characters; a squad can hold at most {MaximumCharactersPerSquad}.",
+                "profile.assignments"));
         }
     }
 

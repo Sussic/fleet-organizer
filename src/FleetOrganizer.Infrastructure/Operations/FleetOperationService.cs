@@ -35,6 +35,11 @@ internal sealed class FleetOperationService : IFleetOperationService, IDisposabl
         CancellationToken cancellationToken = default) =>
         repository.LoadLatestResumableAsync(cancellationToken);
 
+    public Task<LiveFleetSnapshot?> LoadInitialSnapshotAsync(
+        Guid operationId,
+        CancellationToken cancellationToken = default) =>
+        repository.LoadInitialSnapshotAsync(operationId, cancellationToken);
+
     public async Task<FleetOperationStartResult> StartAsync(
         FleetProfile profile,
         FleetDryRunPlan reviewedPlan,
@@ -58,7 +63,9 @@ internal sealed class FleetOperationService : IFleetOperationService, IDisposabl
                 .RefreshCurrentAsync(cancellationToken)
                 .ConfigureAwait(false);
             var snapshot = RequireReadySnapshot(liveResult);
-            var currentPlan = FleetPlanner.Build(profile, snapshot);
+            var currentPlan = FleetPlanModeFilter.Apply(
+                FleetPlanner.Build(profile, snapshot),
+                reviewedPlan.Mode);
             if (!string.Equals(
                 FleetOperationFactory.GetReviewSignature(reviewedPlan),
                 FleetOperationFactory.GetReviewSignature(currentPlan),

@@ -6,8 +6,10 @@ using FleetOrganizer.Core.Planning;
 
 namespace FleetOrganizer.App.ViewModels;
 
-public sealed record ProfileListItemViewModel(FleetProfile Profile)
+public sealed partial class ProfileListItemViewModel(FleetProfile profile) : ObservableObject
 {
+    public FleetProfile Profile { get; } = profile;
+
     public Guid Id => Profile.Id;
 
     public string Name => Profile.Name;
@@ -15,6 +17,20 @@ public sealed record ProfileListItemViewModel(FleetProfile Profile)
     public string Summary =>
         $"{Profile.Assignments.Count} characters • {Profile.Wings.Count} wings • " +
         $"{Profile.ShipRules.Count} ship rule{(Profile.ShipRules.Count == 1 ? string.Empty : "s")}";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(StatusText))]
+    public partial bool IsPinned { get; set; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(StatusText))]
+    public partial bool IsDefault { get; set; }
+
+    public string StatusText => IsDefault
+        ? "DEFAULT"
+        : IsPinned
+            ? "PINNED"
+            : string.Empty;
 }
 
 public sealed partial class ProfileWingEditorViewModel(
@@ -95,6 +111,26 @@ public sealed partial class ProfileShipRuleEditorViewModel(
 }
 
 public sealed record DesiredRoleOptionViewModel(DesiredFleetRole Value, string DisplayName);
+
+public sealed record FleetRunModeOptionViewModel(
+    FleetRunMode Value,
+    string DisplayName,
+    string Description);
+
+public sealed record WaitingCharacterViewModel(
+    long CharacterId,
+    string CharacterName,
+    string Target,
+    string StateText);
+
+public sealed class FleetAttentionEventArgs(
+    string message,
+    bool isUrgent) : EventArgs
+{
+    public string Message { get; } = message;
+
+    public bool IsUrgent { get; } = isUrgent;
+}
 
 public sealed record FleetPlanItemViewModel(FleetPlanItem Item)
 {

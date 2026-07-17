@@ -110,6 +110,41 @@ public sealed class FleetOperationFactoryTests
             step => Assert.Equal(FleetOperationStepType.RenameSquad, step.Type));
     }
 
+    [Fact]
+    public void InviteOnlyModeDoesNotCreateHiddenPlacementWork()
+    {
+        var profile = CreateProfile(DesiredFleetRole.SquadMember);
+        var snapshot = CreateSnapshot(includePilot: false) with { Wings = [] };
+        var plan = FleetPlanModeFilter.Apply(
+            FleetPlanner.Build(profile, snapshot),
+            FleetRunMode.InviteMissing);
+
+        var operation = FleetOperationFactory.Create(
+            Guid.NewGuid(),
+            profile,
+            snapshot,
+            plan,
+            Now);
+
+        var step = Assert.Single(operation.Steps);
+        Assert.Equal(FleetOperationStepType.Invite, step.Type);
+        Assert.Equal(0, step.Target.WingId);
+        Assert.Equal(0, step.Target.SquadId);
+    }
+
+    [Fact]
+    public void ReviewSignatureIncludesSelectedRunMode()
+    {
+        var profile = CreateProfile(DesiredFleetRole.SquadMember);
+        var snapshot = CreateSnapshot(includePilot: false);
+        var fullPlan = FleetPlanner.Build(profile, snapshot);
+        var invitePlan = FleetPlanModeFilter.Apply(fullPlan, FleetRunMode.InviteMissing);
+
+        Assert.NotEqual(
+            FleetOperationFactory.GetReviewSignature(fullPlan),
+            FleetOperationFactory.GetReviewSignature(invitePlan));
+    }
+
     private static FleetProfile CreateProfile(DesiredFleetRole role)
     {
         var squadId = Guid.Parse("22222222-2222-2222-2222-222222222222");

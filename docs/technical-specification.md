@@ -1,7 +1,7 @@
 # Fleet Organizer — Technical Specification
 
 **Status:** Approved implementation baseline
-**Revision:** 1.7
+**Revision:** 1.8
 **Reviewed:** 17 July 2026
 **Target:** Windows 11, local single-user desktop application
 **Working title:** Fleet Organizer (name can change without affecting the architecture)
@@ -39,10 +39,16 @@ Implemented and tested in the current repository:
 - Exact live ship-type matching with explicit-character precedence, fleet-boss exclusion, ordinary-member-only roles, and visible preview match counts.
 - Automatic 30-second continuation while a confirmed operation waits for invitation acceptance, with the manual check action retained.
 - A cohesive Fleet Desk visual system and plain preview → organise → monitor terminology across Home, templates, and activity.
+- Persistent default, last-used, and pinned templates plus remembered run mode and attention-sound preference.
+- Safe filtered run modes for full organisation, invitations only, present-member placement, structure only, and commander assignment; the selected mode is part of stale-review validation.
+- Preflight fleet-capacity validation for wings, squads, and ordinary squad positions.
+- A named invitation waiting room with a visible automatic-check countdown.
+- A staged Live Fleet Board for ordinary-member drag/drop, pending-change review, and one final confirmation through the existing durable engine.
+- Best-effort pre-run snapshot restore preview and in-app/Windows-sound attention notifications.
 
 Milestone 5 keeps the complete write queue serialized. Structure create results are persisted before dependent naming/placement steps, interrupted creates are reconciled against the initial snapshot, and ambiguous outcomes require attention instead of blind duplication. Rename and commander writes are also verified from fresh live state.
 
-The Fleet Desk slice adds the repetitive-use interface around that engine: a guided Home launcher, plain-language review and operation phases, visual squad cards, local multi-character drag/drop, exact ship placement rules, automatic acceptance checks, profile/roster filtering, recycling virtualization, filtered bulk selection, optional hierarchy editing, unsaved-change status, and keyboard shortcuts. Snapshot restore preview, chronological history, and redacted diagnostic export remain separate recovery slices; this UI checkpoint does not widen the ESI write boundary.
+The FC workflow slice adds the repetitive-use interface around that engine: a guided Home launcher, remembered frequent templates, safe partial-run modes, plain-language review and operation phases, a live staging board, visual template squad cards, local multi-character drag/drop, exact ship placement rules, named automatic acceptance checks, restore previews, profile/roster filtering, recycling virtualization, filtered bulk selection, optional hierarchy editing, unsaved-change status, and keyboard shortcuts. Chronological history and redacted diagnostic export remain separate recovery slices; this UI checkpoint does not widen the ESI write boundary.
 
 ## 1. Executive decision
 
@@ -409,7 +415,7 @@ Kicking and hierarchy deletion are separate, explicit commands with a confirmati
 
 ### 9.6 Snapshot and restore
 
-A snapshot stores the hierarchy, member IDs, roles, and positions seen immediately before applying a profile. Restore is a **best-effort forward operation**, not a database rollback: ESI has no transaction, some characters may have left, and live fleet IDs may have changed. The restore preview shows possible, impossible, and destructive parts before execution. MVP restore never reinvites departed characters automatically.
+A snapshot stores the hierarchy, member IDs, roles, and positions seen immediately before applying a profile. Restore is a **best-effort forward operation**, not a database rollback: ESI has no transaction, some characters may have left, and live fleet IDs may have changed. The restore preview makes any departed-character invitations visible and requires the normal explicit start confirmation; it never starts or reinvites automatically.
 
 ## 10. User experience specification
 
@@ -698,6 +704,8 @@ No Rust, Node.js, database server, Docker, IIS, or cloud account is required.
 - Multi-select drag/drop, ship placement rules, automatic invite-acceptance checks, snapshots, restore preview, activity history, diagnostic export, keyboard flows, tray behavior, sounds, and stale-state badges.
 - **Exit:** routine repeated use requires only profile choice, one click, and invite acceptance.
 
+**Implemented in the FC workflow slice:** frequent-template preferences, safe partial modes, template/live-board drag staging, ship rules, named acceptance waiting, capacity preflight, restore preview, keyboard flows, and attention sounds. Chronological history, redacted diagnostic export, and tray/minimize polish remain.
+
 ### Milestone 7 — release hardening
 
 - Clean-machine package test, performance/accessibility pass, rate/network soak tests, ESI contract review, documentation, checksum, and release workflow.
@@ -754,4 +762,4 @@ None of these changes the selected stack or core operation engine. They can be d
 
 ## 20. Current build checkpoint
 
-Milestones 0–5 and the Fleet Desk usability slice are implemented in the repository. The current live-write boundary includes safe structure creation/renaming, invitations, managed-member staging, and serialized squad/wing commander transitions with final verification. Visual local drag/drop, exact ship placement rules, and automatic acceptance checks are implemented without widening that boundary. Remaining recovery slices are snapshot/restore preview, chronological activity history, and redacted diagnostics.
+Milestones 0–5 and the FC workflow slice are implemented in the repository. The current live-write boundary includes safe structure creation/renaming, invitations, managed-member staging, and serialized squad/wing commander transitions with final verification. Frequent-template preferences, filtered quick-run modes, visual template and live-board drag/drop, exact ship placement rules, named automatic acceptance checks, capacity preflight, restore preview, and attention sounds are implemented without widening that boundary. Remaining recovery slices are chronological activity history and redacted diagnostics.

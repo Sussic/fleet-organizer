@@ -44,6 +44,7 @@ public static class DependencyInjection
         services.AddSingleton<IFleetWriteService, EveFleetWriteService>();
         services.AddSingleton<ICharacterNameResolver, EveCharacterNameResolver>();
         services.AddSingleton<IFleetProfileRepository, FleetProfileRepository>();
+        services.AddSingleton<IFleetDeskPreferencesRepository, FleetDeskPreferencesRepository>();
         services.AddSingleton<IFleetOperationRepository, FleetOperationRepository>();
         services.AddSingleton<IFleetOperationService, FleetOperationService>();
         services.AddSingleton<SqliteDatabaseInitializer>();

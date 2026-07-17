@@ -16,7 +16,7 @@ using Microsoft.Win32;
 
 namespace FleetOrganizer.App.ViewModels;
 
-public partial class ProfilesViewModel : ObservableObject
+public partial class ProfilesViewModel : ObservableObject, IDisposable
 {
     private static readonly char[] TagSeparators = [',', ';'];
 
@@ -24,11 +24,15 @@ public partial class ProfilesViewModel : ObservableObject
     private readonly ICharacterNameResolver characterNameResolver;
     private readonly ILiveFleetService liveFleetService;
     private readonly IFleetOperationService operationService;
+    private readonly IFleetDeskPreferencesRepository preferencesRepository;
+    private readonly SemaphoreSlim preferencesGate = new(1, 1);
     private bool isLoadingEditor;
+    private bool isLoadingPreferences;
     private FleetDryRunPlan? lastDryRunPlan;
     private FleetProfile? lastPreparedProfile;
     private int lastShipRuleMatchCount;
     private FleetOperation? currentOperation;
+    private FleetDeskPreferences preferences = new();
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanPrepareFleet))]
@@ -50,6 +54,7 @@ public partial class ProfilesViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(CanEdit))]
     [NotifyPropertyChangedFor(nameof(CanOperate))]
     [NotifyPropertyChangedFor(nameof(CanPrepareFleet))]
+    [NotifyPropertyChangedFor(nameof(CanPreviewRestore))]
     public partial bool IsBusy { get; set; }
 
     [ObservableProperty]
@@ -111,6 +116,7 @@ public partial class ProfilesViewModel : ObservableObject
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanEdit))]
     [NotifyPropertyChangedFor(nameof(CanOperate))]
+    [NotifyPropertyChangedFor(nameof(CanPreviewRestore))]
     public partial bool HasOperation { get; set; }
 
     [ObservableProperty]
@@ -128,6 +134,7 @@ public partial class ProfilesViewModel : ObservableObject
     public partial string OperationStatusMessage { get; set; } = string.Empty;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanPreviewRestore))]
     public partial bool OperationIsTerminal { get; set; }
 
     [ObservableProperty]
@@ -143,21 +150,42 @@ public partial class ProfilesViewModel : ObservableObject
     [ObservableProperty]
     public partial double OperationProgressPercent { get; set; }
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SelectedRunModeDescription))]
+    [NotifyPropertyChangedFor(nameof(RunPrimaryActionText))]
+    public partial FleetRunMode SelectedRunMode { get; set; } = FleetRunMode.FullOrganise;
+
+    [ObservableProperty]
+    public partial bool AttentionSoundsEnabled { get; set; } = true;
+
+    [ObservableProperty]
+    public partial bool IsWaitingForInvites { get; set; }
+
+    [ObservableProperty]
+    public partial string WaitingRoomSummary { get; set; } = "No invitations are waiting.";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanPreviewRestore))]
+    public partial bool HasRestoreSnapshot { get; set; }
+
     public ProfilesViewModel(
         IFleetProfileRepository repository,
         ICharacterNameResolver characterNameResolver,
         ILiveFleetService liveFleetService,
-        IFleetOperationService operationService)
+        IFleetOperationService operationService,
+        IFleetDeskPreferencesRepository preferencesRepository)
     {
         ArgumentNullException.ThrowIfNull(repository);
         ArgumentNullException.ThrowIfNull(characterNameResolver);
         ArgumentNullException.ThrowIfNull(liveFleetService);
         ArgumentNullException.ThrowIfNull(operationService);
+        ArgumentNullException.ThrowIfNull(preferencesRepository);
 
         this.repository = repository;
         this.characterNameResolver = characterNameResolver;
         this.liveFleetService = liveFleetService;
         this.operationService = operationService;
+        this.preferencesRepository = preferencesRepository;
 
         FilteredProfileItems = CollectionViewSource.GetDefaultView(ProfileItems);
         FilteredProfileItems.Filter = FilterProfile;
@@ -183,6 +211,8 @@ public partial class ProfilesViewModel : ObservableObject
 
     public ObservableCollection<FleetOperationStepViewModel> OperationItems { get; } = [];
 
+    public ObservableCollection<WaitingCharacterViewModel> WaitingCharacters { get; } = [];
+
     public ICollectionView FilteredProfileItems { get; }
 
     public ICollectionView FilteredAssignments { get; }
@@ -195,12 +225,46 @@ public partial class ProfilesViewModel : ObservableObject
         new(DesiredFleetRole.FleetCommander, "Fleet commander"),
     ];
 
+    public FleetRunModeOptionViewModel[] RunModeOptions { get; } =
+    [
+        new(FleetRunMode.FullOrganise, "Full organise", "Build structure, invite, place, and assign commanders."),
+        new(FleetRunMode.InviteMissing, "Invite missing", "Send only missing-character invitations."),
+        new(FleetRunMode.PlacePresent, "Place joined", "Move characters already in fleet; never invite."),
+        new(FleetRunMode.FixStructure, "Fix structure", "Create or rename wings and squads only."),
+        new(FleetRunMode.AssignCommanders, "Assign commanders", "Promote configured commanders after placement is ready."),
+    ];
+
+    public event EventHandler<FleetAttentionEventArgs>? AttentionRequested;
+
     public bool CanEdit => IsEditorActive && !IsBusy && !HasActiveOperation;
 
     public bool CanOperate => HasOperation && !IsBusy;
 
     public bool CanPrepareFleet =>
         IsEditorActive && !IsBusy && !HasActiveOperation && !HasUnsavedChanges;
+
+    public bool CanPreviewRestore => HasOperation && OperationIsTerminal && HasRestoreSnapshot && !IsBusy;
+
+    public string SelectedRunModeDescription => RunModeOptions
+        .Single(option => option.Value == SelectedRunMode)
+        .Description;
+
+    public string RunPrimaryActionText => SelectedRunMode switch
+    {
+        FleetRunMode.InviteMissing => "Send missing invites",
+        FleetRunMode.PlacePresent => "Place joined characters",
+        FleetRunMode.FixStructure => "Fix fleet structure",
+        FleetRunMode.AssignCommanders => "Assign commanders",
+        _ => "Organise fleet now",
+    };
+
+    public IEnumerable<ProfileListItemViewModel> PinnedProfiles => ProfileItems
+        .Where(item => item.IsPinned || item.IsDefault)
+        .OrderByDescending(item => item.IsDefault)
+        .ThenBy(item => item.Name, StringComparer.OrdinalIgnoreCase);
+
+    public string DefaultProfileName => ProfileItems
+        .FirstOrDefault(item => item.IsDefault)?.Name ?? "No default template";
 
     public string SelectedProfileQuickSummary => SelectedProfile is null
         ? "No profile selected"
@@ -223,11 +287,24 @@ public partial class ProfilesViewModel : ObservableObject
         ? "Unsaved local changes"
         : "All changes saved locally";
 
+    public void Dispose()
+    {
+        preferencesGate.Dispose();
+        GC.SuppressFinalize(this);
+    }
+
     public async Task InitializeAsync()
     {
         try
         {
-            await ReloadProfilesAsync(null);
+            isLoadingPreferences = true;
+            preferences = await preferencesRepository.LoadAsync();
+            SelectedRunMode = Enum.IsDefined(preferences.RunMode)
+                ? preferences.RunMode
+                : FleetRunMode.FullOrganise;
+            AttentionSoundsEnabled = preferences.AttentionSoundsEnabled;
+            await ReloadProfilesAsync(preferences.DefaultProfileId ?? preferences.LastUsedProfileId);
+            isLoadingPreferences = false;
             var resumableOperation = await operationService.LoadLatestResumableAsync();
             if (resumableOperation is not null)
             {
@@ -240,6 +317,7 @@ public partial class ProfilesViewModel : ObservableObject
         }
         catch (Exception exception)
         {
+            isLoadingPreferences = false;
             StatusMessage = $"Profiles could not be loaded: {exception.Message}";
         }
     }
@@ -268,6 +346,54 @@ public partial class ProfilesViewModel : ObservableObject
 
     [RelayCommand]
     private void ShowAdvancedEditor() => IsAdvancedMode = true;
+
+    [RelayCommand]
+    private void SelectProfile(ProfileListItemViewModel? item)
+    {
+        if (item is not null)
+        {
+            SelectedProfile = item;
+        }
+    }
+
+    [RelayCommand]
+    private async Task TogglePinAsync(ProfileListItemViewModel? item)
+    {
+        item ??= SelectedProfile;
+        if (item is null)
+        {
+            return;
+        }
+
+        item.IsPinned = !item.IsPinned;
+        await SavePreferencesAsync();
+        OnPropertyChanged(nameof(PinnedProfiles));
+        StatusMessage = item.IsPinned
+            ? $"Pinned '{item.Name}' to the FC console."
+            : $"Unpinned '{item.Name}'.";
+    }
+
+    [RelayCommand]
+    private async Task SetDefaultProfileAsync(ProfileListItemViewModel? item)
+    {
+        item ??= SelectedProfile;
+        if (item is null)
+        {
+            return;
+        }
+
+        foreach (var profile in ProfileItems)
+        {
+            profile.IsDefault = profile.Id == item.Id;
+        }
+
+        item.IsPinned = true;
+        SelectedProfile = item;
+        await SavePreferencesAsync();
+        OnPropertyChanged(nameof(PinnedProfiles));
+        OnPropertyChanged(nameof(DefaultProfileName));
+        StatusMessage = $"'{item.Name}' is now the default FC template.";
+    }
 
     [RelayCommand]
     private async Task NewProfileAsync()
@@ -434,6 +560,7 @@ public partial class ProfilesViewModel : ObservableObject
         {
             await repository.DeleteAsync(EditingProfileId);
             await ReloadProfilesAsync(null);
+            await SavePreferencesAsync();
             StatusMessage = "Profile deleted. No EVE fleet changes were made.";
         }
         catch (Exception exception)
@@ -660,8 +787,11 @@ public partial class ProfilesViewModel : ObservableObject
             var resolution = ShipRuleResolver.Resolve(profile, liveResult.Snapshot);
             lastPreparedProfile = resolution.EffectiveProfile;
             lastShipRuleMatchCount = resolution.Matches.Count;
-            var plan = FleetPlanner.Build(resolution.EffectiveProfile, liveResult.Snapshot);
+            var plan = FleetPlanModeFilter.Apply(
+                FleetPlanner.Build(resolution.EffectiveProfile, liveResult.Snapshot),
+                SelectedRunMode);
             ApplyDryRun(plan, liveResult.Snapshot.ConfirmedAtUtc);
+            await SavePreferencesAsync();
             StatusMessage = plan.BlockingIssues == 0
                 ? $"Preview ready: {plan.TotalChanges} proposed change{(plan.TotalChanges == 1 ? string.Empty : "s")}" +
                     (lastShipRuleMatchCount == 0
@@ -702,6 +832,7 @@ public partial class ProfilesViewModel : ObservableObject
 
         var answer = MessageBox.Show(
             $"Start a guarded fleet operation for '{reviewedPlan.ProfileName}'?\n\n" +
+            $"Mode: {RunModeOptions.Single(option => option.Value == reviewedPlan.Mode).DisplayName}\n" +
             $"Fleet: {reviewedPlan.FleetId}\n" +
             $"Structure creates: {reviewedPlan.StructureCreates}\n" +
             $"Structure renames: {reviewedPlan.StructureRenames}\n" +
@@ -858,6 +989,128 @@ public partial class ProfilesViewModel : ObservableObject
         OperationNextAction = "Choose a profile on Home to prepare a run.";
         OperationProgressText = "0 of 0 steps finished";
         OperationProgressPercent = 0;
+        WaitingCharacters.Clear();
+        IsWaitingForInvites = false;
+        WaitingRoomSummary = "No invitations are waiting.";
+        HasRestoreSnapshot = false;
+    }
+
+    public async Task<bool> PrepareRestorePreviewAsync()
+    {
+        var operation = currentOperation;
+        if (operation is null || !operation.IsTerminal || IsBusy)
+        {
+            StatusMessage = "Finish the current run before preparing a restore preview.";
+            return false;
+        }
+
+        IsBusy = true;
+        StatusMessage = "Loading the pre-run snapshot and comparing it with the live fleet…";
+        try
+        {
+            var initialSnapshot = await operationService.LoadInitialSnapshotAsync(operation.Id);
+            if (initialSnapshot is null)
+            {
+                HasRestoreSnapshot = false;
+                StatusMessage = "This run does not have a pre-run snapshot to preview.";
+                return false;
+            }
+
+            var liveResult = await liveFleetService.LoadCurrentAsync();
+            if (liveResult.Status != LiveFleetLoadStatus.Ready || liveResult.Snapshot is null)
+            {
+                StatusMessage = liveResult.UserMessage;
+                return false;
+            }
+
+            var restoreProfile = FleetProfileFactory.FromLiveFleet(
+                initialSnapshot,
+                $"Restore before {operation.ProfileName}") with
+            {
+                Id = operation.ProfileId,
+            };
+            lastPreparedProfile = restoreProfile;
+            lastShipRuleMatchCount = 0;
+            var plan = FleetPlanModeFilter.Apply(
+                FleetPlanner.Build(restoreProfile, liveResult.Snapshot),
+                FleetRunMode.FullOrganise);
+            ApplyDryRun(plan, liveResult.Snapshot.ConfirmedAtUtc);
+            DryRunSafetyMessage +=
+                " Restore is best-effort: the preview never kicks members or deletes hierarchy, and characters who left may appear as invitations.";
+            StatusMessage = "Restore preview ready. Review every proposed change before starting it.";
+            return true;
+        }
+        catch (Exception exception)
+        {
+            StatusMessage = $"Restore preview could not be prepared: {exception.Message}";
+            return false;
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    public Task<bool> PrepareStagedMovesAsync(
+        LiveFleetSnapshot snapshot,
+        StagedLiveMoveViewModel[] stagedMoves)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        ArgumentNullException.ThrowIfNull(stagedMoves);
+
+        if (SelectedProfile is null)
+        {
+            StatusMessage = "Choose a saved template first. Fleet Desk uses it only as the local audit owner for this quick move run.";
+            return Task.FromResult(false);
+        }
+
+        if (stagedMoves.Count == 0)
+        {
+            StatusMessage = "Drag at least one ordinary squad member to a target squad first.";
+            return Task.FromResult(false);
+        }
+
+        var profile = FleetProfileFactory.FromLiveFleet(snapshot, "Staged live moves") with
+        {
+            Id = SelectedProfile.Id,
+        };
+        var targetSquadIds = new Dictionary<(long WingId, long SquadId), Guid>();
+        foreach (var (liveWing, profileWing) in snapshot.Wings
+            .Zip(profile.Wings.OrderBy(wing => wing.SortOrder)))
+        {
+            foreach (var (liveSquad, profileSquad) in liveWing.Squads
+                .Zip(profileWing.Squads.OrderBy(squad => squad.SortOrder)))
+            {
+                targetSquadIds[(liveWing.WingId, liveSquad.SquadId)] = profileSquad.Id;
+            }
+        }
+
+        var movesByCharacterId = stagedMoves.ToDictionary(move => move.CharacterId);
+        profile = profile with
+        {
+            Assignments = profile.Assignments
+                .Select(assignment => movesByCharacterId.TryGetValue(
+                    assignment.CharacterId,
+                    out var move)
+                        ? assignment with
+                        {
+                            TargetSquadId = targetSquadIds[(move.TargetWingId, move.TargetSquadId)],
+                            DesiredRole = DesiredFleetRole.SquadMember,
+                        }
+                        : assignment)
+                .ToArray(),
+        };
+        lastPreparedProfile = profile;
+        lastShipRuleMatchCount = 0;
+        var plan = FleetPlanModeFilter.Apply(
+            FleetPlanner.Build(profile, snapshot),
+            FleetRunMode.PlacePresent);
+        ApplyDryRun(plan, snapshot.ConfirmedAtUtc);
+        DryRunTitle = $"{stagedMoves.Count} staged live move{(stagedMoves.Count == 1 ? string.Empty : "s")} • fleet {snapshot.FleetId}";
+        DryRunSafetyMessage +=
+            " This quick run can place ordinary squad members only; commanders and invitations are excluded.";
+        StatusMessage = "Staged move preview ready. One final confirmation remains before any ESI write.";
+        return Task.FromResult(true);
     }
 
     [RelayCommand]
@@ -1163,6 +1416,10 @@ public partial class ProfilesViewModel : ObservableObject
         }
 
         LoadEditor(value.Profile);
+        if (!isLoadingPreferences)
+        {
+            _ = SavePreferencesSafelyAsync();
+        }
     }
 
     partial void OnProfileSearchTextChanged(string value)
@@ -1193,24 +1450,90 @@ public partial class ProfilesViewModel : ObservableObject
         RefreshVisibleDryRunItems();
     }
 
+    partial void OnSelectedRunModeChanged(FleetRunMode value)
+    {
+        _ = value;
+        InvalidateDryRun();
+        if (!isLoadingPreferences)
+        {
+            _ = SavePreferencesSafelyAsync();
+        }
+    }
+
+    partial void OnAttentionSoundsEnabledChanged(bool value)
+    {
+        _ = value;
+        if (!isLoadingPreferences)
+        {
+            _ = SavePreferencesSafelyAsync();
+        }
+    }
+
     private async Task ReloadProfilesAsync(Guid? selectedProfileId)
     {
         var profiles = await repository.LoadAllAsync();
         ProfileItems.Clear();
-        foreach (var profile in profiles)
+        foreach (var profile in profiles
+            .OrderByDescending(profile => profile.Id == preferences.DefaultProfileId)
+            .ThenByDescending(profile => preferences.PinnedProfileIds.Contains(profile.Id))
+            .ThenBy(profile => profile.Name, StringComparer.OrdinalIgnoreCase))
         {
-            ProfileItems.Add(new ProfileListItemViewModel(profile));
+            ProfileItems.Add(new ProfileListItemViewModel(profile)
+            {
+                IsDefault = profile.Id == preferences.DefaultProfileId,
+                IsPinned = preferences.PinnedProfileIds.Contains(profile.Id) ||
+                    profile.Id == preferences.DefaultProfileId,
+            });
         }
 
         FilteredProfileItems.Refresh();
         OnPropertyChanged(nameof(ProfileSearchSummary));
+        OnPropertyChanged(nameof(PinnedProfiles));
+        OnPropertyChanged(nameof(DefaultProfileName));
 
         SelectedProfile = selectedProfileId is Guid id
-            ? ProfileItems.FirstOrDefault(item => item.Id == id)
+            ? ProfileItems.FirstOrDefault(item => item.Id == id) ?? ProfileItems.FirstOrDefault()
             : ProfileItems.FirstOrDefault();
         if (SelectedProfile is null)
         {
             ClearEditor();
+        }
+    }
+
+    private async Task SavePreferencesAsync()
+    {
+        await preferencesGate.WaitAsync();
+        try
+        {
+            preferences = new FleetDeskPreferences
+            {
+                LastUsedProfileId = SelectedProfile?.Id ?? preferences.LastUsedProfileId,
+                DefaultProfileId = ProfileItems.FirstOrDefault(item => item.IsDefault)?.Id,
+                PinnedProfileIds = ProfileItems
+                    .Where(item => item.IsPinned)
+                    .Select(item => item.Id)
+                    .Distinct()
+                    .ToArray(),
+                RunMode = SelectedRunMode,
+                AttentionSoundsEnabled = AttentionSoundsEnabled,
+            };
+            await preferencesRepository.SaveAsync(preferences);
+        }
+        finally
+        {
+            preferencesGate.Release();
+        }
+    }
+
+    private async Task SavePreferencesSafelyAsync()
+    {
+        try
+        {
+            await SavePreferencesAsync();
+        }
+        catch (Exception exception)
+        {
+            StatusMessage = $"Local Fleet Desk preferences could not be saved: {exception.Message}";
         }
     }
 
@@ -1756,6 +2079,7 @@ public partial class ProfilesViewModel : ObservableObject
 
     private void ShowOperation(FleetOperation operation)
     {
+        var previousState = currentOperation?.State;
         currentOperation = operation;
         OperationItems.Clear();
         foreach (var step in operation.Steps.OrderBy(step => step.SortOrder))
@@ -1781,6 +2105,56 @@ public partial class ProfilesViewModel : ObservableObject
         OperationProgressPercent = totalSteps == 0
             ? operation.IsTerminal ? 100 : 0
             : Math.Clamp((double)finishedSteps / totalSteps * 100, 0, 100);
+
+        WaitingCharacters.Clear();
+        if (operation.State == OperationState.AwaitAcceptance)
+        {
+            var waitingIds = operation.Steps
+                .Where(step => step.Type == FleetOperationStepType.Place &&
+                    step.State == FleetOperationStepState.Waiting)
+                .Select(step => step.Target.CharacterId)
+                .ToHashSet();
+            foreach (var invite in operation.Steps
+                .Where(step => step.Type == FleetOperationStepType.Invite &&
+                    waitingIds.Contains(step.Target.CharacterId))
+                .OrderBy(step => step.Target.CharacterName, StringComparer.OrdinalIgnoreCase))
+            {
+                WaitingCharacters.Add(new WaitingCharacterViewModel(
+                    invite.Target.CharacterId,
+                    invite.Target.CharacterName,
+                    $"{invite.Target.WingName} / {invite.Target.SquadName}",
+                    "Invite sent — waiting in EVE"));
+            }
+        }
+
+        IsWaitingForInvites = WaitingCharacters.Count > 0;
+        WaitingRoomSummary = IsWaitingForInvites
+            ? $"Waiting for {WaitingCharacters.Count} character{(WaitingCharacters.Count == 1 ? string.Empty : "s")} to accept in EVE."
+            : "No invitations are waiting.";
+        HasRestoreSnapshot = operation.IsTerminal;
+
+        if (previousState == OperationState.AwaitAcceptance &&
+            operation.State != OperationState.AwaitAcceptance)
+        {
+            AttentionRequested?.Invoke(
+                this,
+                new FleetAttentionEventArgs("All accepted characters are ready for the next fleet step.", false));
+        }
+
+        if (operation.State == OperationState.NeedsAttention &&
+            previousState != OperationState.NeedsAttention)
+        {
+            AttentionRequested?.Invoke(
+                this,
+                new FleetAttentionEventArgs("Fleet run needs attention before it can continue.", true));
+        }
+        else if (operation.State == OperationState.Complete &&
+            previousState != OperationState.Complete)
+        {
+            AttentionRequested?.Invoke(
+                this,
+                new FleetAttentionEventArgs("Fleet organisation is complete and verified.", false));
+        }
     }
 
     private static string GetOperationPhaseTitle(OperationState state) => state switch
@@ -1843,7 +2217,7 @@ public partial class ProfilesViewModel : ObservableObject
     }
 
     private static string BuildDryRunSummary(FleetDryRunPlan plan) =>
-        $"{plan.StructureChanges} structure • {plan.CharacterInvites} invites • " +
+        $"{HumanizeRunMode(plan.Mode)} • {plan.StructureChanges} structure • {plan.CharacterInvites} invites • " +
         $"{plan.CharacterMoves} moves • {plan.RoleChanges} role changes • " +
         $"{plan.AlreadyCorrect} already correct • {plan.IgnoredLiveMembers} live members left untouched";
 
@@ -1854,10 +2228,23 @@ public partial class ProfilesViewModel : ObservableObject
             return $"Blocked: resolve {plan.BlockingIssues} safety issue{(plan.BlockingIssues == 1 ? string.Empty : "s")} before an operation could start.";
         }
 
-        return plan.TotalChanges == 0
+        var baseMessage = plan.TotalChanges == 0
             ? "The saved assignments already match the live fleet. No changes are needed."
-            : "Milestone 5 can repair shown structure, invite/place members, and apply serialized squad/wing commander roles after one final confirmation. No hierarchy is deleted and unmanaged live members remain untouched.";
+            : "Only the actions shown for this run mode are eligible after one final confirmation. No hierarchy is deleted, nobody is kicked, and fleet boss is never transferred.";
+        return plan.IgnoredLiveMembers == 0
+            ? baseMessage
+            : $"{baseMessage} {plan.IgnoredLiveMembers} unmanaged live member{(plan.IgnoredLiveMembers == 1 ? " is" : "s are")} intentionally left untouched.";
     }
+
+    private static string HumanizeRunMode(FleetRunMode mode) => mode switch
+    {
+        FleetRunMode.FullOrganise => "Full organise",
+        FleetRunMode.InviteMissing => "Invite missing",
+        FleetRunMode.PlacePresent => "Place joined",
+        FleetRunMode.FixStructure => "Fix structure",
+        FleetRunMode.AssignCommanders => "Assign commanders",
+        _ => mode.ToString(),
+    };
 
     private static string GetSafeFileName(string value)
     {

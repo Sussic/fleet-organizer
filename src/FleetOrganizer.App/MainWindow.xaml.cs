@@ -9,6 +9,7 @@ namespace FleetOrganizer.App;
 public partial class MainWindow : Window
 {
     private const string AssignmentDragFormat = "FleetOrganizer.ProfileAssignment";
+    private const string LiveMemberDragFormat = "FleetOrganizer.LiveFleetMember";
     private readonly MainWindowViewModel viewModel;
     private Point dragStartPoint;
 
@@ -71,6 +72,54 @@ public partial class MainWindow : Window
             e.Data.GetData(AssignmentDragFormat) is long characterId)
         {
             viewModel.Profiles.MoveAssignmentsToSquad(squad.Id, characterId);
+        }
+
+        e.Handled = true;
+    }
+
+    private void OnLiveMemberPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        _ = sender;
+        dragStartPoint = e.GetPosition(null);
+    }
+
+    private void OnLiveMemberMouseMove(object sender, MouseEventArgs e)
+    {
+        if (e.LeftButton != MouseButtonState.Pressed ||
+            sender is not FrameworkElement
+            {
+                DataContext: LiveFleetBoardMemberViewModel { CanStage: true } member,
+            } element)
+        {
+            return;
+        }
+
+        var position = e.GetPosition(null);
+        if (Math.Abs(position.X - dragStartPoint.X) < SystemParameters.MinimumHorizontalDragDistance &&
+            Math.Abs(position.Y - dragStartPoint.Y) < SystemParameters.MinimumVerticalDragDistance)
+        {
+            return;
+        }
+
+        var data = new DataObject(LiveMemberDragFormat, member.CharacterId);
+        DragDrop.DoDragDrop(element, data, DragDropEffects.Move);
+    }
+
+    private static void OnLiveSquadDragOver(object sender, DragEventArgs e)
+    {
+        e.Effects = sender is FrameworkElement { DataContext: LiveFleetBoardSquadViewModel } &&
+            e.Data.GetDataPresent(LiveMemberDragFormat)
+                ? DragDropEffects.Move
+                : DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    private void OnLiveSquadDrop(object sender, DragEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: LiveFleetBoardSquadViewModel squad } &&
+            e.Data.GetData(LiveMemberDragFormat) is long characterId)
+        {
+            viewModel.StageLiveMemberMove(characterId, squad.WingId, squad.SquadId);
         }
 
         e.Handled = true;

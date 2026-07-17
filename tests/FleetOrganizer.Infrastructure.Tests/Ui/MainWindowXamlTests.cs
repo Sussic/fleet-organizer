@@ -76,6 +76,30 @@ public sealed class MainWindowXamlTests
         Assert.Contains("MouseMove=\"OnRosterMouseMove\"", xaml, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void CommanderRunModeWaitingRoomAndRestoreAreVisibleWorkflows()
+    {
+        var xaml = ReadMainWindowXaml();
+
+        Assert.Contains("Profiles.RunModeOptions", xaml, StringComparison.Ordinal);
+        Assert.Contains("Invitation waiting room", xaml, StringComparison.Ordinal);
+        Assert.Contains("AutomaticCheckCountdownText", xaml, StringComparison.Ordinal);
+        Assert.Contains("Preview pre-run restore", xaml, StringComparison.Ordinal);
+        Assert.Contains("Profiles.AttentionSoundsEnabled", xaml, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void LiveBoardStagesDragMovesBeforeReview()
+    {
+        var xaml = ReadMainWindowXaml();
+
+        Assert.Contains("Text=\"Live Fleet Board\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("DragOver=\"OnLiveSquadDragOver\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Drop=\"OnLiveSquadDrop\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("ReviewStagedLiveMovesCommand", xaml, StringComparison.Ordinal);
+        Assert.Contains("ClearStagedLiveMovesCommand", xaml, StringComparison.Ordinal);
+    }
+
     private static string ReadMainWindowXaml()
     {
         var xamlPath = Path.Combine(
