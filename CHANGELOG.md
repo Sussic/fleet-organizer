@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.1
+
+- Replaced the disabled full Live Fleet workspace with a compact empty state until ESI confirms a usable fleet.
+- Tightened the saved-setup selector, template details, action buttons, padding, and vertical gaps.
+- Collapsed optional ship rules, character import, and squad drag/drop cards so the main roster is reached quickly without removing any capability.
+
 ## 0.9.0
 
 - Replaced invitation staging with a direct `Invite now` path: exact names, arrival squad, one click, immediate ESI invitations, and automatic joined/waiting reconciliation.

@@ -132,6 +132,18 @@ public sealed class MainWindowXamlTests
         Assert.Contains("ResetLocalDataCommand", xaml, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void EmptyFleetAndOptionalSetupEditorsStayCompact()
+    {
+        var xaml = ReadMainWindowXaml();
+
+        Assert.Contains("Text=\"Waiting for a fleet\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Binding IsLiveFleetReady", xaml, StringComparison.Ordinal);
+        Assert.Contains("Optional • expand to edit rules", xaml, StringComparison.Ordinal);
+        Assert.Contains("Paste names only when changing the roster", xaml, StringComparison.Ordinal);
+        Assert.Contains("Squad cards — expand for drag &amp; drop", xaml, StringComparison.Ordinal);
+    }
+
     private static string ReadMainWindowXaml()
     {
         var xamlPath = Path.Combine(

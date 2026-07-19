@@ -480,7 +480,48 @@
           </Grid>
         </Border>
 
-        <Grid Grid.Row="1" Margin="0,12,0,0" IsEnabled="{Binding IsLiveFleetReady}">
+        <Border Grid.Row="1"
+                Margin="0,12,0,0"
+                Padding="18,16"
+                VerticalAlignment="Top"
+                Background="{StaticResource SurfaceBrush}"
+                BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="1"
+                CornerRadius="10">
+          <Border.Style>
+            <Style TargetType="Border">
+              <Setter Property="Visibility" Value="Visible" />
+              <Style.Triggers>
+                <DataTrigger Binding="{Binding IsLiveFleetReady}" Value="True">
+                  <Setter Property="Visibility" Value="Collapsed" />
+                </DataTrigger>
+              </Style.Triggers>
+            </Style>
+          </Border.Style>
+          <StackPanel>
+              <TextBlock Text="Waiting for a fleet"
+                         FontSize="18"
+                         FontWeight="SemiBold" />
+              <TextBlock Text="Create or join a fleet in EVE and make the signed-in character fleet boss. Fleet Desk checks automatically; the command board appears when ESI confirms it."
+                         Margin="0,5,20,0"
+                         MaxWidth="720"
+                         HorizontalAlignment="Left"
+                         TextWrapping="Wrap"
+                         Opacity="0.66" />
+          </StackPanel>
+        </Border>
+
+        <Grid Grid.Row="1" Margin="0,12,0,0">
+          <Grid.Style>
+            <Style TargetType="Grid">
+              <Setter Property="Visibility" Value="Collapsed" />
+              <Style.Triggers>
+                <DataTrigger Binding="{Binding IsLiveFleetReady}" Value="True">
+                  <Setter Property="Visibility" Value="Visible" />
+                </DataTrigger>
+              </Style.Triggers>
+            </Style>
+          </Grid.Style>
           <Grid.ColumnDefinitions>
             <ColumnDefinition Width="3*" />
             <ColumnDefinition Width="12" />
@@ -941,7 +982,7 @@
         </ScrollViewer.Style>
 
         <StackPanel>
-          <Border Style="{StaticResource CardStyle}">
+          <Border Style="{StaticResource CardStyle}" Padding="14,10">
             <Grid>
               <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
@@ -1145,7 +1186,7 @@
         </ScrollViewer.Style>
 
         <StackPanel>
-          <Border Style="{StaticResource CardStyle}">
+          <Border Style="{StaticResource CardStyle}" Padding="14,10">
             <Grid>
               <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
@@ -1153,10 +1194,11 @@
               </Grid.ColumnDefinitions>
               <StackPanel>
                 <TextBlock Text="Fleet templates"
-                           FontSize="20"
+                           FontSize="18"
                            FontWeight="SemiBold" />
                 <TextBlock Text="{Binding Profiles.StatusMessage}"
-                           Margin="0,7,24,0"
+                           Margin="0,3,24,0"
+                           FontSize="12"
                            TextWrapping="Wrap"
                            Opacity="0.72" />
               </StackPanel>
@@ -1166,56 +1208,56 @@
                           Content="Edit wings &amp; squads"
                           IsChecked="{Binding Profiles.IsAdvancedMode}" />
                 <Button Margin="4,0"
-                        Padding="12,8"
+                        Padding="10,6"
                         Content="New template"
                         Command="{Binding Profiles.NewProfileCommand}" />
                 <Button Margin="4,0"
-                        Padding="12,8"
+                        Padding="10,6"
                         Content="Capture current"
                         ToolTip="Read the current EVE fleet and save it as an editable local profile"
                         Command="{Binding Profiles.CaptureCurrentFleetCommand}" />
                 <Button Margin="4,0"
-                        Padding="12,8"
+                        Padding="10,6"
                         Content="Import JSON"
                         Command="{Binding Profiles.ImportProfileCommand}" />
               </WrapPanel>
             </Grid>
           </Border>
 
-          <Grid Margin="0,18,0,0">
+          <Grid Margin="0,12,0,0">
             <Grid.ColumnDefinitions>
-              <ColumnDefinition Width="240" />
-              <ColumnDefinition Width="18" />
+              <ColumnDefinition Width="220" />
+              <ColumnDefinition Width="12" />
               <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
-            <Border Grid.Column="0" Style="{StaticResource CardStyle}">
+            <Border Grid.Column="0" Style="{StaticResource CardStyle}" Padding="14">
               <StackPanel>
                 <TextBlock Text="Templates"
                            FontSize="17"
                            FontWeight="SemiBold" />
                 <TextBlock Text="Saved only on this PC"
-                           Margin="0,4,0,12"
+                           Margin="0,2,0,7"
                            FontSize="12"
                            Opacity="0.62" />
                 <TextBox Padding="8,6"
                          Text="{Binding Profiles.ProfileSearchText, UpdateSourceTrigger=PropertyChanged}"
                          ToolTip="Search profiles by name" />
                 <TextBlock Text="{Binding Profiles.ProfileSearchSummary}"
-                           Margin="0,5,0,8"
+                           Margin="0,3,0,5"
                            FontSize="11"
                            Opacity="0.6" />
                 <ListBox ItemsSource="{Binding Profiles.FilteredProfileItems}"
                          SelectedItem="{Binding Profiles.SelectedProfile}"
-                         MinHeight="150"
-                         MaxHeight="310"
+                         MinHeight="105"
+                         MaxHeight="220"
                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                          ScrollViewer.CanContentScroll="True"
                          VirtualizingPanel.IsVirtualizing="True"
                          VirtualizingPanel.VirtualizationMode="Recycling">
                   <ListBox.ItemTemplate>
                     <DataTemplate>
-                      <StackPanel Margin="4,6">
+                      <StackPanel Margin="3,4">
                         <DockPanel>
                           <TextBlock DockPanel.Dock="Right" Text="{Binding StatusText}"
                                      FontSize="10" Foreground="{StaticResource EveAccentBrush}" />
@@ -1234,59 +1276,60 @@
               </StackPanel>
             </Border>
 
-            <Border Grid.Column="2" Style="{StaticResource CardStyle}">
+            <Border Grid.Column="2" Style="{StaticResource CardStyle}" Padding="14">
               <StackPanel>
                 <TextBlock Text="Template details"
                            FontSize="17"
                            FontWeight="SemiBold" />
                 <TextBlock Text="Choose a reusable setup on the left, or create a new one."
-                           Margin="0,5,0,0"
+                           Margin="0,3,0,0"
+                           FontSize="12"
                            TextWrapping="Wrap"
                            Opacity="0.62" />
 
-                <StackPanel Margin="0,16,0,0"
+                <StackPanel Margin="0,9,0,0"
                             IsEnabled="{Binding Profiles.CanEdit}"
                             Visibility="{Binding Profiles.IsEditorActive, Converter={StaticResource BooleanToVisibilityConverter}}">
                   <TextBlock Text="Template name"
                              FontWeight="SemiBold" />
                   <TextBox Text="{Binding Profiles.ProfileName, UpdateSourceTrigger=PropertyChanged}"
-                           Margin="0,6,0,0"
-                           Padding="9,7"
+                           Margin="0,4,0,0"
+                           Padding="8,5"
                            MaxLength="100" />
-                  <WrapPanel Margin="0,12,0,0">
+                  <WrapPanel Margin="0,7,0,0">
                     <Button Margin="0,0,8,0"
                             Style="{StaticResource PrimaryButtonStyle}"
-                            Padding="12,8"
+                            Padding="10,6"
                             Content="Save changes"
                             Command="{Binding Profiles.SaveProfileCommand}" />
                     <Button Margin="0,0,8,0"
-                            Padding="12,8"
+                            Padding="10,6"
                             Content="Duplicate"
                             Command="{Binding Profiles.DuplicateProfileCommand}" />
                     <Button Margin="0,0,8,0"
-                            Padding="12,8"
+                            Padding="10,6"
                             Content="Preview with live fleet"
                             ToolTip="Build a read-only desired-versus-live dry run"
                             Command="{Binding Profiles.CompareCurrentProfileCommand}" />
                     <Button Margin="0,0,8,0"
-                            Padding="12,8"
+                            Padding="10,6"
                             Content="Export JSON"
                             Command="{Binding Profiles.ExportProfileCommand}" />
                     <Button Margin="0,0,8,0"
-                            Padding="12,8"
+                            Padding="10,6"
                             Content="Pin / unpin"
                             Command="{Binding Profiles.TogglePinCommand}"
                             CommandParameter="{Binding Profiles.SelectedProfile}" />
                     <Button Margin="0,0,8,0"
-                            Padding="12,8"
+                            Padding="10,6"
                             Content="Make default"
                             Command="{Binding Profiles.SetDefaultProfileCommand}"
                             CommandParameter="{Binding Profiles.SelectedProfile}" />
-                    <Button Padding="12,8"
+                    <Button Padding="10,6"
                             Content="Delete"
                             Command="{Binding Profiles.DeleteProfileCommand}" />
                   </WrapPanel>
-                  <Grid Margin="0,13,0,0">
+                  <Grid Margin="0,8,0,0">
                     <Grid.ColumnDefinitions>
                       <ColumnDefinition Width="180" />
                       <ColumnDefinition Width="*" />
@@ -1300,12 +1343,12 @@
                                TextWrapping="Wrap" Opacity="0.65" />
                   </Grid>
                   <TextBlock Text="{Binding Profiles.ValidationSummary}"
-                             Margin="0,12,0,0"
+                             Margin="0,7,0,0"
                              TextWrapping="Wrap"
                              FontSize="12"
                              Opacity="0.72" />
                   <TextBlock Text="{Binding Profiles.EditorStateText}"
-                             Margin="0,5,0,0"
+                             Margin="0,3,0,0"
                              FontSize="12"
                              FontWeight="SemiBold">
                     <TextBlock.Style>
@@ -1325,7 +1368,7 @@
             </Border>
           </Grid>
 
-          <Border Margin="0,18,0,0">
+          <Border Margin="0,10,0,0" Padding="14">
             <Border.Style>
               <Style TargetType="Border" BasedOn="{StaticResource CardStyle}">
                 <Setter Property="Visibility" Value="Collapsed" />
@@ -1431,27 +1474,35 @@
             </StackPanel>
           </Border>
 
-          <Border Margin="0,18,0,0"
+          <Border Margin="0,10,0,0"
                   Style="{StaticResource CardStyle}"
+                  Padding="14,10"
                   Visibility="{Binding Profiles.IsEditorActive, Converter={StaticResource BooleanToVisibilityConverter}}">
-            <StackPanel IsEnabled="{Binding Profiles.CanEdit}">
-              <DockPanel>
+            <Expander IsExpanded="False">
+              <Expander.Header>
+                <StackPanel Orientation="Horizontal">
+                  <TextBlock Text="Automatic ship placement"
+                             FontSize="16"
+                             FontWeight="SemiBold" />
+                  <TextBlock Text="  Optional • expand to edit rules"
+                             Margin="6,2,0,0"
+                             FontSize="11"
+                             Opacity="0.58" />
+                </StackPanel>
+              </Expander.Header>
+              <StackPanel Margin="0,10,0,0" IsEnabled="{Binding Profiles.CanEdit}">
+                <DockPanel>
                 <Button DockPanel.Dock="Right"
                         Margin="12,0,0,0"
                         Content="Add ship rule"
                         Command="{Binding Profiles.AddShipRuleCommand}" />
-                <StackPanel>
-                  <TextBlock Text="Automatic ship placement"
-                             FontSize="17"
-                             FontWeight="SemiBold" />
-                  <TextBlock Text="Create ordered ship policies with several exact ship types, optional overflow balancing, safe capacities, and one final fallback. Exact character assignments always win."
-                             Margin="0,5,18,0"
+                  <TextBlock Text="Rules match exact ship types, can overflow or balance between squads, and never override an exact character assignment."
+                             Margin="0,2,18,0"
                              TextWrapping="Wrap"
                              Opacity="0.64" />
-                </StackPanel>
-              </DockPanel>
+                </DockPanel>
 
-              <ItemsControl ItemsSource="{Binding Profiles.ShipRules}" Margin="0,14,0,0">
+              <ItemsControl ItemsSource="{Binding Profiles.ShipRules}" Margin="0,10,0,0">
                 <ItemsControl.ItemTemplate>
                   <DataTemplate>
                     <Border Margin="0,4" Padding="12" Style="{StaticResource DropCardStyle}">
@@ -1534,18 +1585,28 @@
                          FontSize="12"
                          Foreground="{StaticResource TextMutedBrush}"
                          TextWrapping="Wrap" />
-            </StackPanel>
+              </StackPanel>
+            </Expander>
           </Border>
 
-          <Border Margin="0,18,0,0"
+          <Border Margin="0,10,0,0"
                   Style="{StaticResource CardStyle}"
+                  Padding="14,10"
                   Visibility="{Binding Profiles.IsEditorActive, Converter={StaticResource BooleanToVisibilityConverter}}">
-            <StackPanel IsEnabled="{Binding Profiles.CanEdit}">
-              <TextBlock Text="Add characters"
-                         FontSize="17"
-                         FontWeight="SemiBold" />
+            <Expander IsExpanded="False">
+              <Expander.Header>
+                <StackPanel Orientation="Horizontal">
+                  <TextBlock Text="Add characters"
+                             FontSize="16"
+                             FontWeight="SemiBold" />
+                  <TextBlock Text="  Paste names only when changing the roster"
+                             Margin="6,2,0,0"
+                             FontSize="11"
+                             Opacity="0.58" />
+                </StackPanel>
+              </Expander.Header>
+              <StackPanel Margin="0,10,0,0" IsEnabled="{Binding Profiles.CanEdit}">
               <TextBlock Text="Paste exact EVE character names separated by new lines, commas, or tabs. Optional structured form: Name — Squad — Role."
-                         Margin="0,5,0,0"
                          TextWrapping="Wrap"
                          Opacity="0.62" />
               <TextBox Text="{Binding Profiles.RosterPasteText, UpdateSourceTrigger=PropertyChanged}"
@@ -1576,11 +1637,13 @@
                   </DataTemplate>
                 </ItemsControl.ItemTemplate>
               </ItemsControl>
-            </StackPanel>
+              </StackPanel>
+            </Expander>
           </Border>
 
-          <Border Margin="0,18,0,0"
+          <Border Margin="0,10,0,0"
                   Style="{StaticResource CardStyle}"
+                  Padding="14"
                   Visibility="{Binding Profiles.IsEditorActive, Converter={StaticResource BooleanToVisibilityConverter}}">
             <StackPanel IsEnabled="{Binding Profiles.CanEdit}">
               <TextBlock Text="Characters and placement"
@@ -1591,9 +1654,12 @@
                          TextWrapping="Wrap"
                          Opacity="0.62" />
 
-              <ItemsControl ItemsSource="{Binding Profiles.Wings}" Margin="0,14,0,4">
-                <ItemsControl.ItemTemplate>
-                  <DataTemplate>
+              <Expander Margin="0,10,0,4"
+                        Header="Squad cards — expand for drag &amp; drop"
+                        IsExpanded="False">
+                <ItemsControl ItemsSource="{Binding Profiles.Wings}" Margin="0,8,0,0">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate>
                     <Border Margin="0,0,0,10"
                             Padding="13"
                             Background="{StaticResource SurfaceAltBrush}"
@@ -1642,9 +1708,10 @@
                         </ItemsControl>
                       </StackPanel>
                     </Border>
-                  </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </Expander>
 
               <Grid Margin="0,12,0,4">
                 <Grid.ColumnDefinitions>

@@ -44,6 +44,7 @@ Implemented and tested in the current repository:
 - Preflight fleet-capacity validation for wings, squads, and ordinary squad positions.
 - A named invitation waiting room with a visible automatic-check countdown.
 - A compact Live Fleet command board ordered around FC frequency: immediate exact-name invitations, saved setup/ship-policy application, queued member/commander drag/drop, fleet settings, and separately unlocked dangerous actions.
+- A state-aware layout that hides the unusable command board when no fleet is detected and collapses optional saved-setup editors until explicitly opened.
 - One-click low-risk invitations with a fresh same-fleet/fleet-boss/target check, session waiting-state reconciliation, and no redundant second review screen.
 - One-confirmation queued live placement: the exact confirmation is the review, while broad saved setups retain a separate preview.
 - Best-effort pre-run snapshot restore preview and in-app/Windows-sound attention notifications.
