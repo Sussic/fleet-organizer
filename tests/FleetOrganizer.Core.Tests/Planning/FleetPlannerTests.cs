@@ -167,9 +167,9 @@ public sealed class FleetPlannerTests
         Assert.True(plan.CanExecute);
         Assert.Equal(0, plan.BlockingIssues);
         Assert.Equal(1, plan.CharacterInvites);
-        Assert.Contains(plan.Items, item =>
-            item.Kind == FleetPlanItemKind.AlreadyCorrect &&
-            item.Title.Contains("Wing Commander", StringComparison.OrdinalIgnoreCase));
+        Assert.Equal(0, plan.RoleChanges);
+        Assert.DoesNotContain(plan.Items, item =>
+            item.CharacterId == 9001 && item.Kind == FleetPlanItemKind.Blocked);
     }
 
     [Fact]
