@@ -1,7 +1,7 @@
 # Fleet Organizer — Technical Specification
 
 **Status:** Approved implementation baseline
-**Revision:** 1.9
+**Revision:** 2.0
 **Reviewed:** 17 July 2026
 **Target:** Windows 11, local single-user desktop application
 **Working title:** Fleet Organizer (name can change without affecting the architecture)
@@ -11,7 +11,7 @@
 Implemented and tested in the current repository:
 
 - EVE SSO Authorization Code + PKCE, JWT validation, DPAPI refresh-token storage, and logout.
-- Cache/rate-aware read-only fleet detection with named hierarchy and member details.
+- Cache/rate-aware live fleet detection with named hierarchy, member details, and a bounded command workspace.
 - SQLite-backed profile create, rename, duplicate, delete, and current-fleet capture.
 - Wing/squad add, rename, reorder, duplicate, and guarded deletion.
 - Newline/comma/tab and structured roster paste with exact public `POST /universe/ids` resolution in batches of 500.
@@ -43,9 +43,10 @@ Implemented and tested in the current repository:
 - Safe filtered run modes for full organisation, invitations only, present-member placement, structure only, and commander assignment; the selected mode is part of stale-review validation.
 - Preflight fleet-capacity validation for wings, squads, and ordinary squad positions.
 - A named invitation waiting room with a visible automatic-check countdown.
-- A staged Live Fleet Board for ordinary-member drag/drop, pending-change review, and one final confirmation through the existing durable engine.
+- A compact Live Fleet command board for member/commander drag/drop, invitations, template/ship-policy application, pending-change review, and one final confirmation through the existing durable engine.
 - Best-effort pre-run snapshot restore preview and in-app/Windows-sound attention notifications.
-- Searchable multi-select Live Fleet staging by character, ship, role, wing, or squad.
+- Searchable multi-select Live Fleet staging by character, ship, role, wing, or squad, including fleet/wing command positions.
+- Separately unlocked, freshly revalidated, and reconfirmed manual kick, empty hierarchy deletion, and fleet-boss transfer actions.
 - Ordered multi-ship policies with capacity, overflow, even balancing, and a final fallback rule.
 - Durable latest-50 run history with direct per-run reopening.
 - Configurable fleet/invitation polling and attention timeout, System/Light/Dark theme, and optional notification-tray operation.

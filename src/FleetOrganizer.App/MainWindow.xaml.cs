@@ -251,7 +251,10 @@ public sealed partial class MainWindow : Window, IDisposable
 
     private void OnLiveSquadDragOver(object sender, DragEventArgs e)
     {
-        e.Effects = sender is FrameworkElement { DataContext: LiveFleetBoardSquadViewModel } &&
+        e.Effects = sender is FrameworkElement
+            {
+                DataContext: LiveFleetBoardSquadViewModel { CanAcceptDrop: true },
+            } &&
             e.Data.GetDataPresent(LiveMemberDragFormat)
                 ? DragDropEffects.Move
                 : DragDropEffects.None;
@@ -260,7 +263,10 @@ public sealed partial class MainWindow : Window, IDisposable
 
     private void OnLiveSquadDrop(object sender, DragEventArgs e)
     {
-        if (sender is FrameworkElement { DataContext: LiveFleetBoardSquadViewModel squad } &&
+        if (sender is FrameworkElement
+            {
+                DataContext: LiveFleetBoardSquadViewModel { CanAcceptDrop: true } squad,
+            } &&
             e.Data.GetData(LiveMemberDragFormat) is long characterId)
         {
             viewModel.StageDraggedLiveMembers(characterId, squad.WingId, squad.SquadId);

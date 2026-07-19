@@ -1152,24 +1152,40 @@ public partial class ProfilesViewModel : ObservableObject, IDisposable
 
     public Task<bool> PrepareStagedMovesAsync(
         LiveFleetSnapshot snapshot,
-        StagedLiveMoveViewModel[] stagedMoves)
+        StagedLiveMoveViewModel[] stagedMoves) =>
+        PrepareLiveDeskChangesAsync(snapshot, stagedMoves, []);
+
+    public async Task<bool> PrepareLiveDeskChangesAsync(
+        LiveFleetSnapshot snapshot,
+        StagedLiveMoveViewModel[] stagedMoves,
+        StagedLiveInviteViewModel[] stagedInvites)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
         ArgumentNullException.ThrowIfNull(stagedMoves);
+        ArgumentNullException.ThrowIfNull(stagedInvites);
 
         if (SelectedProfile is null)
         {
-            StatusMessage = "Choose a saved template first. Fleet Desk uses it only as the local audit owner for this quick move run.";
-            return Task.FromResult(false);
+            var auditProfile = FleetProfileFactory.FromLiveFleet(
+                snapshot,
+                MakeUniqueProfileName("Live Desk"));
+            await repository.SaveAsync(auditProfile);
+            await ReloadProfilesAsync(auditProfile.Id);
         }
 
-        if (stagedMoves.Length == 0)
+        if (SelectedProfile is null)
         {
-            StatusMessage = "Drag at least one ordinary squad member to a target squad first.";
-            return Task.FromResult(false);
+            StatusMessage = "Fleet Desk could not create the local audit template required for a durable run.";
+            return false;
         }
 
-        var profile = FleetProfileFactory.FromLiveFleet(snapshot, "Staged live moves") with
+        if (stagedMoves.Length == 0 && stagedInvites.Length == 0)
+        {
+            StatusMessage = "Stage at least one live-fleet change first.";
+            return false;
+        }
+
+        var profile = FleetProfileFactory.FromLiveFleet(snapshot, "Live Desk changes") with
         {
             Id = SelectedProfile.Id,
         };
@@ -1185,6 +1201,11 @@ public partial class ProfilesViewModel : ObservableObject, IDisposable
         }
 
         var movesByCharacterId = stagedMoves.ToDictionary(move => move.CharacterId);
+        var invitationAssignments = stagedInvites.Select(invite => new ProfileAssignment(
+            invite.CharacterId,
+            invite.CharacterName,
+            targetSquadIds[(invite.TargetWingId, invite.TargetSquadId)],
+            invite.DesiredRole));
         profile = profile with
         {
             Assignments = profile.Assignments
@@ -1194,9 +1215,10 @@ public partial class ProfilesViewModel : ObservableObject, IDisposable
                         ? assignment with
                         {
                             TargetSquadId = targetSquadIds[(move.TargetWingId, move.TargetSquadId)],
-                            DesiredRole = DesiredFleetRole.SquadMember,
+                            DesiredRole = move.DesiredRole,
                         }
                         : assignment)
+                .Concat(invitationAssignments)
                 .ToArray(),
         };
         lastPreparedProfile = profile;
@@ -1204,13 +1226,13 @@ public partial class ProfilesViewModel : ObservableObject, IDisposable
         lastShipRuleCapacitySkipCount = 0;
         var plan = FleetPlanModeFilter.Apply(
             FleetPlanner.Build(profile, snapshot),
-            FleetRunMode.PlacePresent);
+            FleetRunMode.FullOrganise);
         ApplyDryRun(plan, snapshot.ConfirmedAtUtc);
-        DryRunTitle = $"{stagedMoves.Length} staged live move{(stagedMoves.Length == 1 ? string.Empty : "s")} • fleet {snapshot.FleetId}";
+        DryRunTitle = $"{stagedMoves.Length + stagedInvites.Length} staged Live Desk change{(stagedMoves.Length + stagedInvites.Length == 1 ? string.Empty : "s")} • fleet {snapshot.FleetId}";
         DryRunSafetyMessage +=
-            " This quick run can place ordinary squad members only; commanders and invitations are excluded.";
-        StatusMessage = "Staged move preview ready. One final confirmation remains before any ESI write.";
-        return Task.FromResult(true);
+            " This run contains only the moves, roles, and invitations staged on Live Fleet. Fleet-boss transfer, kicks, and deletion use their separate high-impact unlock.";
+        StatusMessage = "Live Desk preview ready. One final confirmation remains before any ESI write.";
+        return true;
     }
 
     [RelayCommand]

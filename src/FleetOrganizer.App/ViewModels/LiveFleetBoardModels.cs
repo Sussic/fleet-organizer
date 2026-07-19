@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
+using FleetOrganizer.Core.Domain;
 
 namespace FleetOrganizer.App.ViewModels;
 
@@ -41,7 +42,9 @@ public sealed partial class LiveFleetBoardMemberViewModel(
     [ObservableProperty]
     public partial bool IsVisible { get; set; } = true;
 
-    public bool CanStage => string.Equals(Role, "squad_member", StringComparison.Ordinal);
+    public bool CanStage => !string.Equals(Role, "fleet_commander", StringComparison.Ordinal);
+
+    public bool IsCommander => !string.Equals(Role, "squad_member", StringComparison.Ordinal);
 
     public string Detail => $"{ShipTypeName} • {RoleName}";
 
@@ -72,12 +75,25 @@ public sealed record LiveFleetBoardSquadViewModel(
 {
     public string MemberCountText =>
         $"{Members.Count} member{(Members.Count == 1 ? string.Empty : "s")}";
+
+    public bool IsEmpty => Members.Count == 0;
+
+    public bool CanAcceptDrop => WingId > 0 && SquadId > 0;
+
+    public bool IsLiveStructure => CanAcceptDrop;
 }
 
 public sealed record LiveFleetBoardWingViewModel(
     long WingId,
     string Name,
-    ObservableCollection<LiveFleetBoardSquadViewModel> Squads);
+    ObservableCollection<LiveFleetBoardSquadViewModel> Squads)
+{
+    public int MemberCount => Squads.Sum(squad => squad.Members.Count);
+
+    public bool IsEmpty => MemberCount == 0;
+
+    public bool IsLiveStructure => WingId > 0;
+}
 
 public sealed record LiveFleetSquadTargetViewModel(
     long WingId,
@@ -91,7 +107,53 @@ public sealed record StagedLiveMoveViewModel(
     long SourceSquadId,
     long TargetWingId,
     long TargetSquadId,
-    string TargetName)
+    string TargetName,
+    DesiredFleetRole DesiredRole,
+    string PreviousRole)
 {
-    public string Summary => $"{CharacterName} → {TargetName}";
+    public bool ChangesRole => !string.Equals(
+        PreviousRole,
+        ToEsiRole(DesiredRole),
+        StringComparison.Ordinal);
+
+    public bool IsHighImpact => ChangesRole &&
+        !string.Equals(PreviousRole, "squad_member", StringComparison.Ordinal);
+
+    public string Summary => ChangesRole
+        ? $"{CharacterName} → {TargetName} as {HumanizeRole(DesiredRole)}"
+        : $"{CharacterName} → {TargetName}";
+
+    private static string ToEsiRole(DesiredFleetRole role) => role switch
+    {
+        DesiredFleetRole.SquadCommander => "squad_commander",
+        DesiredFleetRole.WingCommander => "wing_commander",
+        DesiredFleetRole.FleetCommander => "fleet_commander",
+        _ => "squad_member",
+    };
+
+    private static string HumanizeRole(DesiredFleetRole role) => role switch
+    {
+        DesiredFleetRole.SquadCommander => "Squad Commander",
+        DesiredFleetRole.WingCommander => "Wing Commander",
+        DesiredFleetRole.FleetCommander => "Fleet Commander",
+        _ => "Squad Member",
+    };
+}
+
+public sealed record StagedLiveInviteViewModel(
+    long CharacterId,
+    string CharacterName,
+    long TargetWingId,
+    long TargetSquadId,
+    string TargetName,
+    DesiredFleetRole DesiredRole)
+{
+    public string Summary => $"Invite {CharacterName} → {TargetName} as {RoleName}";
+
+    public string RoleName => DesiredRole switch
+    {
+        DesiredFleetRole.SquadCommander => "Squad Commander",
+        DesiredFleetRole.WingCommander => "Wing Commander",
+        _ => "Squad Member",
+    };
 }

@@ -60,6 +60,10 @@ internal sealed record FleetInfoResponse(
     [property: JsonPropertyName("is_voice_enabled")] bool IsVoiceEnabled,
     [property: JsonPropertyName("motd")] string Motd);
 
+internal sealed record UpdateFleetRequest(
+    [property: JsonPropertyName("is_free_move")] bool IsFreeMove,
+    [property: JsonPropertyName("motd")] string Motd);
+
 internal sealed record FleetMemberResponse(
     [property: JsonPropertyName("character_id")] long CharacterId,
     [property: JsonPropertyName("join_time")] DateTimeOffset JoinTime,

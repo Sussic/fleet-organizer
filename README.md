@@ -2,7 +2,7 @@
 
 Fleet Organizer is a local Windows 11 utility for repeatedly creating the same useful EVE Online fleet layout. It is designed for one player managing their own fleets and alts.
 
-This repository contains the **Fleet Desk 0.7 FC workflow** on top of the guarded fleet engine. Home remembers default and pinned templates, exposes clearly bounded quick-run modes, and shows readiness before the single review/confirm flow. Live Fleet is a searchable staging board with multi-select drag/drop; templates support exact rosters and ordered ship policies with overflow/balancing. Invitation waiting, durable history, recovery, and attention states are presented before technical details. Fresh-fleet checks, explicit confirmation, durable persistence, and the no-kick/no-delete safety boundary remain mandatory.
+This repository contains the **Fleet Desk 0.8 FC workflow** on top of the guarded fleet engine. Live Fleet is the primary compact command workspace: search and multi-select members, drag them between EVE-like wing/squad cards, paste invitations, choose roles, or apply a saved template and its ship policies without page hopping. Normal work uses one pending tray and one reviewed confirmation. High-impact kick, empty hierarchy deletion, and fleet-boss transfer controls are separately unlocked, freshly revalidated, and confirmed again before they write.
 
 ## Requirements
 
@@ -64,10 +64,11 @@ After saving the public client ID, run `run.cmd`, open **Settings**, and choose 
 2. Make the signed-in character fleet boss.
 3. Open **Live Fleet** in Fleet Organizer.
 4. Leave the page open for automatic cache-aware checks, or use **Check immediately** when needed.
-5. Search by character, ship, role, wing, or squad; select matching ordinary members and stage them in bulk, or drag one/many members between cards on the **Live Fleet Board**.
-6. Inspect the pending tray and choose **Review pending moves**. Nothing is written until the normal dry run and final confirmation.
+5. Search by character, ship, role, wing, or squad; select matching members and choose a target/role, or drag one or many members between cards on the **Fleet board**.
+6. Use the right action rail to paste invitations, apply a saved setup and ship policies, or inspect the pending tray.
+7. Review once and confirm once. Fleet Desk remains on the command page while the durable run proceeds.
 
-The view shows fleet command, wings, squads, member roles, ships, and locations. Commander dragging is deliberately blocked; commander changes go through a saved-template commander run. The page automatically refreshes every 30 seconds while open and pauses while the app is minimized. ESI's cache expiry can mean a just-created fleet takes roughly one minute to appear.
+The view shows fleet command, wing command, squads, member roles, ships, and locations. Commander placement uses the same reviewed queue as ordinary movement. The page automatically refreshes every 30 seconds while open and reconciles completed pending work. ESI's cache expiry can mean a just-created fleet takes roughly one minute to appear.
 
 ## Build saved profiles
 
@@ -155,4 +156,6 @@ The EVE client ID is public but kept in `appsettings.Local.json` so each develop
 
 ## Current safety boundary
 
-The Fleet Desk interface uses the guarded engine for ESI wing/squad creation and naming, invitations, ordinary staging, and serialized squad/wing commander transitions. Every run requires a reviewed preview, explicit confirmation, fresh same-fleet/fleet-boss checks, durable per-write state, and final live verification. Fleet-boss transfer, hierarchy deletion, kicks, unmanaged-commander demotion, and automatic cleanup remain disabled.
+The normal Fleet Desk run uses the guarded engine for ESI wing/squad creation and naming, invitations, staging, and serialized squad/wing commander transitions. Every run requires a reviewed preview, explicit confirmation, fresh same-fleet/fleet-boss checks, durable per-write state, and final live verification. Normal runs never kick members, delete hierarchy, or transfer fleet boss.
+
+Those ESI-supported high-impact actions are available manually on Live Fleet. They require the **Unlock high-impact actions** flag, a second action-specific confirmation, and another fresh same-fleet/fleet-boss validation immediately before the write. Empty hierarchy is deletion-only; Fleet Desk will not delete an occupied squad or wing. Fleet-boss transfer intentionally ends the current character's write access.

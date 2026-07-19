@@ -89,15 +89,22 @@ public sealed class MainWindowXamlTests
     }
 
     [Fact]
-    public void LiveBoardStagesDragMovesBeforeReview()
+    public void LiveFleetIsACompactCommandWorkspaceRatherThanAReadOnlyPage()
     {
         var xaml = ReadMainWindowXaml();
 
-        Assert.Contains("Text=\"Live Fleet Board\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Text=\"Fleet board\"", xaml, StringComparison.Ordinal);
         Assert.Contains("DragOver=\"OnLiveSquadDragOver\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Drop=\"OnLiveSquadDrop\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("ReviewStagedLiveMovesCommand", xaml, StringComparison.Ordinal);
-        Assert.Contains("ClearStagedLiveMovesCommand", xaml, StringComparison.Ordinal);
+        Assert.Contains("ReviewPendingLiveChangesCommand", xaml, StringComparison.Ordinal);
+        Assert.Contains("StageLiveInvitesCommand", xaml, StringComparison.Ordinal);
+        Assert.Contains("PreviewSelectedTemplateCommand", xaml, StringComparison.Ordinal);
+        Assert.Contains("SelectedBulkLiveRole", xaml, StringComparison.Ordinal);
+        Assert.Contains("Header=\"High impact\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("UnlockHighImpactActions", xaml, StringComparison.Ordinal);
+        Assert.Contains("KickSelectedLiveMembersCommand", xaml, StringComparison.Ordinal);
+        Assert.Contains("TransferFleetBossToSelectedCommand", xaml, StringComparison.Ordinal);
+        Assert.Contains("ApplyFleetSettingsCommand", xaml, StringComparison.Ordinal);
     }
 
     [Fact]
