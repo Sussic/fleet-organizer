@@ -2,7 +2,7 @@
 setlocal
 cd /d "%~dp0"
 
-set "VERSION=0.8.1"
+set "VERSION=0.9.0"
 set "OUTPUT=artifacts\FleetOrganizer-%VERSION%-win-x64"
 
 taskkill /IM FleetOrganizer.exe /F >nul 2>nul

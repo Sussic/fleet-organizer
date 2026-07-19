@@ -141,6 +141,38 @@ public sealed class FleetPlannerTests
     }
 
     [Fact]
+    public void FleetBossMayRemainWingCommanderWhileInvitingAnotherCharacter()
+    {
+        var squadId = Guid.NewGuid();
+        var profile = new FleetProfile(
+            Guid.NewGuid(),
+            "Boss is wing commander",
+            [
+                new ProfileWing(
+                    Guid.NewGuid(),
+                    "Wing 1",
+                    0,
+                    [new ProfileSquad(squadId, "Squad 1", 0)]),
+            ],
+            [
+                new ProfileAssignment(9001, "Fleet Boss", squadId, DesiredFleetRole.WingCommander),
+                new ProfileAssignment(9002, "Invited Pilot", squadId, DesiredFleetRole.SquadMember),
+            ]);
+        var snapshot = CreateSnapshot(
+            [new LiveFleetWing(10, "Wing 1", [new LiveFleetSquad(20, "Squad 1")])],
+            [CreateMember(9001, "Fleet Boss", "wing_commander", "Wing Commander", 10, -1)]);
+
+        var plan = FleetPlanner.Build(profile, snapshot);
+
+        Assert.True(plan.CanExecute);
+        Assert.Equal(0, plan.BlockingIssues);
+        Assert.Equal(1, plan.CharacterInvites);
+        Assert.Contains(plan.Items, item =>
+            item.Kind == FleetPlanItemKind.AlreadyCorrect &&
+            item.Title.Contains("Wing Commander", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void AmbiguousLiveHierarchyBlocksTargetPlacement()
     {
         var squadId = Guid.NewGuid();

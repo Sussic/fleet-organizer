@@ -190,7 +190,7 @@ public sealed record StagedLiveInviteViewModel(
     string TargetName,
     DesiredFleetRole DesiredRole)
 {
-    public string Summary => $"Invite {CharacterName} → {TargetName} as {RoleName}";
+    public string Summary => $"Waiting for {CharacterName} → {TargetName}";
 
     public string RoleName => DesiredRole switch
     {

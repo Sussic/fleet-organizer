@@ -45,6 +45,7 @@ public static class DependencyInjection
         services.AddSingleton<EveEsiClient>();
         services.AddSingleton<ILiveFleetService, EveFleetService>();
         services.AddSingleton<IFleetWriteService, EveFleetWriteService>();
+        services.AddSingleton<IFleetInvitationService, EveFleetInvitationService>();
         services.AddSingleton<IFleetAdministrationService, EveFleetAdministrationService>();
         services.AddSingleton<ICharacterNameResolver, EveCharacterNameResolver>();
         services.AddSingleton<IFleetProfileRepository, FleetProfileRepository>();

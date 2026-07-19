@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.9.0
+
+- Replaced invitation staging with a direct `Invite now` path: exact names, arrival squad, one click, immediate ESI invitations, and automatic joined/waiting reconciliation.
+- Reduced normal live placement to drag/select, queue, and one exact `Apply N fleet changes` confirmation; the confirmation itself is the review.
+- Separated sent invitations from unsent queued changes and clarified that stopping local tracking cannot cancel an EVE invitation.
+- Corrected fleet-boss planning so ESI write authority is not confused with the Fleet Command hierarchy position.
+- Added visible blocker details and disabled start buttons for blocked or zero-change plans.
+- Reordered the Live Fleet action rail around FC frequency: Invite, Saved setup, Changes, Fleet, and Danger.
+
 ## 0.8.1
 
 - Made Live Fleet the first and default workspace; removed the redundant Home destination from navigation.

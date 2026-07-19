@@ -7,6 +7,7 @@ public enum FleetRunMode
     PlacePresent,
     FixStructure,
     AssignCommanders,
+    ApplyLiveChanges,
 }
 
 public enum FleetPlanItemKind
@@ -105,6 +106,12 @@ public static class FleetPlanModeFilter
             },
             FleetRunMode.AssignCommanders => new HashSet<FleetPlanItemKind>
             {
+                FleetPlanItemKind.ChangeRole,
+                FleetPlanItemKind.Blocked,
+            },
+            FleetRunMode.ApplyLiveChanges => new HashSet<FleetPlanItemKind>
+            {
+                FleetPlanItemKind.MoveCharacter,
                 FleetPlanItemKind.ChangeRole,
                 FleetPlanItemKind.Blocked,
             },

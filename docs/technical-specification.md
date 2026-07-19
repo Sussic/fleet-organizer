@@ -1,7 +1,7 @@
 # Fleet Organizer — Technical Specification
 
 **Status:** Approved implementation baseline
-**Revision:** 2.1
+**Revision:** 2.2
 **Reviewed:** 19 July 2026
 **Target:** Windows 11, local single-user desktop application
 **Working title:** Fleet Organizer (name can change without affecting the architecture)
@@ -19,7 +19,7 @@ Implemented and tested in the current repository:
 - Versioned profile JSON import/export and validation before persistence.
 - Deterministic desired-versus-live comparison ordered as structure, invites, moves, and role changes.
 - Explicit already-correct and unmanaged-live-member counts, with no-op entries hidden by default.
-- Hard blockers for lost fleet-boss access, ambiguous hierarchy targets, fleet-boss transfer, and fleet-boss demotion.
+- Hard blockers for lost fleet-boss access, ambiguous hierarchy targets, and an attempted fleet-boss transfer. Fleet-boss authority is deliberately independent of the member's fleet/wing/squad command slot.
 - Automatic stale-preview invalidation whenever the current profile hierarchy or assignment data changes.
 - Guarded `POST /fleets/{fleet_id}/members` invitation writes and `PUT /fleets/{fleet_id}/members/{member_id}` ordinary squad-member placement.
 - Fresh same-fleet and fleet-boss verification immediately before execution, with forced re-review when the live plan differs from the reviewed plan.
@@ -43,7 +43,9 @@ Implemented and tested in the current repository:
 - Safe filtered run modes for full organisation, invitations only, present-member placement, structure only, and commander assignment; the selected mode is part of stale-review validation.
 - Preflight fleet-capacity validation for wings, squads, and ordinary squad positions.
 - A named invitation waiting room with a visible automatic-check countdown.
-- A compact Live Fleet command board for member/commander drag/drop, invitations, template/ship-policy application, pending-change review, and one final confirmation through the existing durable engine.
+- A compact Live Fleet command board ordered around FC frequency: immediate exact-name invitations, saved setup/ship-policy application, queued member/commander drag/drop, fleet settings, and separately unlocked dangerous actions.
+- One-click low-risk invitations with a fresh same-fleet/fleet-boss/target check, session waiting-state reconciliation, and no redundant second review screen.
+- One-confirmation queued live placement: the exact confirmation is the review, while broad saved setups retain a separate preview.
 - Best-effort pre-run snapshot restore preview and in-app/Windows-sound attention notifications.
 - Searchable multi-select Live Fleet staging by character, ship, role, wing, or squad, including fleet/wing command positions.
 - Separately unlocked, freshly revalidated, and reconfirmed manual kick, empty hierarchy deletion, and fleet-boss transfer actions.
@@ -54,7 +56,7 @@ Implemented and tested in the current repository:
 
 Milestone 5 keeps the complete write queue serialized. Structure create results are persisted before dependent naming/placement steps, interrupted creates are reconciled against the initial snapshot, and ambiguous outcomes require attention instead of blind duplication. Rename and commander writes are also verified from fresh live state.
 
-The FC workflow slice adds the repetitive-use interface around that engine: a unified Live Fleet command centre, remembered frequent setups, safe partial-run modes, plain-language review and operation phases, a searchable/bulk live staging board, visual template squad cards, local multi-character drag/drop, ordered capacity-aware ship policies, named automatic acceptance checks, restore previews, durable history, redacted diagnostics, configurable polling/tray/theme preferences, recycling virtualization, optional hierarchy editing, unsaved-change status, and keyboard shortcuts. This UI checkpoint does not widen the ESI write boundary.
+The FC workflow slice adds the repetitive-use interface around that engine: a unified Live Fleet command centre, paste-and-send invitations, one-confirmation routine moves, remembered frequent setups, safe partial-run modes, plain-language blockers and operation phases, a searchable/bulk live staging board, visual template squad cards, local multi-character drag/drop, ordered capacity-aware ship policies, named automatic acceptance checks, restore previews, durable history, redacted diagnostics, configurable polling/tray/theme preferences, recycling virtualization, optional hierarchy editing, unsaved-change status, and keyboard shortcuts. This UI checkpoint does not widen the ESI write boundary.
 
 ## 1. Executive decision
 
@@ -394,15 +396,17 @@ Every transition and external write is recorded. On restart, the runner does not
 
 - Commander changes are serialized because one slot may need to be vacated before another member can occupy it.
 - The transition planner uses legal intermediate `squad_member` moves where needed.
-- The currently authenticated fleet boss is never demoted, moved into a state that would lose required write authority, or treated as fleet commander/boss interchangeably.
+- Fleet-boss authority and the fleet/wing/squad command slot are separate. A boss occupying Wing Command or a squad role remains authorized; the planner blocks only attempts to transfer boss authority automatically.
 - Before each commander write, refresh the involved member(s) if the cached state could be stale.
 - A failed transition stops only the dependent role chain; unrelated squad-member placements continue.
-- Drag/drop edits local profile assignments and invalidates any stale preview; live movement still goes through the normal saved-profile validation, preview, confirmation, and operation engine.
+- Template drag/drop edits local assignments and invalidates stale previews. Live-board movement queues the exact selected changes, validates them, and uses one explicit exact-count confirmation before the durable operation engine writes.
 
 ### 9.4 Invite behavior
 
 - Invite requests are per character because ESI has no bulk fleet-invite transaction.
 - Default invite role is `squad_member`; placement occurs after acceptance.
+- The explicit **Invite now** click sends immediately after exact-name resolution and a fresh same-fleet, fleet-boss, and target-squad check; a second confirmation would add no useful information for this reversible/ignorable request.
+- Sent quick invitations are tracked in the current session until the automatic live-fleet refresh sees the character join. Stopping local tracking does not and cannot recall an EVE invitation.
 - A character already in the fleet is never invited.
 - A character present in a different fleet or unavailable receives a clear per-character failure; the rest of the roster continues.
 - Pending invitations have an operation timeout (default 10 minutes) but remain individually retryable.
@@ -748,6 +752,8 @@ None of these changes the selected stack or core operation engine.
 - [EVE ESI rate limiting](https://developers.eveonline.com/docs/services/esi/rate-limiting/)
 - [EVE ESI best practices](https://developers.eveonline.com/docs/services/esi/best-practices/)
 - [Current ESI OpenAPI document](https://esi.evetech.net/meta/openapi.json)
+- [CCP fleet multi-selection and mass-operation design](https://www.eveonline.com/ja/news/view/fleetchanges_ui)
+- [CCP distinction between Fleet Commander and Fleet Boss authority](https://www.eveonline.com/ko/news/view/fleet-you-fools)
 - [.NET 10 overview and LTS status](https://learn.microsoft.com/en-us/dotnet/core/whats-new/dotnet-10/overview)
 - [WPF changes in .NET 10](https://learn.microsoft.com/en-us/dotnet/desktop/wpf/whats-new/net100)
 - [Microsoft MVVM Toolkit](https://learn.microsoft.com/en-us/dotnet/communitytoolkit/mvvm/)

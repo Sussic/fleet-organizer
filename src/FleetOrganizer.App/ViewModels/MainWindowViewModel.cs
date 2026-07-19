@@ -27,6 +27,7 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
     private readonly IEveAuthenticationService authenticationService;
     private readonly ILiveFleetService liveFleetService;
     private readonly ICharacterNameResolver characterNameResolver;
+    private readonly IFleetInvitationService fleetInvitationService;
     private readonly IFleetAdministrationService fleetAdministrationService;
     private readonly IDiagnosticExportService diagnosticExportService;
     private readonly ILocalDataService localDataService;
@@ -60,11 +61,14 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
     public partial DesiredFleetRole SelectedInviteRole { get; set; } = DesiredFleetRole.SquadMember;
 
     [ObservableProperty]
+    public partial int SelectedLiveActionTabIndex { get; set; }
+
+    [ObservableProperty]
     public partial bool UnlockHighImpactActions { get; set; }
 
     [ObservableProperty]
     public partial string LiveCommandStatus { get; set; } =
-        "Stage normal work freely. Fleet Desk asks once before it writes.";
+        "Paste names and Invite now, or drag pilots to queue fleet changes.";
 
     [ObservableProperty]
     public partial bool FleetSettingsFreeMove { get; set; }
@@ -189,17 +193,25 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
 
     public bool HasStagedLiveInvites => StagedLiveInvites.Count > 0;
 
-    public bool HasPendingLiveChanges => HasStagedLiveMoves || HasStagedLiveInvites;
+    public bool HasPendingLiveChanges => HasStagedLiveMoves;
 
-    public int PendingLiveChangeCount => StagedLiveMoves.Count + StagedLiveInvites.Count;
+    public int PendingLiveChangeCount => StagedLiveMoves.Count;
 
     public string StagedLiveMovesSummary => HasStagedLiveMoves
         ? $"{StagedLiveMoves.Count} pending move{(StagedLiveMoves.Count == 1 ? string.Empty : "s")} — no ESI write yet"
         : "Drag a member to another squad to stage a move.";
 
     public string PendingLiveChangesSummary => HasPendingLiveChanges
-        ? $"{PendingLiveChangeCount} pending change{(PendingLiveChangeCount == 1 ? string.Empty : "s")} • no ESI write yet"
-        : "No pending changes. Drag members, bulk-place them, invite pilots, or apply a template.";
+        ? $"{PendingLiveChangeCount} queued fleet change{(PendingLiveChangeCount == 1 ? string.Empty : "s")} • nothing sent yet"
+        : "No queued moves or role changes.";
+
+    public string ApplyPendingLiveChangesText => PendingLiveChangeCount == 1
+        ? "Apply 1 fleet change"
+        : $"Apply {PendingLiveChangeCount} fleet changes";
+
+    public string SentLiveInvitesSummary => HasStagedLiveInvites
+        ? $"{StagedLiveInvites.Count} invitation{(StagedLiveInvites.Count == 1 ? string.Empty : "s")} sent • waiting for EVE acceptance"
+        : "No invitations are currently being tracked.";
 
     public int LiveFleetSelectedCount => FleetBoardWings
         .SelectMany(wing => wing.Squads)
@@ -227,6 +239,7 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         IEveAuthenticationService authenticationService,
         ILiveFleetService liveFleetService,
         ICharacterNameResolver characterNameResolver,
+        IFleetInvitationService fleetInvitationService,
         IFleetAdministrationService fleetAdministrationService,
         IDiagnosticExportService diagnosticExportService,
         ILocalDataService localDataService,
@@ -240,6 +253,7 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         this.authenticationService = authenticationService;
         this.liveFleetService = liveFleetService;
         this.characterNameResolver = characterNameResolver;
+        this.fleetInvitationService = fleetInvitationService;
         this.fleetAdministrationService = fleetAdministrationService;
         this.diagnosticExportService = diagnosticExportService;
         this.localDataService = localDataService;
@@ -263,7 +277,7 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
     public string PageSubtitle => SelectedPage switch
     {
         "Profiles" => "Create reusable layouts for the Run setup tab in Live Fleet.",
-        "Live Fleet" => "Run the fleet from one place: drag, invite, apply a template, review, confirm.",
+        "Live Fleet" => "Run the fleet from one place: invite, drag, apply a saved setup, confirm.",
         "Activity" => "Review the current run, recover individual steps, or reopen a previous fleet run.",
         "Settings" => "Configure EVE SSO, storage, polling, and appearance.",
         _ => string.Empty,
@@ -620,9 +634,8 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
     private void ClearPendingLiveChanges()
     {
         StagedLiveMoves.Clear();
-        StagedLiveInvites.Clear();
         Profiles.HideDryRunCommand.Execute(null);
-        LiveCommandStatus = "Pending changes cleared. Nothing was written to EVE.";
+        LiveCommandStatus = "Queued fleet changes cleared. Sent invitations are still being tracked.";
         RefreshPendingLiveChangeState();
     }
 
@@ -694,21 +707,21 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         }
 
         StagedLiveInvites.Remove(invite);
+        LiveCommandStatus =
+            $"Stopped tracking {invite.CharacterName}. The invitation already sent in EVE cannot be recalled.";
         RefreshPendingLiveChangeState();
     }
 
     [RelayCommand]
-    private async Task StageLiveInvitesAsync()
+    private Task StageLiveInvitesAsync() => InviteNowAsync();
+
+    [RelayCommand]
+    private async Task InviteNowAsync()
     {
-        if (currentSnapshot is null || SelectedInviteTarget is not { } target)
+        var snapshot = currentSnapshot;
+        if (snapshot is null || SelectedInviteTarget is not { } target)
         {
             LiveCommandStatus = "Load a fleet and choose the invitation target squad first.";
-            return;
-        }
-
-        if (SelectedInviteRole == DesiredFleetRole.FleetCommander)
-        {
-            LiveCommandStatus = "Use the separately locked fleet-boss transfer action after the character joins.";
             return;
         }
 
@@ -725,37 +738,55 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         {
             var resolution = await characterNameResolver.ResolveAsync(
                 entries.Select(entry => entry.CharacterName).ToArray());
-            var liveIds = currentSnapshot.Members.Select(member => member.CharacterId).ToHashSet();
-            var stagedIds = StagedLiveInvites.Select(invite => invite.CharacterId).ToHashSet();
-            var added = 0;
-            foreach (var character in resolution.Resolved)
+            var liveIds = snapshot.Members.Select(member => member.CharacterId).ToHashSet();
+            var trackedIds = StagedLiveInvites.Select(invite => invite.CharacterId).ToHashSet();
+            var candidates = resolution.Resolved
+                .Where(character =>
+                    !liveIds.Contains(character.CharacterId) &&
+                    !trackedIds.Contains(character.CharacterId))
+                .Select(character => new FleetInvitationCandidate(
+                    character.CharacterId,
+                    character.CharacterName))
+                .ToArray();
+            if (candidates.Length == 0)
             {
-                if (liveIds.Contains(character.CharacterId) || !stagedIds.Add(character.CharacterId))
-                {
-                    continue;
-                }
+                LiveInviteText = string.Join(Environment.NewLine, resolution.UnresolvedNames);
+                LiveCommandStatus = resolution.UnresolvedNames.Length > 0
+                    ? "No invitation was sent. Check the exact character name shown in the box."
+                    : "Everyone listed is already in the fleet or already has a tracked invitation.";
+                return;
+            }
 
+            LiveCommandStatus = $"Sending {candidates.Length} invitation{(candidates.Length == 1 ? string.Empty : "s")}…";
+            var result = await fleetInvitationService.InviteAsync(
+                snapshot.FleetId,
+                target.WingId,
+                target.SquadId,
+                target.DisplayName,
+                candidates);
+            foreach (var character in result.Sent)
+            {
                 StagedLiveInvites.Add(new StagedLiveInviteViewModel(
                     character.CharacterId,
                     character.CharacterName,
                     target.WingId,
                     target.SquadId,
                     target.DisplayName,
-                    SelectedInviteRole));
-                added++;
+                    DesiredFleetRole.SquadMember));
             }
 
-            LiveInviteText = resolution.UnresolvedNames.Length == 0
-                ? string.Empty
-                : string.Join(Environment.NewLine, resolution.UnresolvedNames);
-            LiveCommandStatus = resolution.UnresolvedNames.Length == 0
-                ? $"Staged {added} invitation{(added == 1 ? string.Empty : "s")}."
-                : $"Staged {added}; {resolution.UnresolvedNames.Length} exact name{(resolution.UnresolvedNames.Length == 1 ? " was" : "s were")} not found.";
+            LiveInviteText = string.Join(
+                Environment.NewLine,
+                resolution.UnresolvedNames.Concat(result.Unsent.Select(character => character.CharacterName)));
+            var remainingCount = resolution.UnresolvedNames.Length + result.Unsent.Count;
+            LiveCommandStatus = remainingCount == 0
+                ? result.UserMessage
+                : $"{result.UserMessage} {remainingCount} name{(remainingCount == 1 ? " remains" : "s remain")} in the box.";
             RefreshPendingLiveChangeState();
         }
         catch (Exception exception)
         {
-            LiveCommandStatus = $"Invitations could not be staged: {exception.Message}";
+            LiveCommandStatus = $"Invitations could not be sent: {exception.Message}";
         }
         finally
         {
@@ -775,10 +806,48 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         if (await Profiles.PrepareLiveDeskChangesAsync(
             currentSnapshot,
             StagedLiveMoves.ToArray(),
-            StagedLiveInvites.ToArray()))
+            []))
         {
-            LiveCommandStatus = "Review ready below. Confirm once to send the guarded run.";
+            LiveCommandStatus = Profiles.CanStartReviewedOperation
+                ? "Fleet changes are ready for one confirmation."
+                : Profiles.DryRunBlockingDetails;
         }
+    }
+
+    [RelayCommand]
+    private async Task ApplyPendingLiveChangesAsync()
+    {
+        if (currentSnapshot is null || !HasPendingLiveChanges)
+        {
+            LiveCommandStatus = "Drag or select at least one fleet member to queue a change first.";
+            return;
+        }
+
+        if (!await Profiles.PrepareLiveDeskChangesAsync(
+            currentSnapshot,
+            StagedLiveMoves.ToArray(),
+            []))
+        {
+            LiveCommandStatus = Profiles.StatusMessage;
+            return;
+        }
+
+        if (!Profiles.CanStartReviewedOperation)
+        {
+            LiveCommandStatus = string.IsNullOrWhiteSpace(Profiles.DryRunBlockingDetails)
+                ? Profiles.StatusMessage
+                : Profiles.DryRunBlockingDetails;
+            return;
+        }
+
+        if (await Profiles.StartPreparedOperationAsync())
+        {
+            StagedLiveMoves.Clear();
+            Profiles.HideDryRunCommand.Execute(null);
+        }
+
+        LiveCommandStatus = Profiles.StatusMessage;
+        RefreshPendingLiveChangeState();
     }
 
     [RelayCommand]
@@ -860,6 +929,7 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
             desiredRole,
             member.Role));
         RefreshPendingLiveChangeState();
+        SelectedLiveActionTabIndex = 2;
         LiveCommandStatus = $"Staged {member.CharacterName} → {wing.Name} / {squad.Name}.";
     }
 
@@ -1240,23 +1310,35 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
 
     private void ApplyLiveFleetResult(LiveFleetLoadResult result)
     {
-        FleetHierarchy.Clear();
+        if (result.Status != LiveFleetLoadStatus.Failed || currentSnapshot is null)
+        {
+            FleetHierarchy.Clear();
+        }
         IsLiveFleetReady = result.Status == LiveFleetLoadStatus.Ready;
 
         var snapshot = result.Snapshot;
         if (snapshot is null)
         {
-            currentSnapshot = null;
-            StagedLiveMoves.Clear();
-            StagedLiveInvites.Clear();
-            ClearFleetBoard();
-            LiveFleetSquadTargets.Clear();
-            DetectedFleetId = null;
-            LiveFleetBoss = "Not detected";
-            LiveFleetSummary = "No fleet data loaded";
-            LiveFleetFreshness = result.CheckedAtUtc is DateTimeOffset checkedAtUtc
-                ? $"Checked {checkedAtUtc.ToLocalTime():t} • automatic every {Profiles.FleetPollingSeconds} seconds while open"
-                : "Not refreshed yet";
+            if (result.Status == LiveFleetLoadStatus.Failed && currentSnapshot is not null)
+            {
+                LiveFleetFreshness =
+                    $"Last confirmed {currentSnapshot.ConfirmedAtUtc.ToLocalTime():t} • automatic retry pending";
+            }
+            else
+            {
+                currentSnapshot = null;
+                StagedLiveMoves.Clear();
+                StagedLiveInvites.Clear();
+                ClearFleetBoard();
+                LiveFleetSquadTargets.Clear();
+                DetectedFleetId = null;
+                LiveFleetBoss = "Not detected";
+                LiveFleetSummary = "No fleet data loaded";
+                LiveFleetFreshness = result.CheckedAtUtc is DateTimeOffset checkedAtUtc
+                    ? $"Checked {checkedAtUtc.ToLocalTime():t} • automatic every {Profiles.FleetPollingSeconds} seconds while open"
+                    : "Not refreshed yet";
+                RefreshPendingLiveChangeState();
+            }
         }
         else
         {
@@ -1270,11 +1352,17 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
             currentSnapshot = snapshot;
             ApplySnapshotFleetSettings(snapshot);
             var liveCharacterIds = snapshot.Members.Select(member => member.CharacterId).ToHashSet();
-            foreach (var acceptedInvite in StagedLiveInvites
+            var acceptedInvites = StagedLiveInvites
                 .Where(invite => liveCharacterIds.Contains(invite.CharacterId))
-                .ToArray())
+                .ToArray();
+            foreach (var acceptedInvite in acceptedInvites)
             {
                 StagedLiveInvites.Remove(acceptedInvite);
+            }
+            if (acceptedInvites.Length > 0)
+            {
+                LiveCommandStatus =
+                    $"{acceptedInvites.Length} invited pilot{(acceptedInvites.Length == 1 ? " has" : "s have")} joined the fleet.";
             }
             foreach (var departedMove in StagedLiveMoves
                 .Where(move => !liveCharacterIds.Contains(move.CharacterId))
@@ -1500,6 +1588,8 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(PendingLiveChangeCount));
         OnPropertyChanged(nameof(StagedLiveMovesSummary));
         OnPropertyChanged(nameof(PendingLiveChangesSummary));
+        OnPropertyChanged(nameof(ApplyPendingLiveChangesText));
+        OnPropertyChanged(nameof(SentLiveInvitesSummary));
         if (currentSnapshot is not null)
         {
             BuildFleetBoard(currentSnapshot);

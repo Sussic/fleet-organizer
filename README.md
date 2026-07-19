@@ -2,7 +2,7 @@
 
 Fleet Organizer is a local Windows 11 utility for repeatedly creating the same useful EVE Online fleet layout. It is designed for one player managing their own fleets and alts.
 
-This repository contains the **Fleet Desk 0.8.1 FC workflow** on top of the guarded fleet engine. Live Fleet is the primary compact command workspace: filter and multi-select members, drag them between EVE-like wing/squad cards, paste invitations, choose roles, or apply a saved setup and its ship policies without page hopping. Normal work uses one pending tray and one reviewed confirmation. High-impact kick, empty hierarchy deletion, and fleet-boss transfer controls are separately unlocked, freshly revalidated, and confirmed again before they write.
+This repository contains the **Fleet Desk 0.9.0 FC workflow** on top of the guarded fleet engine. Live Fleet is the primary compact command workspace: filter and multi-select members, drag them between EVE-like wing/squad cards, send exact-name invitations immediately, or apply a saved setup and its ship policies without page hopping. Normal moves use one queue and one confirmation. High-impact kick, empty hierarchy deletion, and fleet-boss transfer controls are separately unlocked, freshly revalidated, and confirmed again before they write.
 
 ## Requirements
 
@@ -65,8 +65,8 @@ After saving the public client ID, run `run.cmd`, open **Settings**, and choose 
 3. Open **Live Fleet** in Fleet Organizer.
 4. Leave the page open for automatic cache-aware checks, or use **Check immediately** when needed.
 5. Use **Find** to narrow the board while keeping only matching wings and squads visible. Choose **Select shown** for a bulk move, or drag one or many members between cards.
-6. Use the right action rail to paste invitations, apply a saved setup and ship policies, or inspect the pending tray.
-7. Review once and confirm once. Fleet Desk remains on the command page while the durable run proceeds.
+6. Use **Invite** for paste-and-send invitations, **Saved setup** for a reusable layout, or **Changes** for queued drag/bulk moves.
+7. Normal moves need one exact confirmation. Invitations send immediately from the explicit **Invite now** button. Fleet Desk remains on the command page while work proceeds.
 
 The view shows fleet command, wing command, squads, member roles, ships, and locations. Commander placement uses the same reviewed queue as ordinary movement. The page automatically refreshes every 30 seconds while open and reconciles completed pending work. ESI's cache expiry can mean a just-created fleet takes roughly one minute to appear.
 
@@ -89,10 +89,10 @@ The normal template view keeps routine roster work visible and hides the denser 
 ## Quick routine workflow
 
 1. Open **Live Fleet**; it is the default command centre and refreshes automatically while visible.
-2. Drag or bulk-stage immediate member changes, or open **Run setup** and choose a saved setup plus **Full organise**, **Invite missing**, **Place joined**, **Fix structure**, or **Assign commanders**.
-3. Preview the changes. This is a read-only comparison with capacity, ambiguity, ignored-member, and commander safety checks.
-4. Read the plain summary, then use the mode-specific primary action and confirm the exact action counts once.
-5. Accept invitations in EVE. The waiting room shows who is outstanding and the countdown to the next automatic check.
+2. For a quick invite, open **Invite**, paste exact names, choose the arrival squad, and press **Invite now**. Sent invitations are tracked until the next automatic live-fleet check sees them join.
+3. For live placement, drag pilots or select several and choose their squad/role. Open **Changes** and press **Apply N fleet changes**; the single confirmation shows the exact counts before writing.
+4. For broader repair, open **Saved setup**, choose **Full organise**, **Invite missing**, **Place joined**, **Fix structure**, or **Assign commanders**, then preview and confirm the reviewed plan.
+5. Fleet settings remain separate, while kick, deletion, and fleet-boss transfer live under **Danger** and require an explicit unlock plus confirmation.
 
 Open **Activity** for the current/recovered run, its phase, next action, progress, virtualized per-step recovery table, and the latest 50 durable runs. A completed run can generate a best-effort **pre-run restore preview**; it never starts a rollback automatically. Fleet Desk can play a Windows attention sound for accepted invitations, completion, and failures without stealing focus from EVE. `Ctrl+Enter` prepares the selected profile, `F5` checks the live fleet immediately, and `Esc` closes the current dry-run preview.
 

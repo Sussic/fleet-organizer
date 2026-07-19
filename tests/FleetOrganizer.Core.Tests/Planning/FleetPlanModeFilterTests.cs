@@ -56,6 +56,21 @@ public sealed class FleetPlanModeFilterTests
             item.Title == "Commander placement is not ready");
     }
 
+    [Fact]
+    public void LiveChangesKeepOnlyQueuedMovesAndRoles()
+    {
+        var plan = CreatePlan(MixedItems);
+
+        var filtered = FleetPlanModeFilter.Apply(plan, FleetRunMode.ApplyLiveChanges);
+
+        Assert.Equal(2, filtered.TotalChanges);
+        Assert.Contains(filtered.Items, item => item.Kind == FleetPlanItemKind.MoveCharacter);
+        Assert.Contains(filtered.Items, item => item.Kind == FleetPlanItemKind.ChangeRole);
+        Assert.DoesNotContain(filtered.Items, item => item.Kind == FleetPlanItemKind.CreateWing);
+        Assert.DoesNotContain(filtered.Items, item => item.Kind == FleetPlanItemKind.InviteCharacter);
+        Assert.Equal(FleetRunMode.ApplyLiveChanges, filtered.Mode);
+    }
+
     private static FleetDryRunPlan CreatePlan(FleetPlanItem[] items) =>
         new(Guid.NewGuid(), "Test", 123, "Boss", items, 0);
 }

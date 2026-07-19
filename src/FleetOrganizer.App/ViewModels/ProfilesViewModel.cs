@@ -50,6 +50,7 @@ public partial class ProfilesViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanEdit))]
     [NotifyPropertyChangedFor(nameof(CanPrepareFleet))]
+    [NotifyPropertyChangedFor(nameof(CanStartReviewedOperation))]
     public partial bool IsEditorActive { get; set; }
 
     [ObservableProperty]
@@ -57,6 +58,7 @@ public partial class ProfilesViewModel : ObservableObject, IDisposable
     [NotifyPropertyChangedFor(nameof(CanOperate))]
     [NotifyPropertyChangedFor(nameof(CanPrepareFleet))]
     [NotifyPropertyChangedFor(nameof(CanPreviewRestore))]
+    [NotifyPropertyChangedFor(nameof(CanStartReviewedOperation))]
     public partial bool IsBusy { get; set; }
 
     [ObservableProperty]
@@ -110,6 +112,9 @@ public partial class ProfilesViewModel : ObservableObject, IDisposable
         "Choose a profile and check the live fleet.";
 
     [ObservableProperty]
+    public partial string DryRunBlockingDetails { get; set; } = string.Empty;
+
+    [ObservableProperty]
     public partial string ShipRuleMatchSummary { get; set; } = string.Empty;
 
     [ObservableProperty]
@@ -124,6 +129,7 @@ public partial class ProfilesViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanEdit))]
     [NotifyPropertyChangedFor(nameof(CanPrepareFleet))]
+    [NotifyPropertyChangedFor(nameof(CanStartReviewedOperation))]
     public partial bool HasActiveOperation { get; set; }
 
     [ObservableProperty]
@@ -272,19 +278,31 @@ public partial class ProfilesViewModel : ObservableObject, IDisposable
     public bool CanPrepareFleet =>
         IsEditorActive && !IsBusy && !HasActiveOperation && !HasUnsavedChanges;
 
+    public bool CanStartReviewedOperation =>
+        CanEdit && lastDryRunPlan is { CanExecute: true, TotalChanges: > 0 };
+
     public bool CanPreviewRestore => HasOperation && OperationIsTerminal && HasRestoreSnapshot && !IsBusy;
 
     public string SelectedRunModeDescription => RunModeOptions
         .Single(option => option.Value == SelectedRunMode)
         .Description;
 
-    public string RunPrimaryActionText => SelectedRunMode switch
+    public string RunPrimaryActionText => lastDryRunPlan switch
     {
-        FleetRunMode.InviteMissing => "Send missing invites",
-        FleetRunMode.PlacePresent => "Place joined characters",
-        FleetRunMode.FixStructure => "Fix fleet structure",
-        FleetRunMode.AssignCommanders => "Assign commanders",
-        _ => "Organise fleet now",
+        { BlockingIssues: > 0 } => "Resolve blockers first",
+        { TotalChanges: 0 } => "No changes needed",
+        { CharacterInvites: > 0, StructureChanges: 0, CharacterMoves: 0, RoleChanges: 0 } plan =>
+            $"Send {plan.CharacterInvites} invite{(plan.CharacterInvites == 1 ? string.Empty : "s")}",
+        { Mode: FleetRunMode.ApplyLiveChanges } plan =>
+            $"Apply {plan.CharacterMoves + plan.RoleChanges} fleet change{(plan.CharacterMoves + plan.RoleChanges == 1 ? string.Empty : "s")}",
+        _ => SelectedRunMode switch
+        {
+            FleetRunMode.InviteMissing => "Send missing invites",
+            FleetRunMode.PlacePresent => "Place joined characters",
+            FleetRunMode.FixStructure => "Fix fleet structure",
+            FleetRunMode.AssignCommanders => "Assign commanders",
+            _ => "Organise fleet now",
+        },
     };
 
     public IEnumerable<ProfileListItemViewModel> PinnedProfiles => ProfileItems
@@ -854,37 +872,53 @@ public partial class ProfilesViewModel : ObservableObject, IDisposable
     private void HideDryRun() => InvalidateDryRun();
 
     [RelayCommand]
-    private async Task StartOperationAsync()
+    private Task StartOperationAsync() => StartPreparedOperationAsync();
+
+    public async Task<bool> StartPreparedOperationAsync()
     {
         var reviewedPlan = lastDryRunPlan;
         var preparedProfile = lastPreparedProfile;
-        if (!CanEdit || reviewedPlan is null || preparedProfile is null)
+        if (reviewedPlan is null || preparedProfile is null)
         {
             StatusMessage = "Generate and review a current dry run before starting.";
-            return;
+            return false;
         }
 
         if (!reviewedPlan.CanExecute)
         {
-            StatusMessage = "Resolve the dry-run safety blockers before starting.";
-            return;
+            StatusMessage = string.IsNullOrWhiteSpace(DryRunBlockingDetails)
+                ? "Resolve the dry-run safety blockers before starting."
+                : DryRunBlockingDetails;
+            return false;
         }
 
+        if (!CanStartReviewedOperation)
+        {
+            StatusMessage = reviewedPlan.TotalChanges == 0
+                ? "The live fleet already matches. There is nothing to send."
+                : "Finish the current fleet operation before starting another one.";
+            return false;
+        }
+
+        var actionCount = reviewedPlan.TotalChanges;
+        var isRoutineLiveChange = reviewedPlan.Mode == FleetRunMode.ApplyLiveChanges;
         var answer = MessageBox.Show(
-            $"Start a guarded fleet operation for '{reviewedPlan.ProfileName}'?\n\n" +
-            $"Mode: {RunModeOptions.Single(option => option.Value == reviewedPlan.Mode).DisplayName}\n" +
+            $"{(isRoutineLiveChange ? "Apply" : "Start")} {actionCount} reviewed fleet change{(actionCount == 1 ? string.Empty : "s")}?\n\n" +
+            $"Setup: {reviewedPlan.ProfileName}\n" +
+            $"Mode: {HumanizeRunMode(reviewedPlan.Mode)}\n" +
             $"Fleet: {reviewedPlan.FleetId}\n" +
             $"Structure creates: {reviewedPlan.StructureCreates}\n" +
             $"Structure renames: {reviewedPlan.StructureRenames}\n" +
             $"Invitations: {reviewedPlan.CharacterInvites}\n" +
-            $"Planned moves/role differences: {reviewedPlan.CharacterMoves + reviewedPlan.RoleChanges}\n\n" +
-            "The app will re-check the live fleet and fleet boss before writing. Structure and commander changes are serialized. It will not delete hierarchy, kick members, transfer fleet boss, or demote unmanaged commanders. Invitations must still be accepted in EVE.",
-            "Start guarded operation",
+            $"Moves and role changes: {reviewedPlan.CharacterMoves + reviewedPlan.RoleChanges}\n\n" +
+            "Fleet Desk re-checks the fleet and fleet-boss authority before writing. Nothing outside this reviewed list is changed.",
+            isRoutineLiveChange ? "Apply fleet changes" : "Start fleet setup",
             MessageBoxButton.YesNo,
-            MessageBoxImage.Warning);
+            MessageBoxImage.Question);
         if (answer != MessageBoxResult.Yes)
         {
-            return;
+            StatusMessage = "No fleet changes were sent.";
+            return false;
         }
 
         IsBusy = true;
@@ -898,16 +932,18 @@ public partial class ProfilesViewModel : ObservableObject, IDisposable
             if (!result.Started || result.Operation is null)
             {
                 StatusMessage = result.UserMessage;
-                return;
+                return false;
             }
 
             ShowOperation(result.Operation);
             await ReloadOperationHistoryAsync();
             StatusMessage = result.UserMessage;
+            return true;
         }
         catch (Exception exception)
         {
             StatusMessage = $"Operation could not start: {exception.Message}";
+            return false;
         }
         finally
         {
@@ -1226,7 +1262,9 @@ public partial class ProfilesViewModel : ObservableObject, IDisposable
         lastShipRuleCapacitySkipCount = 0;
         var plan = FleetPlanModeFilter.Apply(
             FleetPlanner.Build(profile, snapshot),
-            FleetRunMode.FullOrganise);
+            stagedInvites.Length == 0
+                ? FleetRunMode.ApplyLiveChanges
+                : FleetRunMode.FullOrganise);
         ApplyDryRun(plan, snapshot.ConfirmedAtUtc);
         DryRunTitle = $"{stagedMoves.Length + stagedInvites.Length} staged Live Desk change{(stagedMoves.Length + stagedInvites.Length == 1 ? string.Empty : "s")} • fleet {snapshot.FleetId}";
         DryRunSafetyMessage +=
@@ -2230,7 +2268,10 @@ public partial class ProfilesViewModel : ObservableObject, IDisposable
         DryRunSummary = string.Empty;
         DryRunSafetyMessage = string.Empty;
         DryRunPrimaryMessage = "Choose a profile and check the live fleet.";
+        DryRunBlockingDetails = string.Empty;
         ShipRuleMatchSummary = string.Empty;
+        OnPropertyChanged(nameof(CanStartReviewedOperation));
+        OnPropertyChanged(nameof(RunPrimaryActionText));
     }
 
     private void ApplyDryRun(FleetDryRunPlan plan, DateTimeOffset confirmedAtUtc)
@@ -2253,8 +2294,16 @@ public partial class ProfilesViewModel : ObservableObject, IDisposable
             : plan.TotalChanges == 0
                 ? "Fleet is already organised"
                 : "Ready for your confirmation";
+        DryRunBlockingDetails = string.Join(
+            Environment.NewLine,
+            plan.Items
+                .Where(item => item.Kind == FleetPlanItemKind.Blocked)
+                .Take(3)
+                .Select(item => $"{item.Title}: {item.Detail}"));
         HasDryRun = true;
         RefreshVisibleDryRunItems();
+        OnPropertyChanged(nameof(CanStartReviewedOperation));
+        OnPropertyChanged(nameof(RunPrimaryActionText));
     }
 
     private async Task RunOperationActionAsync(
@@ -2461,6 +2510,7 @@ public partial class ProfilesViewModel : ObservableObject, IDisposable
         FleetRunMode.PlacePresent => "Place joined",
         FleetRunMode.FixStructure => "Fix structure",
         FleetRunMode.AssignCommanders => "Assign commanders",
+        FleetRunMode.ApplyLiveChanges => "Live changes",
         _ => mode.ToString(),
     };
 

@@ -27,7 +27,7 @@ public sealed class MainWindowXamlTests
         var xaml = ReadMainWindowXaml();
 
         Assert.Contains("Preview fleet changes", xaml, StringComparison.Ordinal);
-        Assert.Contains("Organise fleet now", xaml, StringComparison.Ordinal);
+        Assert.Contains("Profiles.RunPrimaryActionText", xaml, StringComparison.Ordinal);
         Assert.Contains("Content=\"Check now\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Value=\"Activity\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Text=\"Run details\"", xaml, StringComparison.Ordinal);
@@ -96,11 +96,17 @@ public sealed class MainWindowXamlTests
         Assert.Contains("Text=\"Fleet board\"", xaml, StringComparison.Ordinal);
         Assert.Contains("DragOver=\"OnLiveSquadDragOver\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Drop=\"OnLiveSquadDrop\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("ReviewPendingLiveChangesCommand", xaml, StringComparison.Ordinal);
-        Assert.Contains("StageLiveInvitesCommand", xaml, StringComparison.Ordinal);
+        Assert.Contains("ApplyPendingLiveChangesCommand", xaml, StringComparison.Ordinal);
+        Assert.Contains("InviteNowCommand", xaml, StringComparison.Ordinal);
         Assert.Contains("PreviewSelectedTemplateCommand", xaml, StringComparison.Ordinal);
         Assert.Contains("SelectedBulkLiveRole", xaml, StringComparison.Ordinal);
-        Assert.Contains("Header=\"High impact\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Header=\"Invite\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Header=\"Saved setup\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Header=\"Changes\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Header=\"Danger\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Profiles.CanStartReviewedOperation", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("Content=\"Stage invitations\"", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("Content=\"Review pending changes\"", xaml, StringComparison.Ordinal);
         Assert.Contains("UnlockHighImpactActions", xaml, StringComparison.Ordinal);
         Assert.Contains("KickSelectedLiveMembersCommand", xaml, StringComparison.Ordinal);
         Assert.Contains("TransferFleetBossToSelectedCommand", xaml, StringComparison.Ordinal);

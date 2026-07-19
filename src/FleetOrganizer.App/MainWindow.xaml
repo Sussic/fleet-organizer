@@ -334,7 +334,7 @@
                         Style="{StaticResource PrimaryButtonStyle}"
                         Content="{Binding Profiles.RunPrimaryActionText}"
                         ToolTip="Organise fleet now using the reviewed run mode"
-                        IsEnabled="{Binding Profiles.CanEdit}"
+                        IsEnabled="{Binding Profiles.CanStartReviewedOperation}"
                         Command="{Binding Profiles.StartOperationCommand}"
                         FontWeight="SemiBold" />
                 <Button Margin="0,8,0,0"
@@ -701,8 +701,54 @@
                 <RowDefinition Height="Auto" />
               </Grid.RowDefinitions>
 
-              <TabControl Grid.Row="0">
-                <TabItem Header="Run setup">
+              <TabControl Grid.Row="0" SelectedIndex="{Binding SelectedLiveActionTabIndex}">
+                <TabItem Header="Invite">
+                  <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="10">
+                      <TextBlock Text="Quick invite" FontSize="16" FontWeight="SemiBold" />
+                      <TextBlock Text="Paste exact character names, choose their arrival squad, then send. Pilots do not need to sign into Fleet Desk."
+                                 Margin="0,4,0,8" FontSize="11" Opacity="0.62" TextWrapping="Wrap" />
+                      <TextBox MinHeight="82" Padding="8" AcceptsReturn="True"
+                               VerticalScrollBarVisibility="Auto"
+                               Text="{Binding LiveInviteText, UpdateSourceTrigger=PropertyChanged}" />
+                      <TextBlock Text="Invite into" Margin="0,9,0,4" FontSize="11" Opacity="0.62" />
+                      <ComboBox Padding="8,5"
+                                ItemsSource="{Binding LiveFleetSquadTargets}"
+                                DisplayMemberPath="DisplayName"
+                                SelectedItem="{Binding SelectedInviteTarget}" />
+                      <Button Margin="0,10,0,0" Padding="12,8"
+                              Style="{StaticResource PrimaryButtonStyle}"
+                              Content="Invite now"
+                              Command="{Binding InviteNowCommand}" />
+                      <TextBlock Text="Invitations arrive as ordinary squad members. Promote or move them after they join."
+                                 Margin="0,6,0,0" FontSize="10" Opacity="0.58" TextWrapping="Wrap" />
+
+                      <Border Margin="0,12,0,0" Padding="9"
+                              Background="{StaticResource SurfaceAltBrush}"
+                              CornerRadius="7"
+                              Visibility="{Binding HasStagedLiveInvites, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <StackPanel>
+                          <TextBlock Text="{Binding SentLiveInvitesSummary}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                          <ItemsControl Margin="0,5,0,0" ItemsSource="{Binding StagedLiveInvites}">
+                            <ItemsControl.ItemTemplate>
+                              <DataTemplate>
+                                <DockPanel Margin="0,2" LastChildFill="True">
+                                  <Button DockPanel.Dock="Right" Padding="5,2" Content="Stop tracking"
+                                          ToolTip="This does not cancel the invitation already sent in EVE."
+                                          Command="{Binding DataContext.RemoveStagedLiveInviteCommand, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                                          CommandParameter="{Binding}" />
+                                  <TextBlock Text="{Binding Summary}" Margin="0,3,6,3" TextWrapping="Wrap" />
+                                </DockPanel>
+                              </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                          </ItemsControl>
+                        </StackPanel>
+                      </Border>
+                    </StackPanel>
+                  </ScrollViewer>
+                </TabItem>
+
+                <TabItem Header="Saved setup">
                   <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="10">
                       <TextBlock Text="Apply a saved setup" FontSize="16" FontWeight="SemiBold" />
@@ -734,10 +780,12 @@
                           <TextBlock Text="{Binding Profiles.DryRunSummary}" Margin="0,4,0,0" FontSize="11" TextWrapping="Wrap" />
                           <TextBlock Text="{Binding Profiles.DryRunSafetyMessage}" Margin="0,4,0,0"
                                      FontSize="11" Foreground="{StaticResource WarningBrush}" TextWrapping="Wrap" />
+                          <TextBlock Text="{Binding Profiles.DryRunBlockingDetails}" Margin="0,4,0,0"
+                                     FontSize="11" Foreground="{StaticResource WarningBrush}" TextWrapping="Wrap" />
                           <Button Margin="0,8,0,0" Padding="12,8"
                                   Style="{StaticResource PrimaryButtonStyle}"
                                   Content="{Binding Profiles.RunPrimaryActionText}"
-                                  IsEnabled="{Binding Profiles.CanEdit}"
+                                  IsEnabled="{Binding Profiles.CanStartReviewedOperation}"
                                   Command="{Binding Profiles.StartOperationCommand}" />
                         </StackPanel>
                       </Border>
@@ -758,32 +806,7 @@
                   </ScrollViewer>
                 </TabItem>
 
-                <TabItem Header="Invite">
-                  <StackPanel Margin="10">
-                    <TextBlock Text="Invite pilots" FontSize="16" FontWeight="SemiBold" />
-                    <TextBlock Text="Paste exact character names. They do not need to sign into Fleet Desk."
-                               Margin="0,4,0,8" FontSize="11" Opacity="0.62" TextWrapping="Wrap" />
-                    <TextBox MinHeight="90" Padding="8" AcceptsReturn="True"
-                             VerticalScrollBarVisibility="Auto"
-                             Text="{Binding LiveInviteText, UpdateSourceTrigger=PropertyChanged}" />
-                    <TextBlock Text="Target" Margin="0,9,0,4" FontSize="11" Opacity="0.62" />
-                    <ComboBox Padding="8,5"
-                              ItemsSource="{Binding LiveFleetSquadTargets}"
-                              DisplayMemberPath="DisplayName"
-                              SelectedItem="{Binding SelectedInviteTarget}" />
-                    <ComboBox Margin="0,7,0,0" Padding="8,5"
-                              ItemsSource="{Binding LiveRoleOptions}"
-                              DisplayMemberPath="DisplayName"
-                              SelectedValuePath="Value"
-                              SelectedValue="{Binding SelectedInviteRole}" />
-                    <Button Margin="0,10,0,0" Padding="12,8"
-                            Style="{StaticResource PrimaryButtonStyle}"
-                            Content="Stage invitations"
-                            Command="{Binding StageLiveInvitesCommand}" />
-                  </StackPanel>
-                </TabItem>
-
-                <TabItem Header="Pending">
+                <TabItem Header="Changes">
                   <Grid Margin="10">
                     <Grid.RowDefinitions>
                       <RowDefinition Height="Auto" />
@@ -806,48 +829,31 @@
                             </DataTemplate>
                           </ItemsControl.ItemTemplate>
                         </ItemsControl>
-                        <ItemsControl ItemsSource="{Binding StagedLiveInvites}">
-                          <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                              <DockPanel Margin="0,2" LastChildFill="True">
-                                <Button DockPanel.Dock="Right" Padding="5,2" Content="Remove"
-                                        Command="{Binding DataContext.RemoveStagedLiveInviteCommand, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
-                                        CommandParameter="{Binding}" />
-                                <TextBlock Text="{Binding Summary}" Margin="0,3,6,3" TextWrapping="Wrap" />
-                              </DockPanel>
-                            </DataTemplate>
-                          </ItemsControl.ItemTemplate>
-                        </ItemsControl>
                       </StackPanel>
                     </ScrollViewer>
                     <StackPanel Grid.Row="2">
                       <Button Padding="12,8" Style="{StaticResource PrimaryButtonStyle}"
-                              Content="Review pending changes"
+                              Content="{Binding ApplyPendingLiveChangesText}"
                               IsEnabled="{Binding HasPendingLiveChanges}"
-                              Command="{Binding ReviewPendingLiveChangesCommand}" />
+                              Command="{Binding ApplyPendingLiveChangesCommand}" />
                       <Border Margin="0,7,0,0"
                               Padding="8"
-                              Background="{StaticResource AccentSoftBrush}"
+                              Background="{StaticResource SurfaceAltBrush}"
                               CornerRadius="6"
                               Visibility="{Binding Profiles.HasDryRun, Converter={StaticResource BooleanToVisibilityConverter}}">
                         <StackPanel>
                           <TextBlock Text="{Binding Profiles.DryRunPrimaryMessage}"
                                      FontWeight="SemiBold"
                                      TextWrapping="Wrap" />
-                          <TextBlock Text="{Binding Profiles.DryRunSummary}"
+                          <TextBlock Text="{Binding Profiles.DryRunBlockingDetails}"
                                      Margin="0,3,0,0"
                                      FontSize="11"
+                                     Foreground="{StaticResource WarningBrush}"
                                      TextWrapping="Wrap" />
-                          <Button Margin="0,7,0,0"
-                                  Padding="12,8"
-                                  Style="{StaticResource PrimaryButtonStyle}"
-                                  Content="{Binding Profiles.RunPrimaryActionText}"
-                                  IsEnabled="{Binding Profiles.CanEdit}"
-                                  Command="{Binding Profiles.StartOperationCommand}" />
                         </StackPanel>
                       </Border>
                       <Button Margin="0,6,0,0" Padding="10,6"
-                              Content="Clear pending"
+                              Content="Clear queued changes"
                               IsEnabled="{Binding HasPendingLiveChanges}"
                               Command="{Binding ClearPendingLiveChangesCommand}" />
                     </StackPanel>
@@ -877,7 +883,7 @@
                   </StackPanel>
                 </TabItem>
 
-                <TabItem Header="High impact">
+                <TabItem Header="Danger">
                   <StackPanel Margin="10">
                     <TextBlock Text="High-impact controls" FontSize="16" FontWeight="SemiBold" />
                     <TextBlock Text="These actions take effect immediately after a fresh fleet-boss check. They are deliberately outside the normal staged run."
@@ -1762,8 +1768,8 @@
                   <Button Margin="0,0,8,0"
                           Style="{StaticResource PrimaryButtonStyle}"
                           Padding="11,7"
-                          Content="Organise fleet now"
-                          IsEnabled="{Binding Profiles.CanEdit}"
+                          Content="{Binding Profiles.RunPrimaryActionText}"
+                          IsEnabled="{Binding Profiles.CanStartReviewedOperation}"
                           Command="{Binding Profiles.StartOperationCommand}" />
                   <Button Margin="0,0,8,0"
                           Padding="11,7"
