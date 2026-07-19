@@ -872,7 +872,7 @@ public partial class ProfilesViewModel : ObservableObject, IDisposable
     private void HideDryRun() => InvalidateDryRun();
 
     [RelayCommand]
-    private Task StartOperationAsync() => StartPreparedOperationAsync();
+    private Task<bool> StartOperationAsync() => StartPreparedOperationAsync();
 
     public async Task<bool> StartPreparedOperationAsync()
     {
