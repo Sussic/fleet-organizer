@@ -1,5 +1,6 @@
 using FleetOrganizer.Core.Abstractions;
 using FleetOrganizer.Core.Domain;
+using FleetOrganizer.Core.Fleets;
 using FleetOrganizer.Core.Operations;
 
 namespace FleetOrganizer.Infrastructure.Esi;
