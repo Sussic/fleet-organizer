@@ -166,7 +166,7 @@ public sealed class ProfileValidatorTests
             [
                 new(Guid.NewGuid(), "Hulk, Mackinaw", squadId, 0)
                 {
-                    MaximumPerSquad = 11,
+                    MaximumPerSquad = 257,
                     OverflowSquadId = squadId,
                 },
             ],
@@ -179,9 +179,9 @@ public sealed class ProfileValidatorTests
     }
 
     [Fact]
-    public void MoreThanFiveWingsAreRejectedBeforePreflight()
+    public void MoreThanTwentyFiveWingsAreRejectedBeforePreflight()
     {
-        var wings = Enumerable.Range(1, 6)
+        var wings = Enumerable.Range(1, 26)
             .Select(index => new ProfileWing(Guid.NewGuid(), $"Wing {index}", index, []))
             .ToArray();
         var profile = new FleetProfile(Guid.NewGuid(), "Too wide", wings, []);
@@ -192,10 +192,32 @@ public sealed class ProfileValidatorTests
     }
 
     [Fact]
-    public void MoreThanTenCharactersInASquadAreRejectedBeforePreflight()
+    public void FifteenCharactersInASquadAreAccepted()
     {
         var squadId = Guid.NewGuid();
-        var assignments = Enumerable.Range(1, 11)
+        var assignments = Enumerable.Range(1, 15)
+            .Select(index => new ProfileAssignment(
+                index,
+                $"Character {index}",
+                squadId,
+                DesiredFleetRole.SquadMember))
+            .ToArray();
+        var profile = new FleetProfile(
+            Guid.NewGuid(),
+            "Valid fleet",
+            [new ProfileWing(Guid.NewGuid(), "Main", 0, [new ProfileSquad(squadId, "DPS", 0)])],
+            assignments);
+
+        var errors = ProfileValidator.Validate(profile);
+
+        Assert.DoesNotContain(errors, error => error.Code == "assignment.squad.capacity");
+    }
+
+    [Fact]
+    public void MoreThanTwoHundredFiftySixCharactersAreRejectedBeforePreflight()
+    {
+        var squadId = Guid.NewGuid();
+        var assignments = Enumerable.Range(1, 257)
             .Select(index => new ProfileAssignment(
                 index,
                 $"Character {index}",
@@ -210,6 +232,6 @@ public sealed class ProfileValidatorTests
 
         var errors = ProfileValidator.Validate(profile);
 
-        Assert.Contains(errors, error => error.Code == "assignment.squad.capacity");
+        Assert.Contains(errors, error => error.Code == "profile.assignments.capacity");
     }
 }

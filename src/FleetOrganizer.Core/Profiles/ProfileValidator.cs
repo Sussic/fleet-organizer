@@ -5,9 +5,10 @@ namespace FleetOrganizer.Core.Profiles;
 public static class ProfileValidator
 {
     public const int MaximumHierarchyNameLength = 10;
-    public const int MaximumWings = 5;
-    public const int MaximumSquadsPerWing = 5;
-    public const int MaximumCharactersPerSquad = 10;
+    public const int MaximumWings = 25;
+    public const int MaximumSquadsPerWing = 25;
+    public const int MaximumCharactersPerSquad = 256;
+    public const int MaximumCharactersPerFleet = 256;
 
     public static IReadOnlyList<ProfileValidationError> Validate(FleetProfile profile)
     {
@@ -114,6 +115,14 @@ public static class ProfileValidator
         FleetProfile profile,
         List<ProfileValidationError> errors)
     {
+        if (profile.Assignments.Count > MaximumCharactersPerFleet)
+        {
+            errors.Add(new(
+                "profile.assignments.capacity",
+                $"A fleet can have at most {MaximumCharactersPerFleet} characters.",
+                "profile.assignments"));
+        }
+
         var squadIds = profile.Wings
             .SelectMany(wing => wing.Squads)
             .Select(squad => squad.Id)

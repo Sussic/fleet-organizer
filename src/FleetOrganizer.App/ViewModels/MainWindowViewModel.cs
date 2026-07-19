@@ -206,8 +206,20 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         .SelectMany(squad => squad.Members)
         .Count(member => member.IsSelected);
 
-    public string LiveFleetSelectionSummary =>
-        $"{LiveFleetSelectedCount} selected • search matches character, ship, role, wing, or squad";
+    public int LiveFleetVisibleCount => GetBoardMembers().Count(member => member.IsVisible);
+
+    public string LiveFleetSelectionSummary => $"{LiveFleetSelectedCount} selected";
+
+    public string LiveFleetSearchSummary
+    {
+        get
+        {
+            var total = GetBoardMembers().Count();
+            return string.IsNullOrWhiteSpace(LiveFleetSearchText)
+                ? $"Showing all {total} pilot{(total == 1 ? string.Empty : "s")}."
+                : $"Showing {LiveFleetVisibleCount} of {total} pilots.";
+        }
+    }
 
     public MainWindowViewModel(
         IAppDataPaths paths,
@@ -250,8 +262,7 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
 
     public string PageSubtitle => SelectedPage switch
     {
-        "Home" => "Choose a saved layout, review the exact changes, then organise the fleet.",
-        "Profiles" => "Manage reusable layouts and rosters. Advanced structure controls are optional.",
+        "Profiles" => "Create reusable layouts for the Run setup tab in Live Fleet.",
         "Live Fleet" => "Run the fleet from one place: drag, invite, apply a template, review, confirm.",
         "Activity" => "Review the current run, recover individual steps, or reopen a previous fleet run.",
         "Settings" => "Configure EVE SSO, storage, polling, and appearance.",
@@ -260,7 +271,7 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
 
     public string PageTitle => SelectedPage switch
     {
-        "Profiles" => "Fleet templates",
+        "Profiles" => "Saved setups",
         "Activity" => "Fleet activity",
         _ => SelectedPage,
     };
@@ -591,7 +602,7 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
     {
         if (await Profiles.PrepareRestorePreviewAsync())
         {
-            SelectedPage = "Home";
+            SelectedPage = "Live Fleet";
         }
     }
 
@@ -625,6 +636,9 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
 
         RefreshLiveSelectionSummary();
     }
+
+    [RelayCommand]
+    private void ClearLiveFleetFilter() => LiveFleetSearchText = string.Empty;
 
     [RelayCommand]
     private void ClearLiveMemberSelection()
@@ -825,10 +839,13 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
                 ? staged.TargetWingId == targetWingId && staged.TargetSquadId == targetSquadId
                 : candidate.WingId == targetWingId && candidate.SquadId == targetSquadId;
         });
-        if (targetCount >= FleetOrganizer.Core.Profiles.ProfileValidator.MaximumCharactersPerSquad)
+        var isAlreadyInTarget = member.WingId == targetWingId && member.SquadId == targetSquadId;
+        if (!isAlreadyInTarget &&
+            targetCount >= FleetOrganizer.Core.Profiles.ProfileValidator.MaximumCharactersPerSquad)
         {
             RefreshPendingLiveChangeState();
-            LiveCommandStatus = $"{wing.Name} / {squad.Name} is already at the 10-character capacity.";
+            LiveCommandStatus =
+                $"{wing.Name} / {squad.Name} is already at EVE's {FleetOrganizer.Core.Profiles.ProfileValidator.MaximumCharactersPerSquad}-pilot squad limit.";
             return;
         }
 
@@ -1072,6 +1089,7 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
             member.IsVisible = member.Matches(value);
         }
 
+        ApplyLiveFleetFilter();
         RefreshLiveSelectionSummary();
     }
 
@@ -1398,7 +1416,17 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
             SelectedInviteTarget is not null &&
             target.WingId == SelectedInviteTarget.WingId &&
             target.SquadId == SelectedInviteTarget.SquadId) ?? LiveFleetSquadTargets.FirstOrDefault();
+        ApplyLiveFleetFilter();
         RefreshLiveSelectionSummary();
+    }
+
+    private void ApplyLiveFleetFilter()
+    {
+        var isFiltering = !string.IsNullOrWhiteSpace(LiveFleetSearchText);
+        foreach (var wing in FleetBoardWings)
+        {
+            wing.ApplyFilter(isFiltering);
+        }
     }
 
     private ObservableCollection<LiveFleetBoardMemberViewModel> CreateBoardMembers(
@@ -1459,7 +1487,9 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
     private void RefreshLiveSelectionSummary()
     {
         OnPropertyChanged(nameof(LiveFleetSelectedCount));
+        OnPropertyChanged(nameof(LiveFleetVisibleCount));
         OnPropertyChanged(nameof(LiveFleetSelectionSummary));
+        OnPropertyChanged(nameof(LiveFleetSearchSummary));
     }
 
     private void RefreshPendingLiveChangeState()

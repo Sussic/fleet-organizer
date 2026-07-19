@@ -114,7 +114,10 @@ public sealed class MainWindowXamlTests
 
         Assert.Contains("LiveFleetSearchText", xaml, StringComparison.Ordinal);
         Assert.Contains("SelectAllVisibleLiveMembersCommand", xaml, StringComparison.Ordinal);
+        Assert.Contains("ClearLiveFleetFilterCommand", xaml, StringComparison.Ordinal);
+        Assert.Contains("LiveFleetSearchSummary", xaml, StringComparison.Ordinal);
         Assert.Contains("StageSelectedLiveMembersCommand", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("Content=\"Home\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Profiles.OperationHistory", xaml, StringComparison.Ordinal);
         Assert.Contains("Profiles.MoveShipRuleUpCommand", xaml, StringComparison.Ordinal);
         Assert.Contains("Profiles.InvitationTimeoutMinutes", xaml, StringComparison.Ordinal);

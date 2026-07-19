@@ -42,7 +42,7 @@ public sealed record ProfileShipRule(
 
     public Guid? OverflowSquadId { get; init; }
 
-    public int MaximumPerSquad { get; init; } = 10;
+    public int MaximumPerSquad { get; init; } = 256;
 
     public bool BalanceAcrossTargets { get; init; }
 

@@ -103,7 +103,7 @@ public sealed partial class ProfileShipRuleEditorViewModel(
     Guid targetSquadId,
     string label = "",
     Guid? overflowSquadId = null,
-    int maximumPerSquad = 10,
+    int maximumPerSquad = ProfileValidator.MaximumCharactersPerSquad,
     bool balanceAcrossTargets = false,
     bool isFallback = false) : ObservableObject
 {

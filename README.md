@@ -2,7 +2,7 @@
 
 Fleet Organizer is a local Windows 11 utility for repeatedly creating the same useful EVE Online fleet layout. It is designed for one player managing their own fleets and alts.
 
-This repository contains the **Fleet Desk 0.8 FC workflow** on top of the guarded fleet engine. Live Fleet is the primary compact command workspace: search and multi-select members, drag them between EVE-like wing/squad cards, paste invitations, choose roles, or apply a saved template and its ship policies without page hopping. Normal work uses one pending tray and one reviewed confirmation. High-impact kick, empty hierarchy deletion, and fleet-boss transfer controls are separately unlocked, freshly revalidated, and confirmed again before they write.
+This repository contains the **Fleet Desk 0.8.1 FC workflow** on top of the guarded fleet engine. Live Fleet is the primary compact command workspace: filter and multi-select members, drag them between EVE-like wing/squad cards, paste invitations, choose roles, or apply a saved setup and its ship policies without page hopping. Normal work uses one pending tray and one reviewed confirmation. High-impact kick, empty hierarchy deletion, and fleet-boss transfer controls are separately unlocked, freshly revalidated, and confirmed again before they write.
 
 ## Requirements
 
@@ -64,7 +64,7 @@ After saving the public client ID, run `run.cmd`, open **Settings**, and choose 
 2. Make the signed-in character fleet boss.
 3. Open **Live Fleet** in Fleet Organizer.
 4. Leave the page open for automatic cache-aware checks, or use **Check immediately** when needed.
-5. Search by character, ship, role, wing, or squad; select matching members and choose a target/role, or drag one or many members between cards on the **Fleet board**.
+5. Use **Find** to narrow the board while keeping only matching wings and squads visible. Choose **Select shown** for a bulk move, or drag one or many members between cards.
 6. Use the right action rail to paste invitations, apply a saved setup and ship policies, or inspect the pending tray.
 7. Review once and confirm once. Fleet Desk remains on the command page while the durable run proceeds.
 
@@ -72,7 +72,7 @@ The view shows fleet command, wing command, squads, member roles, ships, and loc
 
 ## Build saved profiles
 
-Open **Fleet templates**, then choose one of these quick starts:
+Open **Saved setups**, then choose one of these quick starts:
 
 - **New template** creates an empty Wing 1 / Squad 1 layout.
 - **Capture current** reads the current live fleet and saves its hierarchy, characters, and roles as an editable profile.
@@ -88,9 +88,9 @@ The normal template view keeps routine roster work visible and hides the denser 
 
 ## Quick routine workflow
 
-1. Open **Home**. The default template is selected automatically; pin other frequent templates for quick access.
-2. Choose a safe run mode: **Full organise**, **Invite missing**, **Place joined**, **Fix structure**, or **Assign commanders**.
-3. Choose **Preview fleet changes**. This is a read-only comparison with capacity, ambiguity, ignored-member, and commander safety checks.
+1. Open **Live Fleet**; it is the default command centre and refreshes automatically while visible.
+2. Drag or bulk-stage immediate member changes, or open **Run setup** and choose a saved setup plus **Full organise**, **Invite missing**, **Place joined**, **Fix structure**, or **Assign commanders**.
+3. Preview the changes. This is a read-only comparison with capacity, ambiguity, ignored-member, and commander safety checks.
 4. Read the plain summary, then use the mode-specific primary action and confirm the exact action counts once.
 5. Accept invitations in EVE. The waiting room shows who is outstanding and the countdown to the next automatic check.
 

@@ -144,7 +144,7 @@ public partial class ProfilesViewModel : ObservableObject, IDisposable
 
     [ObservableProperty]
     public partial string OperationNextAction { get; set; } =
-        "Choose a profile on Home to prepare a run.";
+        "Choose a saved setup on Live Fleet to prepare a run.";
 
     [ObservableProperty]
     public partial string OperationProgressText { get; set; } = "0 of 0 steps finished";
@@ -1056,7 +1056,7 @@ public partial class ProfilesViewModel : ObservableObject, IDisposable
         OperationSummary = string.Empty;
         OperationStatusMessage = string.Empty;
         OperationPhaseTitle = "No fleet run is active";
-        OperationNextAction = "Choose a profile on Home to prepare a run.";
+        OperationNextAction = "Choose a saved setup on Live Fleet to prepare a run.";
         OperationProgressText = "0 of 0 steps finished";
         OperationProgressPercent = 0;
         WaitingCharacters.Clear();

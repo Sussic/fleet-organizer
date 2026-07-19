@@ -1,8 +1,8 @@
 # Fleet Organizer — Technical Specification
 
 **Status:** Approved implementation baseline
-**Revision:** 2.0
-**Reviewed:** 17 July 2026
+**Revision:** 2.1
+**Reviewed:** 19 July 2026
 **Target:** Windows 11, local single-user desktop application
 **Working title:** Fleet Organizer (name can change without affecting the architecture)
 
@@ -38,7 +38,7 @@ Implemented and tested in the current repository:
 - Native WPF multi-character drag/drop from the template roster to visual squad cards; dragging edits local desired state only.
 - Exact live ship-type matching with explicit-character precedence, fleet-boss exclusion, ordinary-member-only roles, and visible preview match counts.
 - Automatic 30-second continuation while a confirmed operation waits for invitation acceptance, with the manual check action retained.
-- A cohesive Fleet Desk visual system and plain preview → organise → monitor terminology across Home, templates, and activity.
+- A cohesive Fleet Desk visual system and plain preview → organise → monitor terminology across Live Fleet, saved setups, and activity.
 - Persistent default, last-used, and pinned templates plus remembered run mode and attention-sound preference.
 - Safe filtered run modes for full organisation, invitations only, present-member placement, structure only, and commander assignment; the selected mode is part of stale-review validation.
 - Preflight fleet-capacity validation for wings, squads, and ordinary squad positions.
@@ -54,7 +54,7 @@ Implemented and tested in the current repository:
 
 Milestone 5 keeps the complete write queue serialized. Structure create results are persisted before dependent naming/placement steps, interrupted creates are reconciled against the initial snapshot, and ambiguous outcomes require attention instead of blind duplication. Rename and commander writes are also verified from fresh live state.
 
-The FC workflow slice adds the repetitive-use interface around that engine: a guided Home launcher, remembered frequent templates, safe partial-run modes, plain-language review and operation phases, a searchable/bulk live staging board, visual template squad cards, local multi-character drag/drop, ordered capacity-aware ship policies, named automatic acceptance checks, restore previews, durable history, redacted diagnostics, configurable polling/tray/theme preferences, recycling virtualization, optional hierarchy editing, unsaved-change status, and keyboard shortcuts. This UI checkpoint does not widen the ESI write boundary.
+The FC workflow slice adds the repetitive-use interface around that engine: a unified Live Fleet command centre, remembered frequent setups, safe partial-run modes, plain-language review and operation phases, a searchable/bulk live staging board, visual template squad cards, local multi-character drag/drop, ordered capacity-aware ship policies, named automatic acceptance checks, restore previews, durable history, redacted diagnostics, configurable polling/tray/theme preferences, recycling virtualization, optional hierarchy editing, unsaved-change status, and keyboard shortcuts. This UI checkpoint does not widen the ESI write boundary.
 
 ## 1. Executive decision
 
@@ -431,28 +431,14 @@ The app is optimized for one person operating several clients. Primary actions r
 
 Left navigation contains:
 
-- **Home**
-- **Profiles**
 - **Live Fleet**
+- **Saved setups**
 - **Activity**
 - **Settings**
 
 The title/status area always shows authenticated character, current fleet ID/state, boss status, last refresh age, ESI health/rate state, and active operation.
 
-### 10.2 Home — fast path
-
-Home is the default screen and includes:
-
-- Profile selector remembering the last choice.
-- Large primary **Invite & Organise** button.
-- Secondary **Invite Missing**, **Repair Layout**, and **Open Live Fleet** commands.
-- Compact preflight summary: “12 saved characters; 4 already present; 8 to invite; 2 squads to create.”
-- Active-run list grouped into **Inviting**, **Waiting for acceptance**, **Placing**, **Done**, and **Needs attention**.
-- **Retry failed**, **Skip**, and **Cancel safely** actions.
-
-Clicking the primary action first opens a dry-run preview only when there are warnings, destructive-looking role transitions, unresolved names, or an invalid profile. A routine clean run starts immediately and remains cancelable.
-
-### 10.3 Profiles
+### 10.2 Saved setups
 
 - Hierarchical wing/squad editor with add, rename, reorder, duplicate, and delete.
 - Roster table with character, tags, intended squad, intended role, and resolution status.
@@ -461,23 +447,24 @@ Clicking the primary action first opens a dry-run preview only when there are wa
 - **Save current fleet as profile** imports the live structure and assignments.
 - Validation appears inline before save; invalid profiles cannot be run.
 
-### 10.4 Live Fleet
+### 10.3 Live Fleet — default command centre
 
-- Virtualized hierarchy tree grouped by wing and squad.
-- Search by character, squad, ship type, or tag.
+- Live board grouped by fleet command, wing, and squad, with the raw ESI tree available only as optional detail.
+- Context-preserving filter by character, squad, wing, ship type, or role with an explicit shown/total count.
 - Multi-select members and drag to another squad.
+- Apply a saved setup, stage exact-name invitations, review pending changes, update fleet settings, and unlock high-impact operations without navigating away.
 - Context actions: move, set squad commander, set wing commander, set fleet commander, return to member, copy name, and retry failed placement.
 - Badges for `Correct`, `Wrong squad`, `Wrong role`, `Unassigned`, `Pending invite`, and `ESI stale`.
 - A ghost/placeholder row can show a saved character expected in a squad but not yet in fleet.
 
-### 10.5 Activity
+### 10.4 Activity
 
 - Chronological operation list with summary and final status.
 - Expandable per-step audit: intended action, ESI result, attempt count, and safe user message.
 - Resume interrupted operation, retry selected failures, view pre-run snapshot, and start restore preview.
 - Export a redacted diagnostic bundle containing logs, app version, settings excluding tokens, and relevant operation metadata.
 
-### 10.6 Settings
+### 10.5 Settings
 
 - Sign in/out and display granted scopes.
 - Client ID and registered callback validation.

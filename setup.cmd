@@ -45,5 +45,5 @@ echo Setup completed successfully.
 echo If it is not configured yet, place your public EVE client ID in:
 echo   src\FleetOrganizer.App\appsettings.Local.json
 echo.
-echo Start the app with run.cmd, choose a saved profile on Home, then use Check fleet ^& review changes.
+echo Start the app with run.cmd. Live Fleet is the command centre for staging and running changes.
 exit /b 0

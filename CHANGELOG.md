@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.8.1
+
+- Made Live Fleet the first and default workspace; removed the redundant Home destination from navigation.
+- Reworked fleet search into a labelled, context-aware filter with shown/total counts and separate bulk controls.
+- Made squad cards use the board width and wrap pilot rows so larger squads are much easier to scan.
+- Corrected obsolete EVE hierarchy validation: 25 wings, 25 squads per wing, 256 pilots per squad, and 256 pilots per fleet.
+- Removed the obsolete 10-pilot default from new ship-placement rules so valid live fleets can be captured as saved setups.
+
 ## 0.8.0
 
 - Rebuilt Live Fleet as a bounded single-screen command workspace instead of a long read-only report.

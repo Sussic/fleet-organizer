@@ -66,33 +66,75 @@ public sealed partial class LiveFleetBoardMemberViewModel(
     }
 }
 
-public sealed record LiveFleetBoardSquadViewModel(
-    long WingId,
-    long SquadId,
-    string WingName,
-    string Name,
-    ObservableCollection<LiveFleetBoardMemberViewModel> Members)
+public sealed partial class LiveFleetBoardSquadViewModel(
+    long wingId,
+    long squadId,
+    string wingName,
+    string name,
+    ObservableCollection<LiveFleetBoardMemberViewModel> members) : ObservableObject
 {
-    public string MemberCountText =>
-        $"{Members.Count} member{(Members.Count == 1 ? string.Empty : "s")}";
+    public long WingId { get; } = wingId;
+
+    public long SquadId { get; } = squadId;
+
+    public string WingName { get; } = wingName;
+
+    public string Name { get; } = name;
+
+    public ObservableCollection<LiveFleetBoardMemberViewModel> Members { get; } = members;
+
+    [ObservableProperty]
+    public partial bool IsVisible { get; set; } = true;
+
+    public string MemberCountText { get; private set; } =
+        $"{members.Count} member{(members.Count == 1 ? string.Empty : "s")}";
 
     public bool IsEmpty => Members.Count == 0;
 
     public bool CanAcceptDrop => WingId > 0 && SquadId > 0;
 
     public bool IsLiveStructure => CanAcceptDrop;
+
+    public void ApplyFilter(bool isFiltering)
+    {
+        var visibleCount = Members.Count(member => member.IsVisible);
+        IsVisible = !isFiltering || visibleCount > 0;
+        MemberCountText = isFiltering
+            ? $"{visibleCount} of {Members.Count} shown"
+            : $"{Members.Count} member{(Members.Count == 1 ? string.Empty : "s")}";
+        OnPropertyChanged(nameof(MemberCountText));
+    }
 }
 
-public sealed record LiveFleetBoardWingViewModel(
-    long WingId,
-    string Name,
-    ObservableCollection<LiveFleetBoardSquadViewModel> Squads)
+public sealed partial class LiveFleetBoardWingViewModel(
+    long wingId,
+    string name,
+    ObservableCollection<LiveFleetBoardSquadViewModel> squads) : ObservableObject
 {
+    public long WingId { get; } = wingId;
+
+    public string Name { get; } = name;
+
+    public ObservableCollection<LiveFleetBoardSquadViewModel> Squads { get; } = squads;
+
+    [ObservableProperty]
+    public partial bool IsVisible { get; set; } = true;
+
     public int MemberCount => Squads.Sum(squad => squad.Members.Count);
 
     public bool IsEmpty => MemberCount == 0;
 
     public bool IsLiveStructure => WingId > 0;
+
+    public void ApplyFilter(bool isFiltering)
+    {
+        foreach (var squad in Squads)
+        {
+            squad.ApplyFilter(isFiltering);
+        }
+
+        IsVisible = !isFiltering || Squads.Any(squad => squad.IsVisible);
+    }
 }
 
 public sealed record LiveFleetSquadTargetViewModel(
