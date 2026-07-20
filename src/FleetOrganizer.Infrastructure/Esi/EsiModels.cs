@@ -100,8 +100,10 @@ internal sealed record UniverseIdsResponse(
 internal sealed record InviteFleetMemberRequest(
     [property: JsonPropertyName("character_id")] long CharacterId,
     [property: JsonPropertyName("role")] string Role,
-    [property: JsonPropertyName("squad_id")] long SquadId,
-    [property: JsonPropertyName("wing_id")] long WingId);
+    [property: JsonPropertyName("squad_id")]
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] long? SquadId,
+    [property: JsonPropertyName("wing_id")]
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] long? WingId);
 
 internal sealed record CreatedFleetWingResponse(
     [property: JsonPropertyName("wing_id")] long WingId);

@@ -21,7 +21,7 @@ Implemented and tested in the current repository:
 - Explicit already-correct and unmanaged-live-member counts, with no-op entries hidden by default.
 - Hard blockers for lost fleet-boss access, ambiguous hierarchy targets, and an attempted fleet-boss transfer. Fleet-boss authority is deliberately independent of the member's fleet/wing/squad command slot.
 - Automatic stale-preview invalidation whenever the current profile hierarchy or assignment data changes.
-- Guarded `POST /fleets/{fleet_id}/members` invitation writes and `PUT /fleets/{fleet_id}/members/{member_id}` ordinary squad-member placement.
+- Guarded role-aware `POST /fleets/{fleet_id}/members` invitation writes and `PUT /fleets/{fleet_id}/members/{member_id}` member/commander placement with role-correct optional wing/squad IDs.
 - Fresh same-fleet and fleet-boss verification immediately before execution, with forced re-review when the live plan differs from the reviewed plan.
 - SQLite schema v2 durable operations, typed step payloads, initial live snapshots, attempts, failures, and retry timestamps.
 - Crash-safe invite handling: an in-progress invitation with an unknown outcome is never blindly replayed; the live roster is checked before an explicit retry.
@@ -43,12 +43,13 @@ Implemented and tested in the current repository:
 - Safe filtered run modes for full organisation, invitations only, present-member placement, structure only, and commander assignment; the selected mode is part of stale-review validation.
 - Preflight fleet-capacity validation for wings, squads, and ordinary squad positions.
 - A named invitation waiting room with a visible automatic-check countdown.
-- A compact Live Fleet command board ordered around FC frequency: immediate exact-name invitations, saved setup/ship-policy application, queued member/commander drag/drop, fleet settings, and separately unlocked dangerous actions.
+- A compact Live Fleet command tree ordered around FC frequency: direct role-aware exact-name invitations, saved setup/ship-policy application, visually staged member/commander drag/drop, fleet settings, and separately unlocked dangerous actions.
 - A state-aware layout that hides the unusable command board when no fleet is detected and collapses optional saved-setup editors until explicitly opened.
 - One-click low-risk invitations with a fresh same-fleet/fleet-boss/target check, session waiting-state reconciliation, and no redundant second review screen.
 - One-confirmation queued live placement: the exact confirmation is the review, while broad saved setups retain a separate preview.
 - Best-effort pre-run snapshot restore preview and in-app/Windows-sound attention notifications.
-- Searchable multi-select Live Fleet staging by character, ship, role, wing, or squad, including fleet/wing command positions.
+- Searchable Windows-style click/Ctrl-click/Shift-click Live Fleet staging by character, ship, role, wing, or squad, including wing/squad command positions.
+- A separately unlocked clean rebuild that uses an `Unknown` staging wing/squad, evacuates the roster before deletion, reconstructs the selected saved layout, restores known/ship-rule placements and command roles, and leaves unmatched members staged safely.
 - Separately unlocked, freshly revalidated, and reconfirmed manual kick, empty hierarchy deletion, and fleet-boss transfer actions.
 - Ordered multi-ship policies with capacity, overflow, even balancing, and a final fallback rule.
 - Durable latest-50 run history with direct per-run reopening.
@@ -57,7 +58,7 @@ Implemented and tested in the current repository:
 
 Milestone 5 keeps the complete write queue serialized. Structure create results are persisted before dependent naming/placement steps, interrupted creates are reconciled against the initial snapshot, and ambiguous outcomes require attention instead of blind duplication. Rename and commander writes are also verified from fresh live state.
 
-The FC workflow slice adds the repetitive-use interface around that engine: a unified Live Fleet command centre, paste-and-send invitations, one-confirmation routine moves, remembered frequent setups, safe partial-run modes, plain-language blockers and operation phases, a searchable/bulk live staging board, visual template squad cards, local multi-character drag/drop, ordered capacity-aware ship policies, named automatic acceptance checks, restore previews, durable history, redacted diagnostics, configurable polling/tray/theme preferences, recycling virtualization, optional hierarchy editing, unsaved-change status, and keyboard shortcuts. This UI checkpoint does not widen the ESI write boundary.
+The FC workflow slice adds the repetitive-use interface around that engine: a unified Live Fleet command centre, role-aware paste-and-send invitations, one-confirmation routine moves, in-destination staged previews, standard range selection, remembered frequent setups, safe partial-run modes, plain-language blockers and operation phases, a dense searchable live hierarchy, compact template roster/drag targets, ordered capacity-aware ship policies, named automatic acceptance checks, restore previews, durable history, redacted diagnostics, configurable polling/tray/theme preferences, recycling virtualization, optional hierarchy editing, unsaved-change status, and keyboard shortcuts. Normal runs retain the non-destructive boundary; clean rebuild is a separately unlocked and reconfirmed high-impact path.
 
 ## 1. Executive decision
 
@@ -446,7 +447,7 @@ The title/status area always shows authenticated character, current fleet ID/sta
 ### 10.2 Saved setups
 
 - Hierarchical wing/squad editor with add, rename, reorder, duplicate, and delete.
-- Roster table with character, tags, intended squad, intended role, and resolution status.
+- Dense extended-selection roster table with character, tags, intended squad, intended role, and resolution status; Ctrl/Shift selection and compact drag targets follow normal Windows list behaviour.
 - Paste roster dialog accepting lines, commas, tabs, copied spreadsheets, and `Name — Squad — Role` where recognizable.
 - Bulk assign selected characters to a squad/tag.
 - **Save current fleet as profile** imports the live structure and assignments.
@@ -454,11 +455,13 @@ The title/status area always shows authenticated character, current fleet ID/sta
 
 ### 10.3 Live Fleet — default command centre
 
-- Live board grouped by fleet command, wing, and squad, with the raw ESI tree available only as optional detail.
+- Dense live tree grouped by fleet command, wing, and squad, with one row per pilot and the raw ESI tree available only as optional detail.
 - Context-preserving filter by character, squad, wing, ship type, or role with an explicit shown/total count.
-- Multi-select members and drag to another squad.
+- Select members with click/Ctrl-click/Shift-click, drag them to another position, and preview them in the destination with `MOVED` plus per-row Undo before Apply/Cancel.
 - Apply a saved setup, stage exact-name invitations, review pending changes, update fleet settings, and unlock high-impact operations without navigating away.
-- Context actions: move, set squad commander, set wing commander, set fleet commander, return to member, copy name, and retry failed placement.
+- Position actions: move/return to squad member, set squad commander, set wing commander, copy name, and retry failed placement. Fleet-boss transfer stays in the separately confirmed high-impact controls.
+- Direct invitations can target an ordinary squad position or one empty squad/wing commander seat; the request omits wing/squad IDs according to ESI's role contract.
+- Clean rebuild is high impact: create/reuse `Unknown`, evacuate every member before deleting emptied live hierarchy, create the saved hierarchy, place exact/ship-rule matches, restore command roles, and leave unmatched members in `Unknown`.
 - Badges for `Correct`, `Wrong squad`, `Wrong role`, `Unassigned`, `Pending invite`, and `ESI stale`.
 - A ghost/placeholder row can show a saved character expected in a squad but not yet in fleet.
 
@@ -489,7 +492,7 @@ The title/status area always shows authenticated character, current fleet ID/sta
 
 ### 11.1 Reliability rules
 
-- External side effects occur only inside persisted operation steps.
+- Routine side effects occur only inside persisted operation steps. Separately unlocked direct administration and clean rebuild actions require a fresh same-fleet/fleet-boss check plus an exact confirmation; an ambiguous write outcome is never automatically replayed.
 - Plan computation is pure and covered by table-driven tests.
 - Every step is idempotent or preceded by a fresh state check.
 - Database writes for step completion are transactional.

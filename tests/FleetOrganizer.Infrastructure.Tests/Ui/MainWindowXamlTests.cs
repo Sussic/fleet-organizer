@@ -99,7 +99,11 @@ public sealed class MainWindowXamlTests
         Assert.Contains("ApplyPendingLiveChangesCommand", xaml, StringComparison.Ordinal);
         Assert.Contains("InviteNowCommand", xaml, StringComparison.Ordinal);
         Assert.Contains("PreviewSelectedTemplateCommand", xaml, StringComparison.Ordinal);
-        Assert.Contains("SelectedBulkLiveRole", xaml, StringComparison.Ordinal);
+        Assert.Contains("Click • Ctrl-click • Shift-click range", xaml, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Move (staged)\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("CancelStagedLiveMemberCommand", xaml, StringComparison.Ordinal);
+        Assert.Contains("SelectionMode=\"Extended\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("CleanRebuildFleetCommand", xaml, StringComparison.Ordinal);
         Assert.Contains("Header=\"Invite\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Header=\"Saved setup\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Header=\"Changes\"", xaml, StringComparison.Ordinal);

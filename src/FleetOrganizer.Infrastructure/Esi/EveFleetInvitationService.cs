@@ -14,6 +14,7 @@ internal sealed class EveFleetInvitationService(
         long targetWingId,
         long targetSquadId,
         string targetName,
+        DesiredFleetRole desiredRole,
         IReadOnlyList<FleetInvitationCandidate> characters,
         CancellationToken cancellationToken = default)
     {
@@ -23,6 +24,17 @@ internal sealed class EveFleetInvitationService(
         if (characters.Count == 0)
         {
             return new(0, [], [], "Add at least one character to invite.");
+        }
+
+        if (desiredRole is DesiredFleetRole.WingCommander or DesiredFleetRole.SquadCommander &&
+            characters.Count != 1)
+        {
+            return Failed(characters, "A commander seat accepts exactly one invitation at a time.");
+        }
+
+        if (desiredRole == DesiredFleetRole.FleetCommander)
+        {
+            return Failed(characters, "Fleet Commander invitation is not exposed here. Transfer fleet boss separately from the guarded high-impact controls.");
         }
 
         var liveResult = await liveFleetService
@@ -49,12 +61,32 @@ internal sealed class EveFleetInvitationService(
         }
 
         var targetWing = snapshot.Wings.SingleOrDefault(wing => wing.WingId == targetWingId);
-        var targetSquad = targetWing?.Squads.SingleOrDefault(squad => squad.SquadId == targetSquadId);
-        if (targetWing is null || targetSquad is null)
+        var targetSquad = targetSquadId > 0
+            ? targetWing?.Squads.SingleOrDefault(squad => squad.SquadId == targetSquadId)
+            : null;
+        var targetExists = desiredRole == DesiredFleetRole.WingCommander
+            ? targetWing is not null
+            : targetWing is not null && targetSquad is not null;
+        if (!targetExists)
         {
             return Failed(
                 characters,
-                $"{targetName} no longer exists. Refresh and choose a current squad.");
+                $"{targetName} no longer exists. Refresh and choose a current fleet position.");
+        }
+
+        var occupied = desiredRole switch
+        {
+            DesiredFleetRole.WingCommander => snapshot.Members.Any(member =>
+                member.WingId == targetWingId &&
+                string.Equals(member.Role, "wing_commander", StringComparison.Ordinal)),
+            DesiredFleetRole.SquadCommander => snapshot.Members.Any(member =>
+                member.SquadId == targetSquadId &&
+                string.Equals(member.Role, "squad_commander", StringComparison.Ordinal)),
+            _ => false,
+        };
+        if (occupied)
+        {
+            return Failed(characters, $"{targetName} is occupied. Move or demote the current commander first.");
         }
 
         var sent = new List<FleetInvitationCandidate>();
@@ -64,11 +96,11 @@ internal sealed class EveFleetInvitationService(
             var target = new FleetOperationTarget(
                 character.CharacterId,
                 character.CharacterName,
-                targetWing.Name,
-                targetSquad.Name,
+                targetWing!.Name,
+                targetSquad?.Name ?? "Wing Command",
                 targetWingId,
                 targetSquadId,
-                DesiredFleetRole.SquadMember);
+                desiredRole);
             var result = await writeService
                 .InviteAsync(expectedFleetId, target, cancellationToken)
                 .ConfigureAwait(false);

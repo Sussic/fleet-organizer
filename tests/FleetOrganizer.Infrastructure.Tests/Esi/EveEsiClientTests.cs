@@ -180,6 +180,31 @@ public sealed class EveEsiClientTests
     }
 
     [Fact]
+    public async Task WingCommanderInvitationOmitsSquadId()
+    {
+        string? requestBody = null;
+        using var httpClient = new HttpClient(new AsyncDelegateHandler(async (
+            request,
+            cancellationToken) =>
+        {
+            requestBody = await request.Content!.ReadAsStringAsync(cancellationToken);
+            return CreateEmptyResponse(HttpStatusCode.NoContent);
+        }));
+        using var client = CreateClient(httpClient, new TestAuthenticationService());
+
+        var result = await client.InviteFleetMemberAsync(
+            7001,
+            new InviteFleetMemberRequest(9002, "wing_commander", null, 10),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var body = Assert.IsType<string>(requestBody);
+        Assert.Contains("\"role\":\"wing_commander\"", body, StringComparison.Ordinal);
+        Assert.Contains("\"wing_id\":10", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("squad_id", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task FleetSettingsUpdatePreservesCurrentOpenApiContract()
     {
         string? requestBody = null;

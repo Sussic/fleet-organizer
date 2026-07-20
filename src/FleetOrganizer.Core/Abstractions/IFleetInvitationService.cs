@@ -1,3 +1,5 @@
+using FleetOrganizer.Core.Domain;
+
 namespace FleetOrganizer.Core.Abstractions;
 
 public interface IFleetInvitationService
@@ -7,6 +9,7 @@ public interface IFleetInvitationService
         long targetWingId,
         long targetSquadId,
         string targetName,
+        DesiredFleetRole desiredRole,
         IReadOnlyList<FleetInvitationCandidate> characters,
         CancellationToken cancellationToken = default);
 }

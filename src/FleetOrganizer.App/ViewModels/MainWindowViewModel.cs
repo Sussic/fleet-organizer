@@ -29,6 +29,7 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
     private readonly ICharacterNameResolver characterNameResolver;
     private readonly IFleetInvitationService fleetInvitationService;
     private readonly IFleetAdministrationService fleetAdministrationService;
+    private readonly IFleetRebuildService fleetRebuildService;
     private readonly IDiagnosticExportService diagnosticExportService;
     private readonly ILocalDataService localDataService;
     private readonly IUpdateCheckService updateCheckService;
@@ -41,6 +42,7 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
     private int secondsUntilFleetRefresh = 30;
     private LiveFleetSnapshot? currentSnapshot;
     private bool isApplyingFleetSettings;
+    private long? liveSelectionAnchorCharacterId;
 
     [ObservableProperty]
     public partial string LiveFleetSearchText { get; set; } = string.Empty;
@@ -49,16 +51,10 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
     public partial LiveFleetSquadTargetViewModel? SelectedBulkLiveTarget { get; set; }
 
     [ObservableProperty]
-    public partial DesiredFleetRole SelectedBulkLiveRole { get; set; } = DesiredFleetRole.SquadMember;
-
-    [ObservableProperty]
     public partial string LiveInviteText { get; set; } = string.Empty;
 
     [ObservableProperty]
     public partial LiveFleetSquadTargetViewModel? SelectedInviteTarget { get; set; }
-
-    [ObservableProperty]
-    public partial DesiredFleetRole SelectedInviteRole { get; set; } = DesiredFleetRole.SquadMember;
 
     [ObservableProperty]
     public partial int SelectedLiveActionTabIndex { get; set; }
@@ -241,6 +237,7 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         ICharacterNameResolver characterNameResolver,
         IFleetInvitationService fleetInvitationService,
         IFleetAdministrationService fleetAdministrationService,
+        IFleetRebuildService fleetRebuildService,
         IDiagnosticExportService diagnosticExportService,
         ILocalDataService localDataService,
         IUpdateCheckService updateCheckService,
@@ -255,15 +252,13 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         this.characterNameResolver = characterNameResolver;
         this.fleetInvitationService = fleetInvitationService;
         this.fleetAdministrationService = fleetAdministrationService;
+        this.fleetRebuildService = fleetRebuildService;
         this.diagnosticExportService = diagnosticExportService;
         this.localDataService = localDataService;
         this.updateCheckService = updateCheckService;
         applicationVersion =
             Assembly.GetEntryAssembly()?.GetName().Version?.ToString(3) ?? "development";
         Profiles = profiles;
-        LiveRoleOptions = Profiles.RoleOptions
-            .Where(option => option.Value != DesiredFleetRole.FleetCommander)
-            .ToArray();
         requiredScopes = string.Join(Environment.NewLine, EveDeveloperOptions.RequiredScopes);
         fleetRefreshTimer = new DispatcherTimer(DispatcherPriority.Background)
         {
@@ -291,8 +286,6 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
     };
 
     public ProfilesViewModel Profiles { get; }
-
-    public DesiredRoleOptionViewModel[] LiveRoleOptions { get; }
 
     public string ConfigurationStatus => developerOptions.IsClientIdConfigured
         ? "EVE client ID configured"
@@ -683,7 +676,20 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
             return;
         }
 
-        StageLiveMembers(selected, target.WingId, target.SquadId, SelectedBulkLiveRole);
+        StageLiveMembers(selected, target.WingId, target.SquadId, target.DesiredRole);
+    }
+
+    [RelayCommand]
+    private void CancelStagedLiveMember(LiveFleetBoardMemberViewModel? member)
+    {
+        if (member?.StagedMove is null)
+        {
+            return;
+        }
+
+        StagedLiveMoves.Remove(member.StagedMove);
+        LiveCommandStatus = $"Cancelled the staged change for {member.CharacterName}.";
+        RefreshPendingLiveChangeState();
     }
 
     [RelayCommand]
@@ -763,6 +769,7 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
                 target.WingId,
                 target.SquadId,
                 target.DisplayName,
+                target.DesiredRole,
                 candidates);
             foreach (var character in result.Sent)
             {
@@ -772,7 +779,7 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
                     target.WingId,
                     target.SquadId,
                     target.DisplayName,
-                    DesiredFleetRole.SquadMember));
+                    target.DesiredRole));
             }
 
             LiveInviteText = string.Join(
@@ -874,10 +881,15 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
 
         var member = snapshot.Members.FirstOrDefault(candidate => candidate.CharacterId == characterId);
         var wing = snapshot.Wings.FirstOrDefault(candidate => candidate.WingId == targetWingId);
-        var squad = wing?.Squads.FirstOrDefault(candidate => candidate.SquadId == targetSquadId);
-        if (member is null || wing is null || squad is null)
+        var squad = targetSquadId > 0
+            ? wing?.Squads.FirstOrDefault(candidate => candidate.SquadId == targetSquadId)
+            : null;
+        var targetIsValid = desiredRole == DesiredFleetRole.WingCommander
+            ? wing is not null
+            : wing is not null && squad is not null;
+        if (member is null || !targetIsValid)
         {
-            LiveFleetStatusDetail = "That character or target squad is no longer in the current fleet. Refresh and try again.";
+            LiveFleetStatusDetail = "That character or target position is no longer in the current fleet. Refresh and try again.";
             return;
         }
 
@@ -909,31 +921,44 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
                 : candidate.WingId == targetWingId && candidate.SquadId == targetSquadId;
         });
         var isAlreadyInTarget = member.WingId == targetWingId && member.SquadId == targetSquadId;
-        if (!isAlreadyInTarget &&
+        if (desiredRole != DesiredFleetRole.WingCommander &&
+            !isAlreadyInTarget &&
             targetCount >= FleetOrganizer.Core.Profiles.ProfileValidator.MaximumCharactersPerSquad)
         {
             RefreshPendingLiveChangeState();
             LiveCommandStatus =
-                $"{wing.Name} / {squad.Name} is already at EVE's {FleetOrganizer.Core.Profiles.ProfileValidator.MaximumCharactersPerSquad}-pilot squad limit.";
+                $"{wing!.Name} / {squad!.Name} is already at EVE's {FleetOrganizer.Core.Profiles.ProfileValidator.MaximumCharactersPerSquad}-pilot squad limit.";
             return;
         }
+
+        var sourceName = GetLivePlacementName(snapshot, member);
+        var targetName = desiredRole == DesiredFleetRole.WingCommander
+            ? $"{wing!.Name} / Wing Command"
+            : desiredRole == DesiredFleetRole.SquadCommander
+                ? $"{wing!.Name} / {squad!.Name} / Squad Commander"
+                : $"{wing!.Name} / {squad!.Name}";
 
         StagedLiveMoves.Add(new StagedLiveMoveViewModel(
             characterId,
             member.CharacterName,
             member.WingId,
             member.SquadId,
+            sourceName,
             targetWingId,
             targetSquadId,
-            $"{wing.Name} / {squad.Name}",
+            targetName,
             desiredRole,
             member.Role));
         RefreshPendingLiveChangeState();
         SelectedLiveActionTabIndex = 2;
-        LiveCommandStatus = $"Staged {member.CharacterName} → {wing.Name} / {squad.Name}.";
+        LiveCommandStatus = $"Staged {member.CharacterName} → {targetName}.";
     }
 
-    public void StageDraggedLiveMembers(long draggedCharacterId, long targetWingId, long targetSquadId)
+    public void StageDraggedLiveMembers(
+        long draggedCharacterId,
+        long targetWingId,
+        long targetSquadId,
+        DesiredFleetRole desiredRole)
     {
         var dragged = GetBoardMembers().FirstOrDefault(member => member.CharacterId == draggedCharacterId);
         var characterIds = dragged is { IsSelected: true }
@@ -942,7 +967,57 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
                 .Select(member => member.CharacterId)
                 .ToArray()
             : [draggedCharacterId];
-        StageLiveMembers(characterIds, targetWingId, targetSquadId, desiredRole: null);
+        StageLiveMembers(characterIds, targetWingId, targetSquadId, desiredRole);
+    }
+
+    public void SelectLiveMember(long characterId, bool extendRange, bool toggle)
+    {
+        var members = GetBoardMembers().Where(member => member.IsVisible && member.CanStage).ToArray();
+        var clickedIndex = Array.FindIndex(members, member => member.CharacterId == characterId);
+        if (clickedIndex < 0)
+        {
+            return;
+        }
+
+        if (extendRange && liveSelectionAnchorCharacterId is long anchorId)
+        {
+            var anchorIndex = Array.FindIndex(members, member => member.CharacterId == anchorId);
+            if (anchorIndex >= 0)
+            {
+                if (!toggle)
+                {
+                    foreach (var member in GetBoardMembers())
+                    {
+                        member.IsSelected = false;
+                    }
+                }
+
+                var start = Math.Min(anchorIndex, clickedIndex);
+                var end = Math.Max(anchorIndex, clickedIndex);
+                for (var index = start; index <= end; index++)
+                {
+                    members[index].IsSelected = true;
+                }
+
+                RefreshLiveSelectionSummary();
+                return;
+            }
+        }
+
+        if (toggle)
+        {
+            members[clickedIndex].IsSelected = !members[clickedIndex].IsSelected;
+        }
+        else
+        {
+            foreach (var member in GetBoardMembers())
+            {
+                member.IsSelected = member.CharacterId == characterId;
+            }
+        }
+
+        liveSelectionAnchorCharacterId = characterId;
+        RefreshLiveSelectionSummary();
     }
 
     private void StageLiveMembers(
@@ -1123,6 +1198,89 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         await RunAdministrativeActionAsync(() => fleetAdministrationService.DeleteWingAsync(
             DetectedFleetId!.Value,
             wing.WingId));
+    }
+
+    [RelayCommand]
+    private async Task CleanRebuildFleetAsync()
+    {
+        var snapshot = currentSnapshot;
+        var profile = Profiles.GetSelectedProfileSnapshot();
+        if (snapshot is null || DetectedFleetId is null)
+        {
+            LiveCommandStatus = "Load the live fleet before starting a clean rebuild.";
+            return;
+        }
+
+        if (profile is null)
+        {
+            LiveCommandStatus = "Choose a saved setup before starting a clean rebuild.";
+            return;
+        }
+
+        if (Profiles.HasUnsavedChanges)
+        {
+            LiveCommandStatus = "Save the setup first so the exact rebuild plan has a durable local record.";
+            return;
+        }
+
+        if (HasPendingLiveChanges)
+        {
+            LiveCommandStatus = "Apply or cancel the currently staged moves before starting a clean rebuild.";
+            return;
+        }
+
+        if (!CanStartHighImpactAction(targetIsValid: true))
+        {
+            LiveCommandStatus = "Unlock high-impact actions before starting a clean rebuild.";
+            return;
+        }
+
+        var effectiveProfile = ShipRuleResolver.Resolve(profile, snapshot).EffectiveProfile;
+        var knownIds = effectiveProfile.Assignments.Select(assignment => assignment.CharacterId).ToHashSet();
+        var unknownCount = snapshot.Members.Count(member => !knownIds.Contains(member.CharacterId));
+        var invitationCount = effectiveProfile.Assignments.Count(assignment =>
+            snapshot.Members.All(member => member.CharacterId != assignment.CharacterId));
+        var squadCount = profile.Wings.Sum(wing => wing.Squads.Count);
+        var answer = MessageBox.Show(
+            $"Clean-rebuild fleet {snapshot.FleetId} from '{profile.Name}'?\n\n" +
+            $"1. Move and temporarily demote {snapshot.Members.Length} live pilots into Unknown.\n" +
+            "2. Delete the now-empty old wings and squads.\n" +
+            $"3. Create {profile.Wings.Count} wings and {squadCount} squads.\n" +
+            $"4. Place known and ship-rule pilots, restore commanders, and send {invitationCount} invitation{(invitationCount == 1 ? string.Empty : "s")}.\n" +
+            $"5. Leave {unknownCount} unmatched pilot{(unknownCount == 1 ? string.Empty : "s")} safely in Unknown.\n\n" +
+            "This is deliberately destructive and may take a while. If ESI stops a write, run Clean rebuild again after refreshing; Fleet Desk will reuse Unknown and continue from the live state.",
+            "Confirm clean fleet rebuild",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
+        if (answer != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        IsFleetBusy = true;
+        UnlockHighImpactActions = false;
+        LiveCommandStatus = "Starting guarded clean rebuild…";
+        try
+        {
+            var progress = new Progress<FleetRebuildProgress>(update =>
+            {
+                LiveCommandStatus = $"Clean rebuild • {update.CompletedWrites} writes • {update.Message}";
+            });
+            var result = await fleetRebuildService.RebuildAsync(
+                snapshot.FleetId,
+                profile,
+                progress);
+            LiveCommandStatus = result.UserMessage;
+        }
+        catch (Exception exception)
+        {
+            LiveCommandStatus = $"Clean rebuild stopped: {exception.Message}";
+        }
+        finally
+        {
+            IsFleetBusy = false;
+            await RefreshFleetAsync();
+        }
     }
 
     private bool CanStartHighImpactAction(bool targetIsValid) =>
@@ -1437,7 +1595,8 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         LiveFleetSquadTargets.Clear();
 
         var fleetCommandMembers = CreateBoardMembers(
-            snapshot.Members.Where(member => member.WingId < 0),
+            snapshot.Members.Where(member =>
+                GetEffectivePosition(member).WingId < 0),
             "Fleet Command",
             "Fleet Command",
             selectedIds);
@@ -1459,25 +1618,34 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
             var squads = new ObservableCollection<LiveFleetBoardSquadViewModel>();
             var wingCommandMembers = CreateBoardMembers(
                 snapshot.Members.Where(member =>
-                    member.WingId == wing.WingId && member.SquadId < 0),
+                {
+                    var position = GetEffectivePosition(member);
+                    return position.WingId == wing.WingId && position.SquadId < 0;
+                }),
                 wing.Name,
                 "Wing Command",
                 selectedIds);
-            if (wingCommandMembers.Count > 0)
-            {
-                squads.Add(new LiveFleetBoardSquadViewModel(
-                    wing.WingId,
-                    -1,
-                    wing.Name,
-                    "Wing Command",
-                    wingCommandMembers));
-            }
+            squads.Add(new LiveFleetBoardSquadViewModel(
+                wing.WingId,
+                -1,
+                wing.Name,
+                "Wing Command",
+                wingCommandMembers));
+            LiveFleetSquadTargets.Add(new LiveFleetSquadTargetViewModel(
+                wing.WingId,
+                -1,
+                $"{wing.Name} — Wing Commander",
+                DesiredFleetRole.WingCommander));
 
             foreach (var squad in wing.Squads)
             {
                 var members = CreateBoardMembers(
                     snapshot.Members.Where(member =>
-                        member.WingId == wing.WingId && member.SquadId == squad.SquadId),
+                    {
+                        var position = GetEffectivePosition(member);
+                        return position.WingId == wing.WingId &&
+                            position.SquadId == squad.SquadId;
+                    }),
                     wing.Name,
                     squad.Name,
                     selectedIds);
@@ -1490,7 +1658,13 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
                 LiveFleetSquadTargets.Add(new LiveFleetSquadTargetViewModel(
                     wing.WingId,
                     squad.SquadId,
-                    $"{wing.Name} / {squad.Name}"));
+                    $"{wing.Name} / {squad.Name} — Squad Commander",
+                    DesiredFleetRole.SquadCommander));
+                LiveFleetSquadTargets.Add(new LiveFleetSquadTargetViewModel(
+                    wing.WingId,
+                    squad.SquadId,
+                    $"{wing.Name} / {squad.Name} — Squad members",
+                    DesiredFleetRole.SquadMember));
             }
 
             FleetBoardWings.Add(new LiveFleetBoardWingViewModel(wing.WingId, wing.Name, squads));
@@ -1499,11 +1673,15 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         SelectedBulkLiveTarget = LiveFleetSquadTargets.FirstOrDefault(target =>
             SelectedBulkLiveTarget is not null &&
             target.WingId == SelectedBulkLiveTarget.WingId &&
-            target.SquadId == SelectedBulkLiveTarget.SquadId) ?? LiveFleetSquadTargets.FirstOrDefault();
+            target.SquadId == SelectedBulkLiveTarget.SquadId &&
+            target.DesiredRole == SelectedBulkLiveTarget.DesiredRole) ?? LiveFleetSquadTargets
+                .FirstOrDefault(target => target.DesiredRole == DesiredFleetRole.SquadMember);
         SelectedInviteTarget = LiveFleetSquadTargets.FirstOrDefault(target =>
             SelectedInviteTarget is not null &&
             target.WingId == SelectedInviteTarget.WingId &&
-            target.SquadId == SelectedInviteTarget.SquadId) ?? LiveFleetSquadTargets.FirstOrDefault();
+            target.SquadId == SelectedInviteTarget.SquadId &&
+            target.DesiredRole == SelectedInviteTarget.DesiredRole) ?? LiveFleetSquadTargets
+                .FirstOrDefault(target => target.DesiredRole == DesiredFleetRole.SquadMember);
         ApplyLiveFleetFilter();
         RefreshLiveSelectionSummary();
     }
@@ -1538,7 +1716,7 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
                     member.SquadId,
                     wingName,
                     squadName,
-                    staged?.Summary);
+                    staged);
             }));
         foreach (var member in members)
         {
@@ -1548,6 +1726,45 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         }
 
         return members;
+    }
+
+    private (long WingId, long SquadId) GetEffectivePosition(LiveFleetMember member)
+    {
+        var staged = StagedLiveMoves.FirstOrDefault(move => move.CharacterId == member.CharacterId);
+        if (staged is null)
+        {
+            return (member.WingId, member.SquadId);
+        }
+
+        return staged.DesiredRole == DesiredFleetRole.WingCommander
+            ? (staged.TargetWingId, -1)
+            : (staged.TargetWingId, staged.TargetSquadId);
+    }
+
+    private static string GetLivePlacementName(
+        LiveFleetSnapshot snapshot,
+        LiveFleetMember member)
+    {
+        if (member.WingId < 0)
+        {
+            return "Fleet Command";
+        }
+
+        var wing = snapshot.Wings.FirstOrDefault(candidate => candidate.WingId == member.WingId);
+        if (wing is null)
+        {
+            return "Unknown position";
+        }
+
+        if (member.SquadId < 0)
+        {
+            return $"{wing.Name} / Wing Command";
+        }
+
+        var squad = wing.Squads.FirstOrDefault(candidate => candidate.SquadId == member.SquadId);
+        return squad is null
+            ? $"{wing.Name} / Unknown squad"
+            : $"{wing.Name} / {squad.Name}";
     }
 
     private IEnumerable<LiveFleetBoardMemberViewModel> GetBoardMembers() =>

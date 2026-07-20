@@ -223,7 +223,18 @@ public sealed partial class MainWindow : Window, IDisposable
 
     private void OnLiveMemberPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        _ = sender;
+        if (sender is FrameworkElement
+            {
+                DataContext: LiveFleetBoardMemberViewModel { CanStage: true } member,
+            })
+        {
+            var modifiers = Keyboard.Modifiers;
+            viewModel.SelectLiveMember(
+                member.CharacterId,
+                extendRange: modifiers.HasFlag(ModifierKeys.Shift),
+                toggle: modifiers.HasFlag(ModifierKeys.Control));
+        }
+
         dragStartPoint = e.GetPosition(null);
     }
 
@@ -269,7 +280,11 @@ public sealed partial class MainWindow : Window, IDisposable
             } &&
             e.Data.GetData(LiveMemberDragFormat) is long characterId)
         {
-            viewModel.StageDraggedLiveMembers(characterId, squad.WingId, squad.SquadId);
+            viewModel.StageDraggedLiveMembers(
+                characterId,
+                squad.WingId,
+                squad.SquadId,
+                squad.DropRole);
         }
 
         e.Handled = true;

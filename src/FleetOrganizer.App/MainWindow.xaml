@@ -523,12 +523,12 @@
             </Style>
           </Grid.Style>
           <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="3*" />
+            <ColumnDefinition Width="7*" />
             <ColumnDefinition Width="12" />
-            <ColumnDefinition Width="2*" MinWidth="350" />
+            <ColumnDefinition Width="4*" MinWidth="330" />
           </Grid.ColumnDefinitions>
 
-          <Border Grid.Column="0" Style="{StaticResource CardStyle}" Padding="14">
+          <Border Grid.Column="0" Style="{StaticResource CardStyle}" Padding="11">
             <Grid>
               <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
@@ -540,7 +540,7 @@
 
               <DockPanel Grid.Row="0">
                 <TextBlock DockPanel.Dock="Right"
-                           Text="{Binding LiveFleetSelectionSummary}"
+                           Text="Click • Ctrl-click • Shift-click range • drag selected rows"
                            VerticalAlignment="Center"
                            FontSize="11"
                            Opacity="0.62" />
@@ -549,10 +549,11 @@
                            FontWeight="SemiBold" />
               </DockPanel>
 
-              <Grid Grid.Row="1" Margin="0,10,0,7">
+              <Grid Grid.Row="1" Margin="0,8,0,6">
                 <Grid.ColumnDefinitions>
                   <ColumnDefinition Width="Auto" />
                   <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="Auto" />
                   <ColumnDefinition Width="Auto" />
                   <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
@@ -565,7 +566,7 @@
                          ToolTip="Search character, ship, role, wing, or squad"
                          Text="{Binding LiveFleetSearchText, UpdateSourceTrigger=PropertyChanged}" />
                 <Button Grid.Column="2" Margin="6,0,0,0" Padding="8,5"
-                        Content="Clear filter"
+                        Content="Clear"
                         Command="{Binding ClearLiveFleetFilterCommand}" />
                 <TextBlock Grid.Column="3"
                            Margin="9,0,0,0"
@@ -573,22 +574,19 @@
                            VerticalAlignment="Center"
                            FontSize="11"
                            Opacity="0.62" />
+                <TextBlock Grid.Column="4"
+                           Margin="9,0,0,0"
+                           Text="{Binding LiveFleetSelectionSummary}"
+                           VerticalAlignment="Center"
+                           FontWeight="SemiBold" />
               </Grid>
 
-              <StackPanel Grid.Row="2" Margin="0,0,0,7" Orientation="Horizontal">
-                <Button Padding="8,5"
-                        Content="Select shown"
-                        Command="{Binding SelectAllVisibleLiveMembersCommand}" />
-                <Button Margin="6,0,0,0" Padding="8,5"
-                        Content="Clear selection"
-                        Command="{Binding ClearLiveMemberSelectionCommand}" />
-              </StackPanel>
-
-              <Grid Grid.Row="3" Margin="0,0,0,10">
+              <Grid Grid.Row="2" Margin="0,0,0,7">
                 <Grid.ColumnDefinitions>
                   <ColumnDefinition Width="Auto" />
-                  <ColumnDefinition Width="2.2*" />
-                  <ColumnDefinition Width="1.45*" />
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="Auto" />
+                  <ColumnDefinition Width="Auto" />
                   <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <TextBlock Text="Move selected to"
@@ -599,16 +597,39 @@
                           ItemsSource="{Binding LiveFleetSquadTargets}"
                           DisplayMemberPath="DisplayName"
                           SelectedItem="{Binding SelectedBulkLiveTarget}" />
-                <ComboBox Grid.Column="2" Margin="6,0,0,0" Padding="7,4"
-                          ItemsSource="{Binding LiveRoleOptions}"
-                          DisplayMemberPath="DisplayName"
-                          SelectedValuePath="Value"
-                          SelectedValue="{Binding SelectedBulkLiveRole}" />
-                <Button Grid.Column="3" Margin="6,0,0,0" Padding="10,5"
+                <Button Grid.Column="2" Margin="6,0,0,0" Padding="10,5"
                         Style="{StaticResource PrimaryButtonStyle}"
-                        Content="Stage selected"
+                        Content="Move (staged)"
                         Command="{Binding StageSelectedLiveMembersCommand}" />
+                <Button Grid.Column="3" Margin="6,0,0,0" Padding="8,5"
+                        Content="Select shown"
+                        Command="{Binding SelectAllVisibleLiveMembersCommand}" />
+                <Button Grid.Column="4" Margin="6,0,0,0" Padding="8,5"
+                        Content="Clear selection"
+                        Command="{Binding ClearLiveMemberSelectionCommand}" />
               </Grid>
+
+              <Border Grid.Row="3"
+                      Margin="0,0,0,7"
+                      Padding="8,6"
+                      Background="{StaticResource AccentSoftBrush}"
+                      CornerRadius="5"
+                      Visibility="{Binding HasPendingLiveChanges, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <DockPanel>
+                  <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                    <Button Padding="10,5"
+                            Style="{StaticResource PrimaryButtonStyle}"
+                            Content="{Binding ApplyPendingLiveChangesText}"
+                            Command="{Binding ApplyPendingLiveChangesCommand}" />
+                    <Button Margin="6,0,0,0" Padding="10,5"
+                            Content="Cancel all"
+                            Command="{Binding ClearPendingLiveChangesCommand}" />
+                  </StackPanel>
+                  <TextBlock Margin="0,5,10,0"
+                             Text="{Binding PendingLiveChangesSummary}"
+                             FontWeight="SemiBold" />
+                </DockPanel>
+              </Border>
 
               <ScrollViewer Grid.Row="4"
                             VerticalScrollBarVisibility="Auto"
@@ -616,52 +637,44 @@
                 <ItemsControl ItemsSource="{Binding FleetBoardWings}">
                   <ItemsControl.ItemTemplate>
                     <DataTemplate>
-                      <Border Margin="0,0,0,10"
-                              Padding="10"
-                              Background="{StaticResource SurfaceAltBrush}"
-                              BorderBrush="{StaticResource BorderBrush}"
-                              BorderThickness="1"
-                              CornerRadius="8"
+                      <StackPanel Margin="0,0,0,5"
                               Visibility="{Binding IsVisible, Converter={StaticResource BooleanToVisibilityConverter}}">
-                        <StackPanel>
-                          <DockPanel>
+                          <DockPanel Height="28"
+                                     Background="{StaticResource SurfaceAltBrush}">
                             <Button DockPanel.Dock="Right"
-                                    Margin="8,0,0,0"
-                                    Padding="6,2"
-                                    Content="Delete empty"
+                                    Margin="4,3"
+                                    Padding="5,0"
+                                    Content="×"
+                                    ToolTip="Delete this empty wing (high-impact unlock required)"
                                     IsEnabled="{Binding IsEmpty}"
                                     Visibility="{Binding IsLiveStructure, Converter={StaticResource BooleanToVisibilityConverter}}"
                                     Command="{Binding DataContext.DeleteLiveWingCommand, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
                                     CommandParameter="{Binding}" />
-                            <TextBlock Text="{Binding Name}"
-                                       FontSize="15"
+                            <TextBlock Margin="7,0"
+                                       Text="{Binding Name}"
+                                       VerticalAlignment="Center"
                                        FontWeight="SemiBold" />
                           </DockPanel>
                           <ItemsControl ItemsSource="{Binding Squads}"
-                                        Margin="0,8,0,0"
+                                        Margin="13,1,0,0"
                                         HorizontalContentAlignment="Stretch">
                             <ItemsControl.ItemTemplate>
                               <DataTemplate>
-                                <Border MinHeight="82"
-                                        Margin="0,0,8,8"
-                                        Padding="9"
+                                <StackPanel Margin="0,0,0,2"
                                         HorizontalAlignment="Stretch"
-                                        Background="{StaticResource SurfaceBrush}"
-                                        BorderBrush="{StaticResource BorderBrush}"
-                                        BorderThickness="1"
-                                        CornerRadius="7"
                                         Visibility="{Binding IsVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
                                         AllowDrop="{Binding CanAcceptDrop}"
                                         DragOver="OnLiveSquadDragOver"
                                         Drop="OnLiveSquadDrop">
-                                  <StackPanel>
-                                    <DockPanel>
+                                    <DockPanel Height="25"
+                                               Background="{StaticResource SurfaceBrush}">
                                       <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
                                         <TextBlock Text="{Binding MemberCountText}"
-                                                   Margin="0,2,5,0"
+                                                   Margin="0,0,5,0"
+                                                   VerticalAlignment="Center"
                                                    FontSize="10"
                                                    Opacity="0.58" />
-                                        <Button Padding="4,1"
+                                        <Button Margin="0,3,3,3" Padding="4,0"
                                                 Content="×"
                                                 ToolTip="Delete this empty live squad (requires high-impact unlock)"
                                                 IsEnabled="{Binding IsEmpty}"
@@ -669,64 +682,79 @@
                                                 Command="{Binding DataContext.DeleteLiveSquadCommand, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
                                                 CommandParameter="{Binding}" />
                                       </StackPanel>
-                                      <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                                      <TextBlock Margin="6,0"
+                                                 Text="{Binding Name}"
+                                                 VerticalAlignment="Center"
+                                                 FontSize="12"
+                                                 FontWeight="SemiBold" />
                                     </DockPanel>
-                                    <ItemsControl ItemsSource="{Binding Members}" Margin="0,5,0,0">
-                                      <ItemsControl.ItemsPanel>
-                                        <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
-                                      </ItemsControl.ItemsPanel>
+                                    <ItemsControl ItemsSource="{Binding Members}" Margin="13,0,0,0">
                                       <ItemsControl.ItemTemplate>
                                         <DataTemplate>
-                                          <Border Width="210"
-                                                  Margin="0,2,6,2"
-                                                  Padding="6,4"
-                                                  Background="{StaticResource SurfaceAltBrush}"
-                                                  CornerRadius="5"
+                                          <Border MinHeight="31"
+                                                  Padding="5,2"
+                                                  BorderBrush="{StaticResource BorderBrush}"
+                                                  BorderThickness="0,0,0,1"
                                                   Visibility="{Binding IsVisible, Converter={StaticResource BooleanToVisibilityConverter}}"
                                                   PreviewMouseLeftButtonDown="OnLiveMemberPreviewMouseLeftButtonDown"
                                                   MouseMove="OnLiveMemberMouseMove">
+                                            <Border.Style>
+                                              <Style TargetType="Border">
+                                                <Setter Property="Background" Value="Transparent" />
+                                                <Style.Triggers>
+                                                  <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                    <Setter Property="Background" Value="{StaticResource AccentSoftBrush}" />
+                                                  </DataTrigger>
+                                                </Style.Triggers>
+                                              </Style>
+                                            </Border.Style>
                                             <Grid>
                                               <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto" />
-                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="18" />
+                                                <ColumnDefinition Width="1.15*" MinWidth="110" />
+                                                <ColumnDefinition Width="1.5*" MinWidth="150" />
                                                 <ColumnDefinition Width="Auto" />
                                               </Grid.ColumnDefinitions>
-                                              <CheckBox Margin="0,0,6,0"
-                                                        VerticalAlignment="Center"
-                                                        IsEnabled="{Binding CanStage}"
-                                                        IsChecked="{Binding IsSelected}" />
-                                              <StackPanel Grid.Column="1">
-                                                <TextBlock Text="{Binding CharacterName}"
-                                                           FontWeight="SemiBold"
-                                                           TextTrimming="CharacterEllipsis" />
-                                                <TextBlock Text="{Binding Detail}"
-                                                           FontSize="11"
-                                                           Opacity="0.6"
-                                                           TextTrimming="CharacterEllipsis" />
-                                                <TextBlock Text="{Binding PendingTarget, StringFormat={}Pending: {0}}"
-                                                           FontSize="10"
-                                                           Foreground="{StaticResource WarningBrush}"
-                                                           TextWrapping="Wrap"
-                                                           Visibility="{Binding IsStaged, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                                              </StackPanel>
-                                              <TextBlock Grid.Column="2"
-                                                         Text="⋮⋮"
-                                                         Margin="5,0,0,0"
+                                              <TextBlock Text="⋮"
                                                          VerticalAlignment="Center"
                                                          Foreground="{StaticResource EveAccentBrush}"
                                                          Visibility="{Binding CanStage, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                              <TextBlock Grid.Column="1"
+                                                         Margin="2,0,8,0"
+                                                         Text="{Binding CharacterName}"
+                                                         VerticalAlignment="Center"
+                                                         FontWeight="SemiBold"
+                                                         TextTrimming="CharacterEllipsis" />
+                                              <TextBlock Grid.Column="2"
+                                                         Margin="0,0,8,0"
+                                                         Text="{Binding Detail}"
+                                                         VerticalAlignment="Center"
+                                                         FontSize="11"
+                                                         Opacity="0.64"
+                                                         TextTrimming="CharacterEllipsis" />
+                                              <StackPanel Grid.Column="3" Orientation="Horizontal"
+                                                          Visibility="{Binding IsStaged, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                                <TextBlock Margin="0,0,6,0"
+                                                           Text="{Binding StagedStatus}"
+                                                           VerticalAlignment="Center"
+                                                           FontSize="10"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{StaticResource WarningBrush}" />
+                                                <Button Padding="5,1"
+                                                        Content="Undo"
+                                                        Command="{Binding DataContext.CancelStagedLiveMemberCommand, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                                                        CommandParameter="{Binding}" />
+                                              </StackPanel>
                                             </Grid>
                                           </Border>
                                         </DataTemplate>
                                       </ItemsControl.ItemTemplate>
                                     </ItemsControl>
-                                  </StackPanel>
-                                </Border>
+                                </StackPanel>
                               </DataTemplate>
                             </ItemsControl.ItemTemplate>
                           </ItemsControl>
-                        </StackPanel>
-                      </Border>
+                      </StackPanel>
                     </DataTemplate>
                   </ItemsControl.ItemTemplate>
                 </ItemsControl>
@@ -747,12 +775,12 @@
                   <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="10">
                       <TextBlock Text="Quick invite" FontSize="16" FontWeight="SemiBold" />
-                      <TextBlock Text="Paste exact character names, choose their arrival squad, then send. Pilots do not need to sign into Fleet Desk."
+                      <TextBlock Text="Paste exact character names, choose a squad or an empty commander seat, then send. Pilots do not need to sign into Fleet Desk."
                                  Margin="0,4,0,8" FontSize="11" Opacity="0.62" TextWrapping="Wrap" />
                       <TextBox MinHeight="82" Padding="8" AcceptsReturn="True"
                                VerticalScrollBarVisibility="Auto"
                                Text="{Binding LiveInviteText, UpdateSourceTrigger=PropertyChanged}" />
-                      <TextBlock Text="Invite into" Margin="0,9,0,4" FontSize="11" Opacity="0.62" />
+                      <TextBlock Text="Invite into / as" Margin="0,9,0,4" FontSize="11" Opacity="0.62" />
                       <ComboBox Padding="8,5"
                                 ItemsSource="{Binding LiveFleetSquadTargets}"
                                 DisplayMemberPath="DisplayName"
@@ -761,7 +789,7 @@
                               Style="{StaticResource PrimaryButtonStyle}"
                               Content="Invite now"
                               Command="{Binding InviteNowCommand}" />
-                      <TextBlock Text="Invitations arrive as ordinary squad members. Promote or move them after they join."
+                      <TextBlock Text="Commander destinations accept one name and must be empty. Squad-member destinations accept a pasted list."
                                  Margin="0,6,0,0" FontSize="10" Opacity="0.58" TextWrapping="Wrap" />
 
                       <Border Margin="0,12,0,0" Padding="9"
@@ -938,6 +966,27 @@
                     <Button Margin="0,6,0,0" Padding="10,7"
                             Content="Transfer fleet boss to selected"
                             Command="{Binding TransferFleetBossToSelectedCommand}" />
+                    <Border Margin="0,12,0,0" Padding="9"
+                            Background="{StaticResource SurfaceAltBrush}"
+                            CornerRadius="6">
+                      <StackPanel>
+                        <TextBlock Text="Clean rebuild from saved setup"
+                                   FontWeight="SemiBold" />
+                        <TextBlock Text="Evacuates everyone into Unknown, removes the emptied old layout, recreates the selected setup, then places known and ship-rule pilots. Unmatched pilots remain in Unknown."
+                                   Margin="0,3,0,7"
+                                   FontSize="10"
+                                   Opacity="0.64"
+                                   TextWrapping="Wrap" />
+                        <ComboBox Padding="7,4"
+                                  ItemsSource="{Binding Profiles.FilteredProfileItems}"
+                                  SelectedItem="{Binding Profiles.SelectedProfile}"
+                                  DisplayMemberPath="Name" />
+                        <Button Margin="0,7,0,0"
+                                Padding="10,7"
+                                Content="Clean rebuild…"
+                                Command="{Binding CleanRebuildFleetCommand}" />
+                      </StackPanel>
+                    </Border>
                     <TextBlock Text="Empty wing/squad delete buttons are on the fleet board. Each action asks again before writing."
                                Margin="0,10,0,0" FontSize="11" Opacity="0.62" TextWrapping="Wrap" />
                   </StackPanel>
@@ -1649,7 +1698,7 @@
               <TextBlock Text="Characters and placement"
                          FontSize="17"
                          FontWeight="SemiBold" />
-              <TextBlock Text="Drag a character row onto a squad card. Tick several rows first to move them together, or use the bulk controls below."
+              <TextBlock Text="A compact Windows-style roster: click one row, Ctrl-click individuals, or Shift-click a range. Drag the selection to a squad or use the bulk destination controls."
                          Margin="0,5,0,0"
                          TextWrapping="Wrap"
                          Opacity="0.62" />
@@ -1660,48 +1709,38 @@
                 <ItemsControl ItemsSource="{Binding Profiles.Wings}" Margin="0,8,0,0">
                   <ItemsControl.ItemTemplate>
                     <DataTemplate>
-                    <Border Margin="0,0,0,10"
-                            Padding="13"
+                    <Border Margin="0,0,0,5"
+                            Padding="8"
                             Background="{StaticResource SurfaceAltBrush}"
                             BorderBrush="{StaticResource BorderBrush}"
                             BorderThickness="1"
-                            CornerRadius="9">
+                            CornerRadius="6">
                       <StackPanel>
                         <TextBlock Text="{Binding Name}"
                                    FontWeight="SemiBold"
                                    FontSize="14" />
-                        <ItemsControl ItemsSource="{Binding Squads}" Margin="0,8,0,0">
-                          <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                              <WrapPanel />
-                            </ItemsPanelTemplate>
-                          </ItemsControl.ItemsPanel>
+                        <ItemsControl ItemsSource="{Binding Squads}" Margin="12,5,0,0">
                           <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                              <Border Width="250"
-                                      MinHeight="82"
-                                      Margin="0,0,9,9"
+                              <Border MinHeight="32"
+                                      Margin="0,0,0,3"
+                                      Padding="8,4"
                                       Style="{StaticResource DropCardStyle}"
                                       AllowDrop="True"
                                       DragOver="OnSquadDragOver"
                                       Drop="OnSquadDrop"
                                       ToolTip="Drop one selected character, or every ticked character, into this squad">
-                                <StackPanel>
-                                  <DockPanel>
+                                <DockPanel>
                                     <TextBlock DockPanel.Dock="Right"
                                                Text="{Binding AssignmentCountText}"
+                                               VerticalAlignment="Center"
                                                FontSize="11"
                                                Foreground="{StaticResource TextMutedBrush}" />
                                     <TextBlock Text="{Binding Name}"
-                                               Margin="0,0,8,0"
+                                               Width="130"
+                                               VerticalAlignment="Center"
                                                FontWeight="SemiBold" />
                                   </DockPanel>
-                                  <TextBlock Text="{Binding CharacterPreview}"
-                                             Margin="0,9,0,0"
-                                             TextWrapping="Wrap"
-                                             FontSize="12"
-                                             Foreground="{StaticResource TextMutedBrush}" />
-                                </StackPanel>
                               </Border>
                             </DataTemplate>
                           </ItemsControl.ItemTemplate>
@@ -1733,23 +1772,23 @@
                          Opacity="0.62" />
 
               <WrapPanel Margin="0,12,0,8">
-                <Button Margin="0,0,6,6" Padding="9,6" Content="Select all"
+                <Button Margin="0,0,6,6" Padding="9,5" Content="Select all shown"
                         Command="{Binding Profiles.SelectAllAssignmentsCommand}" />
-                <Button Margin="0,0,14,6" Padding="9,6" Content="Clear selection"
+                <Button Margin="0,0,14,6" Padding="9,5" Content="Clear selection"
                         Command="{Binding Profiles.ClearAssignmentSelectionCommand}" />
                 <ComboBox Width="210" Margin="0,0,6,6"
                           ItemsSource="{Binding Profiles.SquadOptions}"
                           DisplayMemberPath="DisplayName"
                           SelectedValuePath="Id"
                           SelectedValue="{Binding Profiles.BulkTargetSquadId}" />
-                <Button Margin="0,0,14,6" Padding="9,6" Content="Apply squad"
+                <Button Margin="0,0,14,6" Padding="9,5" Content="Move selected"
                         Command="{Binding Profiles.ApplyBulkSquadCommand}" />
                 <ComboBox Width="155" Margin="0,0,6,6"
                           ItemsSource="{Binding Profiles.RoleOptions}"
                           DisplayMemberPath="DisplayName"
                           SelectedValuePath="Value"
                           SelectedValue="{Binding Profiles.BulkDesiredRole}" />
-                <Button Margin="0,0,14,6" Padding="9,6" Content="Apply role"
+                <Button Margin="0,0,14,6" Padding="9,5" Content="Set role"
                         Command="{Binding Profiles.ApplyBulkRoleCommand}" />
                 <TextBox Width="155" Margin="0,0,6,6" Padding="7,5"
                          ToolTip="Comma-separated local tags"
@@ -1768,20 +1807,24 @@
                         CanUserAddRows="False"
                         CanUserDeleteRows="False"
                         HeadersVisibility="Column"
-                        MinHeight="120"
-                        MaxHeight="360"
-                        SelectionMode="Single"
+                        MinHeight="180"
+                        MaxHeight="520"
+                        RowHeight="30"
+                        SelectionMode="Extended"
+                        SelectionUnit="FullRow"
                         EnableRowVirtualization="True"
                         EnableColumnVirtualization="True"
                         ScrollViewer.CanContentScroll="True"
                         VirtualizingPanel.IsVirtualizing="True"
                         VirtualizingPanel.VirtualizationMode="Recycling">
+                <DataGrid.RowStyle>
+                  <Style TargetType="DataGridRow">
+                    <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}" />
+                  </Style>
+                </DataGrid.RowStyle>
                 <DataGrid.Columns>
-                  <DataGridCheckBoxColumn Width="42"
-                                          Header="Use"
-                                          Binding="{Binding IsSelected, UpdateSourceTrigger=PropertyChanged}" />
                   <DataGridTextColumn Width="180"
-                                      Header="Character (drag me)"
+                                      Header="Pilot"
                                       IsReadOnly="True"
                                       Binding="{Binding CharacterName}" />
                   <DataGridTemplateColumn Width="220" Header="Target squad">
@@ -2252,7 +2295,7 @@
                                                        Visibility="{Binding CanStage, Converter={StaticResource BooleanToVisibilityConverter}}" />
                                           </DockPanel>
                                           <TextBlock Text="{Binding Detail}" FontSize="11" Opacity="0.62" />
-                                          <TextBlock Text="{Binding PendingTarget, StringFormat={}Pending → {0}}"
+                                          <TextBlock Text="{Binding StagedStatus}"
                                                      FontSize="11" Foreground="{StaticResource WarningBrush}"
                                                      Visibility="{Binding IsStaged, Converter={StaticResource BooleanToVisibilityConverter}}" />
                                         </StackPanel>

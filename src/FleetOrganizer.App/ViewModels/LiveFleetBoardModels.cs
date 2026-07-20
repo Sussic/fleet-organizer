@@ -14,7 +14,7 @@ public sealed partial class LiveFleetBoardMemberViewModel(
     long currentSquadId,
     string wingName,
     string squadName,
-    string? pendingTarget) : ObservableObject
+    StagedLiveMoveViewModel? stagedMove) : ObservableObject
 {
     public long CharacterId { get; } = characterId;
 
@@ -34,7 +34,7 @@ public sealed partial class LiveFleetBoardMemberViewModel(
 
     public string SquadName { get; } = squadName;
 
-    public string? PendingTarget { get; } = pendingTarget;
+    public StagedLiveMoveViewModel? StagedMove { get; } = stagedMove;
 
     [ObservableProperty]
     public partial bool IsSelected { get; set; }
@@ -46,9 +46,15 @@ public sealed partial class LiveFleetBoardMemberViewModel(
 
     public bool IsCommander => !string.Equals(Role, "squad_member", StringComparison.Ordinal);
 
-    public string Detail => $"{ShipTypeName} • {RoleName}";
+    public string Detail => stagedMove is null
+        ? $"{ShipTypeName} • {RoleName}"
+        : $"{ShipTypeName} • will be {stagedMove.DesiredRoleName}";
 
-    public bool IsStaged => !string.IsNullOrWhiteSpace(PendingTarget);
+    public bool IsStaged => stagedMove is not null;
+
+    public string StagedStatus => stagedMove is null
+        ? string.Empty
+        : $"MOVED • from {stagedMove.SourceName}";
 
     public bool Matches(string search)
     {
@@ -91,9 +97,13 @@ public sealed partial class LiveFleetBoardSquadViewModel(
 
     public bool IsEmpty => Members.Count == 0;
 
-    public bool CanAcceptDrop => WingId > 0 && SquadId > 0;
+    public bool CanAcceptDrop => WingId > 0;
 
-    public bool IsLiveStructure => CanAcceptDrop;
+    public DesiredFleetRole DropRole => SquadId > 0
+        ? DesiredFleetRole.SquadMember
+        : DesiredFleetRole.WingCommander;
+
+    public bool IsLiveStructure => WingId > 0 && SquadId > 0;
 
     public void ApplyFilter(bool isFiltering)
     {
@@ -140,13 +150,19 @@ public sealed partial class LiveFleetBoardWingViewModel(
 public sealed record LiveFleetSquadTargetViewModel(
     long WingId,
     long SquadId,
-    string DisplayName);
+    string DisplayName,
+    DesiredFleetRole DesiredRole)
+{
+    public bool IsCommandSeat => DesiredRole is
+        DesiredFleetRole.WingCommander or DesiredFleetRole.SquadCommander;
+}
 
 public sealed record StagedLiveMoveViewModel(
     long CharacterId,
     string CharacterName,
     long SourceWingId,
     long SourceSquadId,
+    string SourceName,
     long TargetWingId,
     long TargetSquadId,
     string TargetName,
@@ -164,6 +180,8 @@ public sealed record StagedLiveMoveViewModel(
     public string Summary => ChangesRole
         ? $"{CharacterName} → {TargetName} as {HumanizeRole(DesiredRole)}"
         : $"{CharacterName} → {TargetName}";
+
+    public string DesiredRoleName => HumanizeRole(DesiredRole);
 
     private static string ToEsiRole(DesiredFleetRole role) => role switch
     {

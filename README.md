@@ -2,7 +2,7 @@
 
 Fleet Organizer is a local Windows 11 utility for repeatedly creating the same useful EVE Online fleet layout. It is designed for one player managing their own fleets and alts.
 
-This repository contains the **Fleet Desk 0.9.1 FC workflow** on top of the guarded fleet engine. Live Fleet is the primary compact command workspace: filter and multi-select members, drag them between EVE-like wing/squad cards, send exact-name invitations immediately, or apply a saved setup and its ship policies without page hopping. Empty fleet state stays compact, while optional saved-setup tools expand only when needed. Normal moves use one queue and one confirmation. High-impact kick, empty hierarchy deletion, and fleet-boss transfer controls are separately unlocked, freshly revalidated, and confirmed again before they write.
+This repository contains the **Fleet Desk 0.10.0 FC workflow** on top of the guarded fleet engine. Live Fleet is the primary compact command workspace: filter a dense EVE-style hierarchy, select pilots with normal click/Ctrl-click/Shift-click behaviour, stage their destination visually, invite directly into squads or empty command seats, or apply a saved setup and its ship policies without page hopping. Normal moves use one queue and one confirmation. Kick, hierarchy deletion, fleet-boss transfer, and clean rebuild are separately unlocked, freshly revalidated, and confirmed again before they write.
 
 ## Requirements
 
@@ -64,11 +64,11 @@ After saving the public client ID, run `run.cmd`, open **Settings**, and choose 
 2. Make the signed-in character fleet boss.
 3. Open **Live Fleet** in Fleet Organizer.
 4. Leave the page open for automatic cache-aware checks, or use **Check immediately** when needed.
-5. Use **Find** to narrow the board while keeping only matching wings and squads visible. Choose **Select shown** for a bulk move, or drag one or many members between cards.
-6. Use **Invite** for paste-and-send invitations, **Saved setup** for a reusable layout, or **Changes** for queued drag/bulk moves.
+5. Use **Find** to narrow the hierarchy. Click a pilot, Ctrl-click individuals, or Shift-click a range; then choose a destination or drag the selection onto a squad/wing-command row.
+6. Use **Invite** for paste-and-send invitations to a squad or empty commander seat, **Saved setup** for a reusable layout, or **Changes** for queued drag/bulk moves.
 7. Normal moves need one exact confirmation. Invitations send immediately from the explicit **Invite now** button. Fleet Desk remains on the command page while work proceeds.
 
-The view shows fleet command, wing command, squads, member roles, ships, and locations. Commander placement uses the same reviewed queue as ordinary movement. The page automatically refreshes every 30 seconds while open and reconciles completed pending work. ESI's cache expiry can mean a just-created fleet takes roughly one minute to appear.
+The view shows fleet command, wing command, squads, member roles, and ships in one dense tree. A staged pilot immediately appears in the destination with a `MOVED` marker; use its **Undo** action or **Cancel all** before applying. Commander placement uses the same reviewed queue as ordinary movement. The page automatically refreshes every 30 seconds while open and reconciles completed pending work. ESI's cache expiry can mean a just-created fleet takes roughly one minute to appear.
 
 ## Build saved profiles
 
@@ -80,7 +80,9 @@ Open **Saved setups**, then choose one of these quick starts:
 
 Wing and squad names can be edited inline, reordered, duplicated, and removed. Paste exact character names using new lines, commas, or tabs, then choose **Resolve and add**. A structured row such as `Character Name — Squad 1 — Squad Commander` also applies the recognized squad and role immediately. Name resolution uses ESI's public exact-name endpoint, so pasted characters do not need to authorize the app.
 
-Use the squad cards for the normal layout work: drag a character row onto a squad, or tick several rows before dragging to move the group together. The checkboxes and bulk controls remain available for large rosters, roles, and local tags. Choose **Save changes** when the validation line says the template is ready. Template edits are local and are not sent to EVE.
+The saved roster is the normal layout workspace: click, Ctrl-click, or Shift-click rows, then move the selection, set its role/tags, or drag it onto a compact squad target. Choose **Save changes** when the validation line says the template is ready. Template edits are local and are not sent to EVE.
+
+For a deliberately clean hierarchy, choose the saved setup on **Live Fleet → Danger**, unlock high-impact actions, and choose **Clean rebuild…**. After a second confirmation, Fleet Desk creates or reuses an `Unknown` staging wing/squad, temporarily moves and demotes the live roster there, removes the now-empty old hierarchy, creates the saved hierarchy, places known and ship-rule pilots, restores commander seats, and sends missing invitations. Pilots not covered by an exact assignment or ship rule remain in `Unknown`. This path is destructive and separate from the normal non-deleting saved-setup run.
 
 Optional **Automatic ship placement** policies match one or more comma-separated exact ship names seen in the current live fleet (for example `Hulk, Mackinaw`). Policies run in visible priority order and can use a second overflow squad, balance between both targets, cap each target, or act as the final fallback. Exact character assignments take priority, the fleet boss is ignored, full targets are reported, unmatched characters are untouched, and policies never invite characters or promote commanders. Preview once to load current ship names into the suggestions, or type exact EVE ship types.
 

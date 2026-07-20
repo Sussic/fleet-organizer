@@ -27,6 +27,7 @@ public sealed class EveFleetInvitationServiceTests
             10,
             20,
             "Wing 1 / Squad 1",
+            DesiredFleetRole.SquadMember,
             TwoCharacters);
 
         Assert.True(result.IsComplete);
@@ -54,6 +55,7 @@ public sealed class EveFleetInvitationServiceTests
             10,
             20,
             "Wing 1 / Squad 1",
+            DesiredFleetRole.SquadMember,
             TwoCharacters);
 
         Assert.False(result.IsComplete);
@@ -74,12 +76,58 @@ public sealed class EveFleetInvitationServiceTests
             10,
             20,
             "Wing 1 / Squad 1",
+            DesiredFleetRole.SquadMember,
             TwoCharacters);
 
         Assert.False(result.IsComplete);
         Assert.Equal("First Pilot", Assert.Single(result.Sent).CharacterName);
         Assert.Equal("Second Pilot", Assert.Single(result.Unsent).CharacterName);
         Assert.Equal(2, writer.Targets.Count);
+    }
+
+    [Fact]
+    public async Task MayInviteOneCharacterDirectlyToEmptyWingCommand()
+    {
+        var writer = new StubWriteService();
+        var ready = CreateReadyResult();
+        var snapshot = ready.Snapshot! with
+        {
+            Members = [CreateMember(9001, "squad_member", 10, 20)],
+        };
+        var service = new EveFleetInvitationService(
+            new StubLiveFleetService(ready with { Snapshot = snapshot }),
+            writer);
+
+        var result = await service.InviteAsync(
+            7001,
+            10,
+            -1,
+            "Wing 1 / Wing Command",
+            DesiredFleetRole.WingCommander,
+            [new FleetInvitationCandidate(9002, "First Pilot")]);
+
+        Assert.True(result.IsComplete);
+        Assert.Equal(DesiredFleetRole.WingCommander, Assert.Single(writer.Targets).DesiredRole);
+    }
+
+    [Fact]
+    public async Task CommanderInvitationRejectsAListBeforeWriting()
+    {
+        var writer = new StubWriteService();
+        var service = new EveFleetInvitationService(
+            new StubLiveFleetService(CreateReadyResult()),
+            writer);
+
+        var result = await service.InviteAsync(
+            7001,
+            10,
+            20,
+            "Wing 1 / Squad 1 / Squad Commander",
+            DesiredFleetRole.SquadCommander,
+            TwoCharacters);
+
+        Assert.False(result.IsComplete);
+        Assert.Empty(writer.Targets);
     }
 
     private static LiveFleetLoadResult CreateReadyResult()

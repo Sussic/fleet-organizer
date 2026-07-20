@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.10.0
+
+- Replaced live pilot cards with a dense EVE-style hierarchy: one compact row per pilot, inline ship/role detail, and empty command positions kept visible.
+- Added Windows-style click, Ctrl-click, and Shift-click range selection plus multi-pilot drag and bulk staging.
+- Made staged moves appear in their destination immediately with a visible `MOVED` marker, per-row Undo, and always-nearby Apply/Cancel controls.
+- Added direct one-click invitations to empty wing- and squad-command seats using ESI's role-aware invitation contract.
+- Added commander destinations to the normal move selector instead of requiring a separate role control.
+- Made the saved-setup roster denser and added native extended row selection; optional squad drag targets are compact list rows rather than large cards.
+- Added an explicitly unlocked and reconfirmed clean rebuild: evacuate into `Unknown`, delete the emptied old hierarchy, create the selected saved setup, place known/ship-rule pilots, restore commanders, and retain unmatched pilots safely in `Unknown`.
+
 ## 0.9.1
 
 - Replaced the disabled full Live Fleet workspace with a compact empty state until ESI confirms a usable fleet.

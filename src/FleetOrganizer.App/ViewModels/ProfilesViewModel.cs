@@ -334,6 +334,11 @@ public partial class ProfilesViewModel : ObservableObject, IDisposable
         ? "Unsaved local changes"
         : "All changes saved locally";
 
+    public FleetProfile? GetSelectedProfileSnapshot() =>
+        IsEditorActive && EditingProfileId != Guid.Empty
+            ? BuildCurrentProfile()
+            : null;
+
     public void Dispose()
     {
         preferencesGate.Dispose();
@@ -1250,7 +1255,10 @@ public partial class ProfilesViewModel : ObservableObject, IDisposable
                     out var move)
                         ? assignment with
                         {
-                            TargetSquadId = targetSquadIds[(move.TargetWingId, move.TargetSquadId)],
+                            TargetSquadId = ResolveLiveDeskTargetSquadId(
+                                snapshot,
+                                targetSquadIds,
+                                move),
                             DesiredRole = move.DesiredRole,
                         }
                         : assignment)
@@ -1271,6 +1279,25 @@ public partial class ProfilesViewModel : ObservableObject, IDisposable
             " This run contains only the moves, roles, and invitations staged on Live Fleet. Fleet-boss transfer, kicks, and deletion use their separate high-impact unlock.";
         StatusMessage = "Live Desk preview ready. One final confirmation remains before any ESI write.";
         return true;
+    }
+
+    private static Guid ResolveLiveDeskTargetSquadId(
+        LiveFleetSnapshot snapshot,
+        Dictionary<(long WingId, long SquadId), Guid> targetSquadIds,
+        StagedLiveMoveViewModel move)
+    {
+        if (move.TargetSquadId > 0)
+        {
+            return targetSquadIds[(move.TargetWingId, move.TargetSquadId)];
+        }
+
+        var firstSquad = snapshot.Wings
+            .Single(wing => wing.WingId == move.TargetWingId)
+            .Squads
+            .OrderBy(squad => squad.Name, StringComparer.OrdinalIgnoreCase)
+            .FirstOrDefault() ?? throw new InvalidOperationException(
+                $"{move.TargetName} has no squad that can anchor a saved commander placement.");
+        return targetSquadIds[(move.TargetWingId, firstSquad.SquadId)];
     }
 
     [RelayCommand]
