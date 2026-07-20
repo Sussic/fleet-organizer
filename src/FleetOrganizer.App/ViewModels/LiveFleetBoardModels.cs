@@ -46,15 +46,15 @@ public sealed partial class LiveFleetBoardMemberViewModel(
 
     public bool IsCommander => !string.Equals(Role, "squad_member", StringComparison.Ordinal);
 
-    public string Detail => stagedMove is null
+    public string Detail => StagedMove is null
         ? $"{ShipTypeName} • {RoleName}"
-        : $"{ShipTypeName} • will be {stagedMove.DesiredRoleName}";
+        : $"{ShipTypeName} • will be {StagedMove.DesiredRoleName}";
 
-    public bool IsStaged => stagedMove is not null;
+    public bool IsStaged => StagedMove is not null;
 
-    public string StagedStatus => stagedMove is null
+    public string StagedStatus => StagedMove is null
         ? string.Empty
-        : $"MOVED • from {stagedMove.SourceName}";
+        : $"MOVED • from {StagedMove.SourceName}";
 
     public bool Matches(string search)
     {
