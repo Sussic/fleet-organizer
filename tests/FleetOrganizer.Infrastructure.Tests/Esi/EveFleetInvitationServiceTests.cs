@@ -107,7 +107,9 @@ public sealed class EveFleetInvitationServiceTests
             [new FleetInvitationCandidate(9002, "First Pilot")]);
 
         Assert.True(result.IsComplete);
-        Assert.Equal(DesiredFleetRole.WingCommander, Assert.Single(writer.Targets).DesiredRole);
+        var target = Assert.Single(writer.Targets);
+        Assert.Equal(DesiredFleetRole.WingCommander, target.DesiredRole);
+        Assert.True(target.InviteDirectlyToRole);
     }
 
     [Fact]

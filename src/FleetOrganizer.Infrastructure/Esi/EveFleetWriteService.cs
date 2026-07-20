@@ -78,7 +78,12 @@ internal sealed class EveFleetWriteService(
     {
         ArgumentNullException.ThrowIfNull(target);
 
-        var placement = GetPlacement(target.DesiredRole, target.WingId, target.SquadId);
+        var placement = GetPlacement(
+            target.InviteDirectlyToRole
+                ? target.DesiredRole
+                : DesiredFleetRole.SquadMember,
+            target.WingId,
+            target.SquadId);
         var result = await esiClient.InviteFleetMemberAsync(
             fleetId,
             new InviteFleetMemberRequest(

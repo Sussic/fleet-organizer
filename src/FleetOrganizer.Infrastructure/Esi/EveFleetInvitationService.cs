@@ -100,7 +100,8 @@ internal sealed class EveFleetInvitationService(
                 targetSquad?.Name ?? "Wing Command",
                 targetWingId,
                 targetSquadId,
-                desiredRole);
+                desiredRole,
+                InviteDirectlyToRole: true);
             var result = await writeService
                 .InviteAsync(expectedFleetId, target, cancellationToken)
                 .ConfigureAwait(false);

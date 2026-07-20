@@ -48,7 +48,8 @@ public sealed record FleetOperationTarget(
     long WingId,
     long SquadId,
     DesiredFleetRole DesiredRole,
-    string? PreviousName = null);
+    string? PreviousName = null,
+    bool InviteDirectlyToRole = false);
 
 public sealed record FleetOperationStep(
     string StepKey,
