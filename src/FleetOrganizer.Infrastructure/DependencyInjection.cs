@@ -54,6 +54,7 @@ public static class DependencyInjection
         services.AddSingleton<IFleetOperationRepository, FleetOperationRepository>();
         services.AddSingleton<IFleetOperationService, FleetOperationService>();
         services.AddSingleton<IDiagnosticExportService, DiagnosticExportService>();
+        services.AddSingleton<IWorkflowDiagnosticLog, WorkflowDiagnosticLog>();
         services.AddSingleton<ILocalDataService, LocalDataService>();
         services.AddSingleton<IUpdateCheckService, GitHubUpdateCheckService>();
         services.AddSingleton<SqliteDatabaseInitializer>();

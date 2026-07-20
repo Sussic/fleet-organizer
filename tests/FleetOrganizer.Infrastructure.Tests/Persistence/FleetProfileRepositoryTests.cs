@@ -93,6 +93,25 @@ public sealed class FleetProfileRepositoryTests : IDisposable
         Assert.Empty(await repository.LoadAllAsync(CancellationToken.None));
     }
 
+    [Fact]
+    public async Task InternalOperationProfilesStayOutOfSavedSetupLists()
+    {
+        var paths = new TestAppDataPaths(testRoot);
+        var initializer = new SqliteDatabaseInitializer(
+            paths,
+            NullLogger<SqliteDatabaseInitializer>.Instance);
+        await initializer.InitializeAsync(CancellationToken.None);
+        var repository = new FleetProfileRepository(paths, TimeProvider.System);
+        var internalProfile = FleetProfile.Create("Live Desk operation");
+        var visibleProfile = FleetProfile.Create("Visible setup");
+
+        await repository.SaveInternalAsync(internalProfile, CancellationToken.None);
+        await repository.SaveAsync(visibleProfile, CancellationToken.None);
+
+        var loaded = Assert.Single(await repository.LoadAllAsync(CancellationToken.None));
+        Assert.Equal(visibleProfile.Id, loaded.Id);
+    }
+
     public void Dispose()
     {
         SqliteConnection.ClearAllPools();

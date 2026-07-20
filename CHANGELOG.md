@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.11.0
+
+- Removed the unreachable Home and legacy Live Fleet implementations and their dead commands/properties.
+- Replaced the nested live-board controls with a flat recycling hierarchy so large fleets create only visible rows.
+- Added queued wing/squad creation and renaming to Live Fleet; structure edits and pilot moves share one Apply confirmation.
+- Kept durable ad-hoc operation profiles internal so live changes no longer create, select, or overwrite visible saved setups.
+- Added page-aware Ctrl+Enter, Ctrl+K, Ctrl+Z, F5, and Escape behavior plus automation names on the live hierarchy and structure editor.
+- Extracted live profile composition and board projection into focused components with executable regression tests.
+- Added database schema 5 for internal operation profiles and migration/visibility coverage.
+- Added redacted structured local diagnostics for handled refresh, invitation, Apply, administration, and rebuild failures.
+- Standardized current user-facing product copy on Fleet Desk while preserving assembly and data-path compatibility.
+
 ## 0.10.1
 
 - Separated invite destinations from move destinations so a pasted list can only be invited as ordinary squad members.

@@ -223,3 +223,106 @@ public sealed record StagedLiveInviteViewModel(
         _ => "Squad Member",
     };
 }
+
+public enum LiveFleetBoardRowKind
+{
+    Wing,
+    Squad,
+    Member,
+}
+
+public sealed record LiveFleetBoardRowViewModel(
+    LiveFleetBoardRowKind Kind,
+    LiveFleetBoardWingViewModel? Wing,
+    LiveFleetBoardSquadViewModel? Squad,
+    LiveFleetBoardMemberViewModel? Member)
+{
+    public bool IsWing => Kind == LiveFleetBoardRowKind.Wing;
+
+    public bool IsSquad => Kind == LiveFleetBoardRowKind.Squad;
+
+    public bool IsMember => Kind == LiveFleetBoardRowKind.Member;
+
+    public static LiveFleetBoardRowViewModel ForWing(LiveFleetBoardWingViewModel wing) =>
+        new(LiveFleetBoardRowKind.Wing, wing, null, null);
+
+    public static LiveFleetBoardRowViewModel ForSquad(LiveFleetBoardSquadViewModel squad) =>
+        new(LiveFleetBoardRowKind.Squad, null, squad, null);
+
+    public static LiveFleetBoardRowViewModel ForMember(
+        LiveFleetBoardSquadViewModel squad,
+        LiveFleetBoardMemberViewModel member) =>
+        new(LiveFleetBoardRowKind.Member, null, squad, member);
+}
+
+public sealed record LiveFleetWingTargetViewModel(long WingId, string Name)
+{
+    public override string ToString() => Name;
+}
+
+public enum LiveFleetStructureKind
+{
+    Wing,
+    Squad,
+}
+
+public sealed record LiveFleetStructureTargetViewModel(
+    LiveFleetStructureKind Kind,
+    long WingId,
+    long SquadId,
+    string WingName,
+    string Name)
+{
+    public string DisplayName => Kind == LiveFleetStructureKind.Wing
+        ? $"Wing • {Name}"
+        : $"Squad • {WingName} / {Name}";
+}
+
+public enum StagedLiveStructureChangeKind
+{
+    AddWing,
+    AddSquad,
+    RenameWing,
+    RenameSquad,
+}
+
+public sealed record StagedLiveStructureChangeViewModel(
+    Guid Id,
+    StagedLiveStructureChangeKind Kind,
+    long WingId,
+    long SquadId,
+    string WingName,
+    string CurrentName,
+    string NewName)
+{
+    public string Summary => Kind switch
+    {
+        StagedLiveStructureChangeKind.AddWing => $"Create wing ‘{NewName}’",
+        StagedLiveStructureChangeKind.AddSquad => $"Create squad ‘{NewName}’ under {WingName}",
+        StagedLiveStructureChangeKind.RenameWing => $"Rename wing {CurrentName} → {NewName}",
+        _ => $"Rename squad {WingName} / {CurrentName} → {NewName}",
+    };
+}
+
+public static class LiveFleetBoardProjection
+{
+    public static LiveFleetBoardRowViewModel[] Flatten(
+        IEnumerable<LiveFleetBoardWingViewModel> wings)
+    {
+        ArgumentNullException.ThrowIfNull(wings);
+        var rows = new List<LiveFleetBoardRowViewModel>();
+        foreach (var wing in wings.Where(candidate => candidate.IsVisible))
+        {
+            rows.Add(LiveFleetBoardRowViewModel.ForWing(wing));
+            foreach (var squad in wing.Squads.Where(candidate => candidate.IsVisible))
+            {
+                rows.Add(LiveFleetBoardRowViewModel.ForSquad(squad));
+                rows.AddRange(squad.Members
+                    .Where(member => member.IsVisible)
+                    .Select(member => LiveFleetBoardRowViewModel.ForMember(squad, member)));
+            }
+        }
+
+        return rows.ToArray();
+    }
+}

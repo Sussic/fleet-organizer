@@ -31,6 +31,7 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
     private readonly IFleetAdministrationService fleetAdministrationService;
     private readonly IFleetRebuildService fleetRebuildService;
     private readonly IDiagnosticExportService diagnosticExportService;
+    private readonly IWorkflowDiagnosticLog workflowDiagnosticLog;
     private readonly ILocalDataService localDataService;
     private readonly IUpdateCheckService updateCheckService;
     private readonly string applicationVersion;
@@ -57,6 +58,21 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
     public partial LiveFleetSquadTargetViewModel? SelectedInviteTarget { get; set; }
 
     [ObservableProperty]
+    public partial string NewLiveWingName { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial string NewLiveSquadName { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial LiveFleetWingTargetViewModel? SelectedStructureWing { get; set; }
+
+    [ObservableProperty]
+    public partial LiveFleetStructureTargetViewModel? SelectedStructureRenameTarget { get; set; }
+
+    [ObservableProperty]
+    public partial string LiveStructureRenameText { get; set; } = string.Empty;
+
+    [ObservableProperty]
     public partial int SelectedLiveActionTabIndex { get; set; }
 
     [ObservableProperty]
@@ -80,18 +96,13 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
     public partial bool HasFleetSettingsChanges { get; set; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(StatusTitle))]
-    [NotifyPropertyChangedFor(nameof(StatusDetail))]
     [NotifyPropertyChangedFor(nameof(SignedInCharacter))]
-    [NotifyPropertyChangedFor(nameof(FcReadinessSummary))]
     [NotifyCanExecuteChangedFor(nameof(SignInCommand))]
     [NotifyCanExecuteChangedFor(nameof(SignOutCommand))]
     [NotifyCanExecuteChangedFor(nameof(RefreshFleetCommand))]
     public partial bool IsAuthenticated { get; set; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(StatusTitle))]
-    [NotifyPropertyChangedFor(nameof(StatusDetail))]
     [NotifyCanExecuteChangedFor(nameof(SignInCommand))]
     [NotifyCanExecuteChangedFor(nameof(SignOutCommand))]
     [NotifyCanExecuteChangedFor(nameof(RefreshFleetCommand))]
@@ -126,7 +137,6 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasDetectedFleet))]
-    [NotifyPropertyChangedFor(nameof(FcReadinessSummary))]
     public partial long? DetectedFleetId { get; set; }
 
     [ObservableProperty]
@@ -185,9 +195,17 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
 
     public ObservableCollection<LiveFleetBoardWingViewModel> FleetBoardWings { get; } = [];
 
+    public ObservableCollection<LiveFleetBoardRowViewModel> FleetBoardRows { get; } = [];
+
     public ObservableCollection<StagedLiveMoveViewModel> StagedLiveMoves { get; } = [];
 
     public ObservableCollection<StagedLiveInviteViewModel> StagedLiveInvites { get; } = [];
+
+    public ObservableCollection<StagedLiveStructureChangeViewModel> StagedLiveStructureChanges { get; } = [];
+
+    public ObservableCollection<LiveFleetWingTargetViewModel> LiveStructureWings { get; } = [];
+
+    public ObservableCollection<LiveFleetStructureTargetViewModel> LiveStructureTargets { get; } = [];
 
     public ObservableCollection<LiveFleetSquadTargetViewModel> LiveFleetSquadTargets { get; } = [];
 
@@ -199,9 +217,11 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
 
     public bool HasStagedLiveInvites => StagedLiveInvites.Count > 0;
 
-    public bool HasPendingLiveChanges => HasStagedLiveMoves;
+    public bool HasStagedLiveStructureChanges => StagedLiveStructureChanges.Count > 0;
 
-    public int PendingLiveChangeCount => StagedLiveMoves.Count;
+    public bool HasPendingLiveChanges => HasStagedLiveMoves || HasStagedLiveStructureChanges;
+
+    public int PendingLiveChangeCount => StagedLiveMoves.Count + StagedLiveStructureChanges.Count;
 
     public string StagedLiveMovesSummary => HasStagedLiveMoves
         ? $"{StagedLiveMoves.Count} pending move{(StagedLiveMoves.Count == 1 ? string.Empty : "s")} — no ESI write yet"
@@ -209,7 +229,7 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
 
     public string PendingLiveChangesSummary => HasPendingLiveChanges
         ? $"{PendingLiveChangeCount} queued fleet change{(PendingLiveChangeCount == 1 ? string.Empty : "s")} • nothing sent yet"
-        : "No queued moves or role changes.";
+        : "No queued moves, role changes, or structure edits.";
 
     public string ApplyPendingLiveChangesText => IsFleetBusy
         ? "Fleet check in progress…"
@@ -271,6 +291,7 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         IFleetAdministrationService fleetAdministrationService,
         IFleetRebuildService fleetRebuildService,
         IDiagnosticExportService diagnosticExportService,
+        IWorkflowDiagnosticLog workflowDiagnosticLog,
         ILocalDataService localDataService,
         IUpdateCheckService updateCheckService,
         ProfilesViewModel profiles)
@@ -286,6 +307,7 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         this.fleetAdministrationService = fleetAdministrationService;
         this.fleetRebuildService = fleetRebuildService;
         this.diagnosticExportService = diagnosticExportService;
+        this.workflowDiagnosticLog = workflowDiagnosticLog;
         this.localDataService = localDataService;
         this.updateCheckService = updateCheckService;
         applicationVersion =
@@ -327,56 +349,9 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
 
     public bool HasDetectedFleet => DetectedFleetId.HasValue;
 
-    public string FcReadinessSummary =>
-        $"{(IsAuthenticated ? "✓ EVE sign-in" : "○ Sign in")}" +
-        $"  •  {(HasDetectedFleet ? "✓ Fleet detected" : "○ Open fleet")}" +
-        $"  •  {(Profiles.SelectedProfile is null ? "○ Choose template" : $"✓ {Profiles.SelectedProfile.Name}")}" +
-        $"  •  {Profiles.RunModeOptions.Single(option => option.Value == Profiles.SelectedRunMode).DisplayName}";
-
     public string RedirectUri => developerOptions.RedirectUri;
 
     public string RequiredScopes => requiredScopes;
-
-    public string StatusTitle
-    {
-        get
-        {
-            if (!developerOptions.IsClientIdConfigured)
-            {
-                return "Complete the EVE developer setup";
-            }
-
-            if (IsAuthenticationBusy)
-            {
-                return "Connecting securely to EVE SSO";
-            }
-
-            return IsAuthenticated
-                ? $"Signed in as {AuthenticatedCharacterName}"
-                : "Ready to sign in with EVE";
-        }
-    }
-
-    public string StatusDetail
-    {
-        get
-        {
-            if (!developerOptions.IsClientIdConfigured)
-            {
-                return "Paste only the public client ID into appsettings.Local.json. " +
-                    "The desktop app never uses or stores the developer secret.";
-            }
-
-            if (IsAuthenticationBusy)
-            {
-                return "Complete the authorization in your browser. Fleet Organizer validates the callback, token signature, application audience, and fleet scopes.";
-            }
-
-            return IsAuthenticated
-                ? "Authorization is encrypted for this Windows user. Live Fleet can stage and run reviewed ESI changes; high-impact actions require an explicit unlock and confirmation."
-                : "Open Settings and choose Sign in with EVE. Authorize the character that will be fleet boss.";
-        }
-    }
 
     public string DatabasePath => paths.DatabasePath;
 
@@ -499,6 +474,96 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         }
     }
 
+    [RelayCommand]
+    private async Task RunPagePrimaryActionAsync()
+    {
+        if (string.Equals(SelectedPage, "Live Fleet", StringComparison.Ordinal))
+        {
+            if (HasPendingLiveChanges)
+            {
+                await ApplyPendingLiveChangesAsync();
+            }
+            else if (!string.IsNullOrWhiteSpace(LiveInviteText))
+            {
+                await InviteNowAsync();
+            }
+            else
+            {
+                LiveCommandStatus = "Select pilots to move, paste invitation names, or queue a hierarchy edit first.";
+            }
+
+            return;
+        }
+
+        if (string.Equals(SelectedPage, "Profiles", StringComparison.Ordinal) &&
+            Profiles.CanPrepareFleet)
+        {
+            await Profiles.PrepareFleetCommand.ExecuteAsync(null);
+            return;
+        }
+
+        if (string.Equals(SelectedPage, "Activity", StringComparison.Ordinal) && Profiles.CanOperate)
+        {
+            await Profiles.ContinueOperationCommand.ExecuteAsync(null);
+        }
+    }
+
+    [RelayCommand]
+    private async Task RefreshPageAsync()
+    {
+        if (string.Equals(SelectedPage, "Live Fleet", StringComparison.Ordinal))
+        {
+            await RefreshFleetAsync();
+        }
+    }
+
+    [RelayCommand]
+    private void CancelPageAction()
+    {
+        if (string.Equals(SelectedPage, "Live Fleet", StringComparison.Ordinal))
+        {
+            if (!string.IsNullOrWhiteSpace(LiveFleetSearchText))
+            {
+                LiveFleetSearchText = string.Empty;
+            }
+            else
+            {
+                ClearLiveMemberSelection();
+            }
+
+            return;
+        }
+
+        Profiles.HideDryRunCommand.Execute(null);
+    }
+
+    [RelayCommand]
+    private void UndoPageAction()
+    {
+        if (!string.Equals(SelectedPage, "Live Fleet", StringComparison.Ordinal))
+        {
+            Profiles.HideDryRunCommand.Execute(null);
+            return;
+        }
+
+        if (StagedLiveStructureChanges.Count > 0)
+        {
+            var change = StagedLiveStructureChanges[StagedLiveStructureChanges.Count - 1];
+            StagedLiveStructureChanges.RemoveAt(StagedLiveStructureChanges.Count - 1);
+            LiveCommandStatus = $"Undid: {change.Summary}.";
+            RefreshPendingLiveChangeState();
+            return;
+        }
+
+        if (StagedLiveMoves.Count > 0)
+        {
+            var move = StagedLiveMoves[StagedLiveMoves.Count - 1];
+            StagedLiveMoves.RemoveAt(StagedLiveMoves.Count - 1);
+            LiveCommandStatus = $"Undid: {move.Summary}.";
+            RefreshPendingLiveChangeState();
+        }
+    }
+
     [RelayCommand(CanExecute = nameof(CanRefreshFleet))]
     private async Task RefreshFleetAsync()
     {
@@ -517,6 +582,7 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
             IsLiveFleetReady = false;
             LiveFleetStatusTitle = "Live fleet refresh failed";
             LiveFleetStatusDetail = exception.Message;
+            await RecordWorkflowFailureAsync("live-fleet-refresh", exception);
         }
         finally
         {
@@ -649,19 +715,178 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
     private void DismissAttention() => HasAttentionBanner = false;
 
     [RelayCommand]
-    private void ClearStagedLiveMoves()
+    private void ClearPendingLiveChanges()
     {
         StagedLiveMoves.Clear();
+        StagedLiveStructureChanges.Clear();
+        Profiles.HideDryRunCommand.Execute(null);
+        LiveCommandStatus = "Queued fleet changes cleared. Sent invitations are still being tracked.";
+        LiveApplyFeedback = string.Empty;
         RefreshPendingLiveChangeState();
     }
 
     [RelayCommand]
-    private void ClearPendingLiveChanges()
+    private void QueueLiveWing()
     {
-        StagedLiveMoves.Clear();
-        Profiles.HideDryRunCommand.Execute(null);
-        LiveCommandStatus = "Queued fleet changes cleared. Sent invitations are still being tracked.";
-        LiveApplyFeedback = string.Empty;
+        var name = ValidateLiveStructureName(NewLiveWingName, "wing");
+        if (name is null)
+        {
+            return;
+        }
+
+        if (currentSnapshot is null)
+        {
+            LiveCommandStatus = "Load the live fleet before adding a wing.";
+            return;
+        }
+
+        if (currentSnapshot.Wings.Any(wing => string.Equals(wing.Name, name, StringComparison.OrdinalIgnoreCase)) ||
+            StagedLiveStructureChanges.Any(change =>
+                change.Kind == StagedLiveStructureChangeKind.AddWing &&
+                string.Equals(change.NewName, name, StringComparison.OrdinalIgnoreCase)))
+        {
+            LiveCommandStatus = $"A wing named {name} already exists or is queued.";
+            return;
+        }
+
+        StagedLiveStructureChanges.Add(new StagedLiveStructureChangeViewModel(
+            Guid.NewGuid(),
+            StagedLiveStructureChangeKind.AddWing,
+            0,
+            0,
+            string.Empty,
+            string.Empty,
+            name));
+        NewLiveWingName = string.Empty;
+        FinishQueuedStructureChange($"Queued a new wing named {name}.");
+    }
+
+    [RelayCommand]
+    private void QueueLiveSquad()
+    {
+        var name = ValidateLiveStructureName(NewLiveSquadName, "squad");
+        var targetWing = SelectedStructureWing;
+        if (name is null)
+        {
+            return;
+        }
+
+        if (currentSnapshot is null || targetWing is null)
+        {
+            LiveCommandStatus = "Choose the wing that should receive the new squad.";
+            return;
+        }
+
+        var liveWing = currentSnapshot.Wings.SingleOrDefault(wing => wing.WingId == targetWing.WingId);
+        if (liveWing is null)
+        {
+            LiveCommandStatus = "That wing is no longer in the live fleet. Refresh and try again.";
+            return;
+        }
+
+        if (liveWing.Squads.Any(squad => string.Equals(squad.Name, name, StringComparison.OrdinalIgnoreCase)) ||
+            StagedLiveStructureChanges.Any(change =>
+                change.Kind == StagedLiveStructureChangeKind.AddSquad &&
+                change.WingId == targetWing.WingId &&
+                string.Equals(change.NewName, name, StringComparison.OrdinalIgnoreCase)))
+        {
+            LiveCommandStatus = $"{targetWing.Name} already has, or will have, a squad named {name}.";
+            return;
+        }
+
+        StagedLiveStructureChanges.Add(new StagedLiveStructureChangeViewModel(
+            Guid.NewGuid(),
+            StagedLiveStructureChangeKind.AddSquad,
+            targetWing.WingId,
+            0,
+            targetWing.Name,
+            string.Empty,
+            name));
+        NewLiveSquadName = string.Empty;
+        FinishQueuedStructureChange($"Queued {targetWing.Name} / {name}.");
+    }
+
+    [RelayCommand]
+    private void QueueLiveStructureRename()
+    {
+        var target = SelectedStructureRenameTarget;
+        var name = ValidateLiveStructureName(LiveStructureRenameText, "structure item");
+        if (target is null || name is null)
+        {
+            if (target is null)
+            {
+                LiveCommandStatus = "Choose the wing or squad to rename.";
+            }
+
+            return;
+        }
+
+        if (string.Equals(target.Name, name, StringComparison.Ordinal))
+        {
+            LiveCommandStatus = $"{target.Name} already has that exact name.";
+            return;
+        }
+
+        var kind = target.Kind == LiveFleetStructureKind.Wing
+            ? StagedLiveStructureChangeKind.RenameWing
+            : StagedLiveStructureChangeKind.RenameSquad;
+        foreach (var previous in StagedLiveStructureChanges
+            .Where(change => change.Kind == kind &&
+                change.WingId == target.WingId &&
+                change.SquadId == target.SquadId)
+            .ToArray())
+        {
+            StagedLiveStructureChanges.Remove(previous);
+        }
+
+        StagedLiveStructureChanges.Add(new StagedLiveStructureChangeViewModel(
+            Guid.NewGuid(),
+            kind,
+            target.WingId,
+            target.SquadId,
+            target.WingName,
+            target.Name,
+            name));
+        LiveStructureRenameText = string.Empty;
+        FinishQueuedStructureChange($"Queued rename: {target.DisplayName} → {name}.");
+    }
+
+    [RelayCommand]
+    private void RemoveStagedLiveStructureChange(StagedLiveStructureChangeViewModel? change)
+    {
+        if (change is null)
+        {
+            return;
+        }
+
+        StagedLiveStructureChanges.Remove(change);
+        RefreshPendingLiveChangeState();
+        LiveCommandStatus = "Queued structure edit removed.";
+    }
+
+    private string? ValidateLiveStructureName(string? value, string kind)
+    {
+        var name = value?.Trim() ?? string.Empty;
+        if (name.Length == 0)
+        {
+            LiveCommandStatus = $"Enter a {kind} name first.";
+            return null;
+        }
+
+        if (name.Length > ProfileValidator.MaximumHierarchyNameLength)
+        {
+            LiveCommandStatus = $"EVE {kind} names can be at most {ProfileValidator.MaximumHierarchyNameLength} characters.";
+            return null;
+        }
+
+        return name;
+    }
+
+    private void FinishQueuedStructureChange(string message)
+    {
+        SelectedLiveActionTabIndex = 3;
+        LiveCommandStatus = message;
+        LiveApplyFeedback = "Ready to apply with one confirmation. No ESI write has been sent.";
         RefreshPendingLiveChangeState();
     }
 
@@ -758,9 +983,6 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
     }
 
     [RelayCommand]
-    private Task StageLiveInvitesAsync() => InviteNowAsync();
-
-    [RelayCommand]
     private async Task InviteNowAsync()
     {
         var snapshot = currentSnapshot;
@@ -833,30 +1055,11 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         catch (Exception exception)
         {
             LiveCommandStatus = $"Invitations could not be sent: {exception.Message}";
+            await RecordWorkflowFailureAsync("quick-invite", exception);
         }
         finally
         {
             IsFleetBusy = false;
-        }
-    }
-
-    [RelayCommand]
-    private async Task ReviewPendingLiveChangesAsync()
-    {
-        if (currentSnapshot is null || !HasPendingLiveChanges)
-        {
-            LiveCommandStatus = "Stage at least one move, role change, or invitation first.";
-            return;
-        }
-
-        if (await Profiles.PrepareLiveDeskChangesAsync(
-            currentSnapshot,
-            StagedLiveMoves.ToArray(),
-            []))
-        {
-            LiveCommandStatus = Profiles.CanStartReviewedOperation
-                ? "Fleet changes are ready for one confirmation."
-                : Profiles.DryRunBlockingDetails;
         }
     }
 
@@ -884,7 +1087,8 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
             if (!await Profiles.PrepareLiveDeskChangesAsync(
                 currentSnapshot,
                 StagedLiveMoves.ToArray(),
-                []))
+                [],
+                StagedLiveStructureChanges.ToArray()))
             {
                 LiveApplyFeedback = Profiles.StatusMessage;
                 LiveCommandStatus = LiveApplyFeedback;
@@ -908,6 +1112,7 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
             if (await Profiles.StartPreparedOperationAsync())
             {
                 StagedLiveMoves.Clear();
+                StagedLiveStructureChanges.Clear();
                 Profiles.HideDryRunCommand.Execute(null);
                 await RefreshFleetAsync();
             }
@@ -919,6 +1124,7 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         {
             LiveApplyFeedback = $"Fleet changes could not be prepared: {exception.Message}";
             LiveCommandStatus = LiveApplyFeedback;
+            await RecordWorkflowFailureAsync("apply-pending-changes", exception);
         }
         finally
         {
@@ -926,9 +1132,6 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
             RefreshPendingLiveChangeState();
         }
     }
-
-    [RelayCommand]
-    private Task ReviewStagedLiveMovesAsync() => ReviewPendingLiveChangesAsync();
 
     [RelayCommand]
     private async Task PreviewSelectedTemplateAsync()
@@ -1402,6 +1605,7 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         catch (Exception exception)
         {
             LiveCommandStatus = $"Clean rebuild stopped: {exception.Message}";
+            await RecordWorkflowFailureAsync("clean-rebuild", exception);
         }
         finally
         {
@@ -1429,11 +1633,25 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         catch (Exception exception)
         {
             LiveCommandStatus = $"Fleet action failed: {exception.Message}";
+            await RecordWorkflowFailureAsync("fleet-administration", exception);
             return false;
         }
         finally
         {
             IsFleetBusy = false;
+        }
+    }
+
+    private async Task RecordWorkflowFailureAsync(string action, Exception exception)
+    {
+        try
+        {
+            await workflowDiagnosticLog.WriteFailureAsync(action, DetectedFleetId, exception);
+        }
+        catch (Exception loggingException) when (
+            loggingException is IOException or UnauthorizedAccessException)
+        {
+            // Diagnostics must never hide or replace the workflow error already shown to the FC.
         }
     }
 
@@ -1557,13 +1775,6 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
     private void OnProfilesPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         _ = sender;
-        if (e.PropertyName is nameof(ProfilesViewModel.SelectedProfile) or
-            nameof(ProfilesViewModel.SelectedRunMode) or
-            nameof(ProfilesViewModel.HasUnsavedChanges))
-        {
-            OnPropertyChanged(nameof(FcReadinessSummary));
-        }
-
         if (e.PropertyName == nameof(ProfilesViewModel.IsWaitingForInvites))
         {
             secondsUntilAutomaticCheck = Profiles.InvitationCheckSeconds;
@@ -1620,6 +1831,7 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
                 currentSnapshot = null;
                 StagedLiveMoves.Clear();
                 StagedLiveInvites.Clear();
+                StagedLiveStructureChanges.Clear();
                 ClearFleetBoard();
                 LiveFleetSquadTargets.Clear();
                 LiveBulkMoveTargets.Clear();
@@ -1639,6 +1851,7 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
             {
                 StagedLiveMoves.Clear();
                 StagedLiveInvites.Clear();
+                StagedLiveStructureChanges.Clear();
                 HasFleetSettingsChanges = false;
             }
 
@@ -1709,8 +1922,11 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         LiveFleetSquadTargets.Clear();
         LiveBulkMoveTargets.Clear();
         LiveInviteTargets.Clear();
+        LiveStructureWings.Clear();
+        LiveStructureTargets.Clear();
         StagedLiveMoves.Clear();
         StagedLiveInvites.Clear();
+        StagedLiveStructureChanges.Clear();
         currentSnapshot = null;
         DetectedFleetId = null;
         IsLiveFleetReady = false;
@@ -1730,6 +1946,8 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
             .ToHashSet();
         ClearFleetBoard();
         LiveFleetSquadTargets.Clear();
+        LiveStructureWings.Clear();
+        LiveStructureTargets.Clear();
 
         var fleetCommandMembers = CreateBoardMembers(
             snapshot.Members.Where(member =>
@@ -1754,6 +1972,13 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
 
         foreach (var wing in snapshot.Wings)
         {
+            LiveStructureWings.Add(new LiveFleetWingTargetViewModel(wing.WingId, wing.Name));
+            LiveStructureTargets.Add(new LiveFleetStructureTargetViewModel(
+                LiveFleetStructureKind.Wing,
+                wing.WingId,
+                0,
+                wing.Name,
+                wing.Name));
             var squads = new ObservableCollection<LiveFleetBoardSquadViewModel>();
             var wingCommandMembers = CreateBoardMembers(
                 snapshot.Members.Where(member =>
@@ -1779,6 +2004,12 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
 
             foreach (var squad in wing.Squads)
             {
+                LiveStructureTargets.Add(new LiveFleetStructureTargetViewModel(
+                    LiveFleetStructureKind.Squad,
+                    wing.WingId,
+                    squad.SquadId,
+                    wing.Name,
+                    squad.Name));
                 var members = CreateBoardMembers(
                     snapshot.Members.Where(member =>
                     {
@@ -1818,6 +2049,12 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
 
         RefreshLiveBulkMoveTargets();
         RefreshLiveInviteTargets();
+        SelectedStructureWing = LiveStructureWings.FirstOrDefault(candidate =>
+            candidate.WingId == SelectedStructureWing?.WingId) ?? LiveStructureWings.FirstOrDefault();
+        SelectedStructureRenameTarget = LiveStructureTargets.FirstOrDefault(candidate =>
+            candidate.Kind == SelectedStructureRenameTarget?.Kind &&
+            candidate.WingId == SelectedStructureRenameTarget?.WingId &&
+            candidate.SquadId == SelectedStructureRenameTarget?.SquadId) ?? LiveStructureTargets.FirstOrDefault();
         ApplyLiveFleetFilter();
         RefreshLiveSelectionSummary();
     }
@@ -1895,6 +2132,8 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         {
             wing.ApplyFilter(isFiltering);
         }
+
+        RebuildFleetBoardRows();
     }
 
     private ObservableCollection<LiveFleetBoardMemberViewModel> CreateBoardMembers(
@@ -1980,6 +2219,16 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         }
 
         FleetBoardWings.Clear();
+        FleetBoardRows.Clear();
+    }
+
+    private void RebuildFleetBoardRows()
+    {
+        FleetBoardRows.Clear();
+        foreach (var row in LiveFleetBoardProjection.Flatten(FleetBoardWings))
+        {
+            FleetBoardRows.Add(row);
+        }
     }
 
     private void OnLiveFleetMemberPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -2004,6 +2253,7 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
     {
         OnPropertyChanged(nameof(HasStagedLiveMoves));
         OnPropertyChanged(nameof(HasStagedLiveInvites));
+        OnPropertyChanged(nameof(HasStagedLiveStructureChanges));
         OnPropertyChanged(nameof(HasPendingLiveChanges));
         OnPropertyChanged(nameof(PendingLiveChangeCount));
         OnPropertyChanged(nameof(StagedLiveMovesSummary));

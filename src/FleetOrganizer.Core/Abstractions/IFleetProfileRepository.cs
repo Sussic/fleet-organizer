@@ -8,5 +8,7 @@ public interface IFleetProfileRepository
 
     Task SaveAsync(FleetProfile profile, CancellationToken cancellationToken = default);
 
+    Task SaveInternalAsync(FleetProfile profile, CancellationToken cancellationToken = default);
+
     Task DeleteAsync(Guid profileId, CancellationToken cancellationToken = default);
 }

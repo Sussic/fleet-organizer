@@ -19,6 +19,8 @@ namespace FleetOrganizer.App.ViewModels;
 public partial class ProfilesViewModel : ObservableObject, IDisposable
 {
     private static readonly char[] TagSeparators = [',', ';'];
+    private static readonly Guid InternalLiveDeskProfileId =
+        Guid.Parse("8f566259-0c06-4e48-a210-e999b5dd271a");
 
     private readonly IFleetProfileRepository repository;
     private readonly ICharacterNameResolver characterNameResolver;
@@ -658,8 +660,8 @@ public partial class ProfilesViewModel : ObservableObject, IDisposable
             AddExtension = true,
             DefaultExt = ".json",
             FileName = $"{GetSafeFileName(profile.Name)}.fleet-profile.json",
-            Filter = "Fleet Organizer profile (*.json)|*.json|All files (*.*)|*.*",
-            Title = "Export Fleet Organizer profile",
+            Filter = "Fleet Desk setup (*.json)|*.json|All files (*.*)|*.*",
+            Title = "Export Fleet Desk setup",
         };
         if (dialog.ShowDialog() != true)
         {
@@ -691,9 +693,9 @@ public partial class ProfilesViewModel : ObservableObject, IDisposable
         var dialog = new OpenFileDialog
         {
             CheckFileExists = true,
-            Filter = "Fleet Organizer profile (*.json)|*.json|All files (*.*)|*.*",
+            Filter = "Fleet Desk setup (*.json)|*.json|All files (*.*)|*.*",
             Multiselect = false,
-            Title = "Import Fleet Organizer profile",
+            Title = "Import Fleet Desk setup",
         };
         if (dialog.ShowDialog() != true)
         {
@@ -1195,110 +1197,47 @@ public partial class ProfilesViewModel : ObservableObject, IDisposable
     public Task<bool> PrepareStagedMovesAsync(
         LiveFleetSnapshot snapshot,
         StagedLiveMoveViewModel[] stagedMoves) =>
-        PrepareLiveDeskChangesAsync(snapshot, stagedMoves, []);
+        PrepareLiveDeskChangesAsync(snapshot, stagedMoves, [], []);
 
     public async Task<bool> PrepareLiveDeskChangesAsync(
         LiveFleetSnapshot snapshot,
         StagedLiveMoveViewModel[] stagedMoves,
-        StagedLiveInviteViewModel[] stagedInvites)
+        StagedLiveInviteViewModel[] stagedInvites,
+        StagedLiveStructureChangeViewModel[] stagedStructureChanges)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
         ArgumentNullException.ThrowIfNull(stagedMoves);
         ArgumentNullException.ThrowIfNull(stagedInvites);
+        ArgumentNullException.ThrowIfNull(stagedStructureChanges);
 
-        if (SelectedProfile is null)
-        {
-            var auditProfile = FleetProfileFactory.FromLiveFleet(
-                snapshot,
-                MakeUniqueProfileName("Live Desk"));
-            await repository.SaveAsync(auditProfile);
-            await ReloadProfilesAsync(auditProfile.Id);
-        }
-
-        if (SelectedProfile is null)
-        {
-            StatusMessage = "Fleet Desk could not create the local audit template required for a durable run.";
-            return false;
-        }
-
-        if (stagedMoves.Length == 0 && stagedInvites.Length == 0)
+        if (stagedMoves.Length == 0 && stagedInvites.Length == 0 && stagedStructureChanges.Length == 0)
         {
             StatusMessage = "Stage at least one live-fleet change first.";
             return false;
         }
 
-        var profile = FleetProfileFactory.FromLiveFleet(snapshot, "Live Desk changes") with
-        {
-            Id = SelectedProfile.Id,
-        };
-        var targetSquadIds = new Dictionary<(long WingId, long SquadId), Guid>();
-        foreach (var (liveWing, profileWing) in snapshot.Wings
-            .Zip(profile.Wings.OrderBy(wing => wing.SortOrder)))
-        {
-            foreach (var (liveSquad, profileSquad) in liveWing.Squads
-                .Zip(profileWing.Squads.OrderBy(squad => squad.SortOrder)))
-            {
-                targetSquadIds[(liveWing.WingId, liveSquad.SquadId)] = profileSquad.Id;
-            }
-        }
-
-        var movesByCharacterId = stagedMoves.ToDictionary(move => move.CharacterId);
-        var invitationAssignments = stagedInvites.Select(invite => new ProfileAssignment(
-            invite.CharacterId,
-            invite.CharacterName,
-            targetSquadIds[(invite.TargetWingId, invite.TargetSquadId)],
-            invite.DesiredRole));
-        profile = profile with
-        {
-            Assignments = profile.Assignments
-                .Select(assignment => movesByCharacterId.TryGetValue(
-                    assignment.CharacterId,
-                    out var move)
-                        ? assignment with
-                        {
-                            TargetSquadId = ResolveLiveDeskTargetSquadId(
-                                snapshot,
-                                targetSquadIds,
-                                move),
-                            DesiredRole = move.DesiredRole,
-                        }
-                        : assignment)
-                .Concat(invitationAssignments)
-                .ToArray(),
-        };
+        var profile = LiveFleetProfileComposer.Compose(
+            InternalLiveDeskProfileId,
+            snapshot,
+            stagedMoves,
+            stagedInvites,
+            stagedStructureChanges);
+        await repository.SaveInternalAsync(profile);
         lastPreparedProfile = profile;
         lastShipRuleMatchCount = 0;
         lastShipRuleCapacitySkipCount = 0;
         var plan = FleetPlanModeFilter.Apply(
             FleetPlanner.Build(profile, snapshot),
-            stagedInvites.Length == 0
+            stagedInvites.Length == 0 && stagedStructureChanges.Length == 0
                 ? FleetRunMode.ApplyLiveChanges
                 : FleetRunMode.FullOrganise);
         ApplyDryRun(plan, snapshot.ConfirmedAtUtc);
-        DryRunTitle = $"{stagedMoves.Length + stagedInvites.Length} staged Live Desk change{(stagedMoves.Length + stagedInvites.Length == 1 ? string.Empty : "s")} • fleet {snapshot.FleetId}";
+        var changeCount = stagedMoves.Length + stagedInvites.Length + stagedStructureChanges.Length;
+        DryRunTitle = $"{changeCount} staged Live Desk change{(changeCount == 1 ? string.Empty : "s")} • fleet {snapshot.FleetId}";
         DryRunSafetyMessage +=
-            " This run contains only the moves, roles, and invitations staged on Live Fleet. Fleet-boss transfer, kicks, and deletion use their separate high-impact unlock.";
+            " This run contains only the moves, roles, invitations, and hierarchy edits staged on Live Fleet. Fleet-boss transfer, kicks, and deletion use their separate high-impact unlock.";
         StatusMessage = "Live Desk preview ready. One final confirmation remains before any ESI write.";
         return true;
-    }
-
-    private static Guid ResolveLiveDeskTargetSquadId(
-        LiveFleetSnapshot snapshot,
-        Dictionary<(long WingId, long SquadId), Guid> targetSquadIds,
-        StagedLiveMoveViewModel move)
-    {
-        if (move.TargetSquadId > 0)
-        {
-            return targetSquadIds[(move.TargetWingId, move.TargetSquadId)];
-        }
-
-        var firstSquad = snapshot.Wings
-            .Single(wing => wing.WingId == move.TargetWingId)
-            .Squads
-            .OrderBy(squad => squad.Name, StringComparer.OrdinalIgnoreCase)
-            .FirstOrDefault() ?? throw new InvalidOperationException(
-                $"{move.TargetName} has no squad that can anchor a saved commander placement.");
-        return targetSquadIds[(move.TargetWingId, firstSquad.SquadId)];
     }
 
     [RelayCommand]
@@ -2476,7 +2415,7 @@ public partial class ProfilesViewModel : ObservableObject, IDisposable
             "The requested layout was confirmed against the live fleet.",
         OperationState.Cancelled =>
             "No more writes will be sent. Writes already accepted by EVE were left in place.",
-        _ => "Fleet Organizer will perform one guarded step at a time.",
+        _ => "Fleet Desk will perform one guarded step at a time.",
     };
 
     private static string HumanizeOperationState(OperationState state) => state switch

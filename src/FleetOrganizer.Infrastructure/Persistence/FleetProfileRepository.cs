@@ -36,9 +36,20 @@ internal sealed class FleetProfileRepository(
             .ToArray();
     }
 
-    public async Task SaveAsync(
+    public Task SaveAsync(
         FleetProfile profile,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        SaveCoreAsync(profile, isInternal: false, cancellationToken);
+
+    public Task SaveInternalAsync(
+        FleetProfile profile,
+        CancellationToken cancellationToken = default) =>
+        SaveCoreAsync(profile, isInternal: true, cancellationToken);
+
+    private async Task SaveCoreAsync(
+        FleetProfile profile,
+        bool isInternal,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(profile);
 
@@ -56,7 +67,7 @@ internal sealed class FleetProfileRepository(
             .ConfigureAwait(false);
 
         var nowText = timeProvider.GetUtcNow().ToString("O", CultureInfo.InvariantCulture);
-        await UpsertProfileAsync(connection, transaction, profile, nowText, cancellationToken)
+        await UpsertProfileAsync(connection, transaction, profile, isInternal, nowText, cancellationToken)
             .ConfigureAwait(false);
         await DeleteProfileContentsAsync(connection, transaction, profile.Id, cancellationToken)
             .ConfigureAwait(false);
@@ -126,7 +137,7 @@ internal sealed class FleetProfileRepository(
         var profiles = new List<ProfileBuilder>();
         await using var command = connection.CreateCommand();
         command.CommandText =
-            "SELECT id, name FROM fleet_profiles ORDER BY name COLLATE NOCASE;";
+            "SELECT id, name FROM fleet_profiles WHERE is_internal = 0 ORDER BY name COLLATE NOCASE;";
         await using var reader = await command
             .ExecuteReaderAsync(cancellationToken)
             .ConfigureAwait(false);
@@ -256,6 +267,7 @@ internal sealed class FleetProfileRepository(
         SqliteConnection connection,
         SqliteTransaction transaction,
         FleetProfile profile,
+        bool isInternal,
         string nowText,
         CancellationToken cancellationToken)
     {
@@ -263,16 +275,18 @@ internal sealed class FleetProfileRepository(
         command.Transaction = transaction;
         command.CommandText =
             """
-            INSERT INTO fleet_profiles (id, name, schema_version, created_utc, updated_utc)
-            VALUES ($id, $name, 1, $now, $now)
+            INSERT INTO fleet_profiles (id, name, schema_version, created_utc, updated_utc, is_internal)
+            VALUES ($id, $name, 1, $now, $now, $isInternal)
             ON CONFLICT(id) DO UPDATE SET
                 name = excluded.name,
                 schema_version = excluded.schema_version,
-                updated_utc = excluded.updated_utc;
+                updated_utc = excluded.updated_utc,
+                is_internal = excluded.is_internal;
             """;
         command.Parameters.AddWithValue("$id", profile.Id.ToString("D"));
         command.Parameters.AddWithValue("$name", profile.Name.Trim());
         command.Parameters.AddWithValue("$now", nowText);
+        command.Parameters.AddWithValue("$isInternal", isInternal ? 1 : 0);
         await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
     }
 

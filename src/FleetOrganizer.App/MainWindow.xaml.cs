@@ -225,7 +225,10 @@ public sealed partial class MainWindow : Window, IDisposable
     {
         if (sender is FrameworkElement
             {
-                DataContext: LiveFleetBoardMemberViewModel { CanStage: true } member,
+                DataContext: LiveFleetBoardRowViewModel
+                {
+                    Member: LiveFleetBoardMemberViewModel { CanStage: true } member,
+                },
             })
         {
             var modifiers = Keyboard.Modifiers;
@@ -243,7 +246,10 @@ public sealed partial class MainWindow : Window, IDisposable
         if (e.LeftButton != MouseButtonState.Pressed ||
             sender is not FrameworkElement
             {
-                DataContext: LiveFleetBoardMemberViewModel { CanStage: true } member,
+                DataContext: LiveFleetBoardRowViewModel
+                {
+                    Member: LiveFleetBoardMemberViewModel { CanStage: true } member,
+                },
             } element)
         {
             return;
@@ -264,7 +270,10 @@ public sealed partial class MainWindow : Window, IDisposable
     {
         e.Effects = sender is FrameworkElement
             {
-                DataContext: LiveFleetBoardSquadViewModel { CanAcceptDrop: true },
+                DataContext: LiveFleetBoardRowViewModel
+                {
+                    Squad: LiveFleetBoardSquadViewModel { CanAcceptDrop: true },
+                },
             } &&
             e.Data.GetDataPresent(LiveMemberDragFormat)
                 ? DragDropEffects.Move
@@ -276,7 +285,10 @@ public sealed partial class MainWindow : Window, IDisposable
     {
         if (sender is FrameworkElement
             {
-                DataContext: LiveFleetBoardSquadViewModel { CanAcceptDrop: true } squad,
+                DataContext: LiveFleetBoardRowViewModel
+                {
+                    Squad: LiveFleetBoardSquadViewModel { CanAcceptDrop: true } squad,
+                },
             } &&
             e.Data.GetData(LiveMemberDragFormat) is long characterId)
         {
@@ -288,6 +300,17 @@ public sealed partial class MainWindow : Window, IDisposable
         }
 
         e.Handled = true;
+    }
+
+    private void OnFindCommandExecuted(object sender, ExecutedRoutedEventArgs e)
+    {
+        _ = sender;
+        if (string.Equals(viewModel.SelectedPage, "Live Fleet", StringComparison.Ordinal))
+        {
+            LiveFleetSearchBox.Focus();
+            LiveFleetSearchBox.SelectAll();
+            e.Handled = true;
+        }
     }
 
     private static T? FindAncestor<T>(DependencyObject? source)

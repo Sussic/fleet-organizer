@@ -26,7 +26,7 @@ public sealed class MainWindowXamlTests
     {
         var xaml = ReadMainWindowXaml();
 
-        Assert.Contains("Preview fleet changes", xaml, StringComparison.Ordinal);
+        Assert.Contains("Preview template against fleet", xaml, StringComparison.Ordinal);
         Assert.Contains("Profiles.RunPrimaryActionText", xaml, StringComparison.Ordinal);
         Assert.Contains("Content=\"Check now\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Value=\"Activity\"", xaml, StringComparison.Ordinal);
@@ -107,6 +107,9 @@ public sealed class MainWindowXamlTests
         Assert.Contains("Content=\"Move (staged)\"", xaml, StringComparison.Ordinal);
         Assert.Contains("CancelStagedLiveMemberCommand", xaml, StringComparison.Ordinal);
         Assert.Contains("SelectionMode=\"Extended\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("ItemsSource=\"{Binding FleetBoardRows}\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Header=\"Structure\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("QueueLiveStructureRenameCommand", xaml, StringComparison.Ordinal);
         Assert.Contains("CleanRebuildFleetCommand", xaml, StringComparison.Ordinal);
         Assert.Contains("Header=\"Invite\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Header=\"Saved setup\"", xaml, StringComparison.Ordinal);
@@ -119,6 +122,8 @@ public sealed class MainWindowXamlTests
         Assert.Contains("KickSelectedLiveMembersCommand", xaml, StringComparison.Ordinal);
         Assert.Contains("TransferFleetBossToSelectedCommand", xaml, StringComparison.Ordinal);
         Assert.Contains("ApplyFleetSettingsCommand", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("Legacy Live Fleet", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("Value=\"Home\"", xaml, StringComparison.Ordinal);
     }
 
     [Fact]

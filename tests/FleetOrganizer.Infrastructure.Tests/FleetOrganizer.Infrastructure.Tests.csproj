@@ -7,6 +7,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\FleetOrganizer.Core\FleetOrganizer.Core.csproj" />
     <ProjectReference Include="..\..\src\FleetOrganizer.Infrastructure\FleetOrganizer.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\FleetOrganizer.App\FleetOrganizer.App.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
