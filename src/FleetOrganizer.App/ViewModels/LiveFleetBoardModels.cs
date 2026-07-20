@@ -77,6 +77,7 @@ public sealed partial class LiveFleetBoardSquadViewModel(
     long squadId,
     string wingName,
     string name,
+    bool isLiveEmpty,
     ObservableCollection<LiveFleetBoardMemberViewModel> members) : ObservableObject
 {
     public long WingId { get; } = wingId;
@@ -88,6 +89,8 @@ public sealed partial class LiveFleetBoardSquadViewModel(
     public string Name { get; } = name;
 
     public ObservableCollection<LiveFleetBoardMemberViewModel> Members { get; } = members;
+
+    public bool IsLiveEmpty { get; } = isLiveEmpty;
 
     [ObservableProperty]
     public partial bool IsVisible { get; set; } = true;
@@ -119,6 +122,7 @@ public sealed partial class LiveFleetBoardSquadViewModel(
 public sealed partial class LiveFleetBoardWingViewModel(
     long wingId,
     string name,
+    bool isLiveEmpty,
     ObservableCollection<LiveFleetBoardSquadViewModel> squads) : ObservableObject
 {
     public long WingId { get; } = wingId;
@@ -126,6 +130,8 @@ public sealed partial class LiveFleetBoardWingViewModel(
     public string Name { get; } = name;
 
     public ObservableCollection<LiveFleetBoardSquadViewModel> Squads { get; } = squads;
+
+    public bool IsLiveEmpty { get; } = isLiveEmpty;
 
     [ObservableProperty]
     public partial bool IsVisible { get; set; } = true;
@@ -153,8 +159,8 @@ public sealed record LiveFleetSquadTargetViewModel(
     string DisplayName,
     DesiredFleetRole DesiredRole)
 {
-    public bool IsCommandSeat => DesiredRole is
-        DesiredFleetRole.WingCommander or DesiredFleetRole.SquadCommander;
+    public bool IsCommandSeat => FleetOrganizer.Core.Fleets.FleetCommandSeatRules
+        .IsCommandSeat(DesiredRole);
 }
 
 public sealed record StagedLiveMoveViewModel(

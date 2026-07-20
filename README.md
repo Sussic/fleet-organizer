@@ -2,7 +2,9 @@
 
 Fleet Organizer is a local Windows 11 utility for repeatedly creating the same useful EVE Online fleet layout. It is designed for one player managing their own fleets and alts.
 
-This repository contains the **Fleet Desk 0.10.0 FC workflow** on top of the guarded fleet engine. Live Fleet is the primary compact command workspace: filter a dense EVE-style hierarchy, select pilots with normal click/Ctrl-click/Shift-click behaviour, stage their destination visually, invite directly into squads or empty command seats, or apply a saved setup and its ship policies without page hopping. Normal moves use one queue and one confirmation. Kick, hierarchy deletion, fleet-boss transfer, and clean rebuild are separately unlocked, freshly revalidated, and confirmed again before they write.
+The current implementation review and prioritized engineering debt are recorded in [docs/codebase-audit.md](docs/codebase-audit.md).
+
+This repository contains the **Fleet Desk 0.10.1 FC workflow** on top of the guarded fleet engine. Live Fleet is the primary compact command workspace: filter a dense EVE-style hierarchy, select pilots with normal click/Ctrl-click/Shift-click behaviour, stage their destination visually, invite directly into squads or empty command seats, or apply a saved setup and its ship policies without page hopping. Normal moves use one queue and one confirmation. Invite destinations prevent invalid multi-pilot commander batches before the click. Kick, hierarchy deletion, fleet-boss transfer, and clean rebuild are separately unlocked, freshly revalidated, and confirmed again before they write.
 
 ## Requirements
 

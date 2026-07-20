@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.10.1
+
+- Separated invite destinations from move destinations so a pasted list can only be invited as ordinary squad members.
+- Show empty wing- and squad-command seats only when exactly one character name is entered.
+- Hide command seats that are already occupied or reserved by a staged move or tracked invitation, with an inline explanation of the current rule.
+- Hide commander destinations from bulk moves and reject any stale multi-pilot command-seat request before planning.
+- Refuse to stage a second pilot into an occupied or reserved command seat; stage the existing commander out first to make an intentional replacement.
+- Centralized the one-pilot commander-seat rule in Core and covered both wing and squad roles with unit tests.
+- Decoupled routine Live Fleet execution eligibility from unrelated Saved Setup editor state.
+- Made Apply enter a visible preparing state immediately, disable duplicate clicks, surface blockers beside the button, and catch preparation failures instead of appearing to ignore the click.
+- Explain when a previous durable fleet run must be finished or cancelled before another live change can start.
+- Make Refresh now and scheduled live checks invalidate the ESI fleet cache instead of appearing to refresh while reusing up-to-60-second-old detection data.
+- Refresh the live board immediately after a started move run so cleared staging markers cannot reveal an old in-memory position until the next timer tick.
+- Make setup detect the running app and offer to close it before the build reaches locked DLLs.
+- Base destructive delete availability on actual EVE occupancy, not the staged visual board, so queued moves cannot make a live structure look deletable early.
+
 ## 0.10.0
 
 - Replaced live pilot cards with a dense EVE-style hierarchy: one compact row per pilot, inline ship/role detail, and empty command positions kept visible.

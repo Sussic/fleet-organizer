@@ -26,8 +26,7 @@ internal sealed class EveFleetInvitationService(
             return new(0, [], [], "Add at least one character to invite.");
         }
 
-        if (desiredRole is DesiredFleetRole.WingCommander or DesiredFleetRole.SquadCommander &&
-            characters.Count != 1)
+        if (!FleetCommandSeatRules.AcceptsPilotCount(desiredRole, characters.Count))
         {
             return Failed(characters, "A commander seat accepts exactly one invitation at a time.");
         }

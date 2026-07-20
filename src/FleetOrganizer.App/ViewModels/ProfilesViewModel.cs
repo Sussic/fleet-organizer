@@ -279,7 +279,8 @@ public partial class ProfilesViewModel : ObservableObject, IDisposable
         IsEditorActive && !IsBusy && !HasActiveOperation && !HasUnsavedChanges;
 
     public bool CanStartReviewedOperation =>
-        CanEdit && lastDryRunPlan is { CanExecute: true, TotalChanges: > 0 };
+        !IsBusy && !HasActiveOperation &&
+        lastDryRunPlan is { CanExecute: true, TotalChanges: > 0 };
 
     public bool CanPreviewRestore => HasOperation && OperationIsTerminal && HasRestoreSnapshot && !IsBusy;
 

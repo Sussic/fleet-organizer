@@ -5,6 +5,20 @@ cd /d "%~dp0"
 echo Fleet Organizer - first-time setup
 echo.
 
+tasklist /FI "IMAGENAME eq FleetOrganizer.exe" 2>nul | find /I "FleetOrganizer.exe" >nul
+if not errorlevel 1 (
+  echo Fleet Organizer is currently running and locks the build output.
+  choice /C YN /M "Close it before setup continues"
+  if errorlevel 2 exit /b 1
+  taskkill /IM FleetOrganizer.exe /F >nul 2>nul
+  if errorlevel 1 (
+    echo ERROR: Fleet Organizer could not be closed. Close it manually, then run setup.cmd again.
+    exit /b 1
+  )
+  echo Closed Fleet Organizer.
+  echo.
+)
+
 where dotnet >nul 2>nul
 if errorlevel 1 (
   echo ERROR: The .NET SDK was not found in PATH.

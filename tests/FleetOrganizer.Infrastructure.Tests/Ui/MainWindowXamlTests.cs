@@ -97,7 +97,11 @@ public sealed class MainWindowXamlTests
         Assert.Contains("DragOver=\"OnLiveSquadDragOver\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Drop=\"OnLiveSquadDrop\"", xaml, StringComparison.Ordinal);
         Assert.Contains("ApplyPendingLiveChangesCommand", xaml, StringComparison.Ordinal);
+        Assert.Contains("CanApplyPendingLiveChanges", xaml, StringComparison.Ordinal);
+        Assert.Contains("LiveApplyFeedback", xaml, StringComparison.Ordinal);
         Assert.Contains("InviteNowCommand", xaml, StringComparison.Ordinal);
+        Assert.Contains("ItemsSource=\"{Binding LiveInviteTargets}\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{Binding LiveInviteTargetHint}\"", xaml, StringComparison.Ordinal);
         Assert.Contains("PreviewSelectedTemplateCommand", xaml, StringComparison.Ordinal);
         Assert.Contains("Click • Ctrl-click • Shift-click range", xaml, StringComparison.Ordinal);
         Assert.Contains("Content=\"Move (staged)\"", xaml, StringComparison.Ordinal);
@@ -126,6 +130,7 @@ public sealed class MainWindowXamlTests
         Assert.Contains("SelectAllVisibleLiveMembersCommand", xaml, StringComparison.Ordinal);
         Assert.Contains("ClearLiveFleetFilterCommand", xaml, StringComparison.Ordinal);
         Assert.Contains("LiveFleetSearchSummary", xaml, StringComparison.Ordinal);
+        Assert.Contains("LiveBulkMoveTargets", xaml, StringComparison.Ordinal);
         Assert.Contains("StageSelectedLiveMembersCommand", xaml, StringComparison.Ordinal);
         Assert.DoesNotContain("Content=\"Home\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Profiles.OperationHistory", xaml, StringComparison.Ordinal);
