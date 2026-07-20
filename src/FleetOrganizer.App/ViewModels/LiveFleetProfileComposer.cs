@@ -1,4 +1,5 @@
 using FleetOrganizer.Core.Domain;
+using FleetOrganizer.Core.Fleets;
 using FleetOrganizer.Core.Profiles;
 
 namespace FleetOrganizer.App.ViewModels;
