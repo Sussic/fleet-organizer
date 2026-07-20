@@ -66,8 +66,8 @@ public static class LiveFleetProfileComposer
 
     private static FleetProfile ApplyStructureChanges(
         FleetProfile profile,
-        IReadOnlyDictionary<long, Guid> targetWingIds,
-        IReadOnlyDictionary<(long WingId, long SquadId), Guid> targetSquadIds,
+        Dictionary<long, Guid> targetWingIds,
+        Dictionary<(long WingId, long SquadId), Guid> targetSquadIds,
         IEnumerable<StagedLiveStructureChangeViewModel> changes)
     {
         var wings = profile.Wings.OrderBy(wing => wing.SortOrder).ToList();
@@ -121,7 +121,7 @@ public static class LiveFleetProfileComposer
 
     private static Guid ResolveTargetSquadId(
         LiveFleetSnapshot snapshot,
-        IReadOnlyDictionary<(long WingId, long SquadId), Guid> targetSquadIds,
+        Dictionary<(long WingId, long SquadId), Guid> targetSquadIds,
         StagedLiveMoveViewModel move)
     {
         if (move.TargetSquadId > 0)
