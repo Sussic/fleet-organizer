@@ -2,6 +2,7 @@ using FleetOrganizer.App.ViewModels;
 using FleetOrganizer.Core.Abstractions;
 using FleetOrganizer.Core.Domain;
 using FleetOrganizer.Core.Fleets;
+using FleetOrganizer.Core.Planning;
 
 namespace FleetOrganizer.Infrastructure.Tests.Ui;
 
