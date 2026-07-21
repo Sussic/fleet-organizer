@@ -1,12 +1,19 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
+using System.Media;
+using System.Reflection;
+using System.Windows;
 using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using FleetOrganizer.App.Services;
 using FleetOrganizer.Core.Abstractions;
 using FleetOrganizer.Core.Authentication;
+using FleetOrganizer.Core.Domain;
 using FleetOrganizer.Core.Fleets;
+using FleetOrganizer.Core.Profiles;
 using FleetOrganizer.Infrastructure.Authentication;
 using FleetOrganizer.Infrastructure.Configuration;
 using Microsoft.Extensions.Options;
@@ -19,14 +26,79 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
     private readonly EveDeveloperOptions developerOptions;
     private readonly IEveAuthenticationService authenticationService;
     private readonly ILiveFleetService liveFleetService;
+    private readonly ICharacterNameResolver characterNameResolver;
+    private readonly IFleetInvitationService fleetInvitationService;
+    private readonly IFleetAdministrationService fleetAdministrationService;
+    private readonly IFleetRebuildService fleetRebuildService;
+    private readonly IDiagnosticExportService diagnosticExportService;
+    private readonly IWorkflowDiagnosticLog workflowDiagnosticLog;
+    private readonly ILocalDataService localDataService;
+    private readonly IUpdateCheckService updateCheckService;
+    private readonly IUserInteractionService userInteraction;
+    private readonly IFileDialogService fileDialogs;
+    private readonly string applicationVersion;
     private readonly string requiredScopes;
     private readonly DispatcherTimer fleetRefreshTimer;
 
     private bool isFleetPollingEnabled = true;
+    private int secondsUntilAutomaticCheck = 30;
+    private int secondsUntilFleetRefresh = 30;
+    private LiveFleetSnapshot? currentSnapshot;
+    private bool isApplyingFleetSettings;
+    private readonly LiveFleetPendingChanges pendingLiveChanges = new();
+    private readonly LiveFleetSelectionModel liveSelection = new();
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(StatusTitle))]
-    [NotifyPropertyChangedFor(nameof(StatusDetail))]
+    public partial string LiveFleetSearchText { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial LiveFleetSquadTargetViewModel? SelectedBulkLiveTarget { get; set; }
+
+    [ObservableProperty]
+    public partial string LiveInviteText { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial LiveFleetSquadTargetViewModel? SelectedInviteTarget { get; set; }
+
+    [ObservableProperty]
+    public partial string NewLiveWingName { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial string NewLiveSquadName { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial LiveFleetWingTargetViewModel? SelectedStructureWing { get; set; }
+
+    [ObservableProperty]
+    public partial LiveFleetStructureTargetViewModel? SelectedStructureRenameTarget { get; set; }
+
+    [ObservableProperty]
+    public partial string LiveStructureRenameText { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial int SelectedLiveActionTabIndex { get; set; }
+
+    [ObservableProperty]
+    public partial bool UnlockHighImpactActions { get; set; }
+
+    [ObservableProperty]
+    public partial string LiveCommandStatus { get; set; } =
+        "Paste names and Invite now, or drag pilots to queue fleet changes.";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasLiveApplyFeedback))]
+    public partial string LiveApplyFeedback { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial bool FleetSettingsFreeMove { get; set; }
+
+    [ObservableProperty]
+    public partial string FleetSettingsMotd { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial bool HasFleetSettingsChanges { get; set; }
+
+    [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(SignedInCharacter))]
     [NotifyCanExecuteChangedFor(nameof(SignInCommand))]
     [NotifyCanExecuteChangedFor(nameof(SignOutCommand))]
@@ -34,8 +106,6 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
     public partial bool IsAuthenticated { get; set; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(StatusTitle))]
-    [NotifyPropertyChangedFor(nameof(StatusDetail))]
     [NotifyCanExecuteChangedFor(nameof(SignInCommand))]
     [NotifyCanExecuteChangedFor(nameof(SignOutCommand))]
     [NotifyCanExecuteChangedFor(nameof(RefreshFleetCommand))]
@@ -51,10 +121,13 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(PageSubtitle))]
-    public partial string SelectedPage { get; set; } = "Home";
+    [NotifyPropertyChangedFor(nameof(PageTitle))]
+    public partial string SelectedPage { get; set; } = "Live Fleet";
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(RefreshFleetCommand))]
+    [NotifyPropertyChangedFor(nameof(CanApplyPendingLiveChanges))]
+    [NotifyPropertyChangedFor(nameof(ApplyPendingLiveChangesText))]
     public partial bool IsFleetBusy { get; set; }
 
     [ObservableProperty]
@@ -81,13 +154,152 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     public partial bool IsLiveFleetReady { get; set; }
 
+    [ObservableProperty]
+    public partial string AutomaticCheckCountdownText { get; set; } =
+        "Automatic acceptance check in 30 seconds";
+
+    [ObservableProperty]
+    public partial string LiveFleetRefreshCountdownText { get; set; } =
+        "Automatic fleet check starts when this page is open";
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(ResetLocalDataCommand))]
+    public partial string ResetConfirmationText { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial string MaintenanceStatus { get; set; } =
+        "Support exports are redacted and never include the local database or EVE tokens.";
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(CheckForUpdatesCommand))]
+    public partial bool IsUpdateCheckBusy { get; set; }
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(OpenAvailableUpdateCommand))]
+    public partial string? AvailableUpdateUrl { get; set; }
+
+    [ObservableProperty]
+    public partial bool HasAvailableUpdate { get; set; }
+
+    [ObservableProperty]
+    public partial string UpdateStatus { get; set; } =
+        "Updates are checked only when you ask; Fleet Desk never installs one automatically.";
+
+    [ObservableProperty]
+    public partial bool HasAttentionBanner { get; set; }
+
+    [ObservableProperty]
+    public partial string AttentionBannerText { get; set; } = string.Empty;
+
+    [ObservableProperty]
+    public partial bool AttentionIsUrgent { get; set; }
+
     public ObservableCollection<LiveFleetTreeNodeViewModel> FleetHierarchy { get; } = [];
+
+    public ObservableCollection<LiveFleetBoardWingViewModel> FleetBoardWings { get; } = [];
+
+    public ObservableCollection<LiveFleetBoardRowViewModel> FleetBoardRows { get; } = [];
+
+    public ObservableCollection<StagedLiveMoveViewModel> StagedLiveMoves => pendingLiveChanges.Moves;
+
+    public ObservableCollection<StagedLiveInviteViewModel> StagedLiveInvites => pendingLiveChanges.Invites;
+
+    public ObservableCollection<StagedLiveStructureChangeViewModel> StagedLiveStructureChanges =>
+        pendingLiveChanges.StructureChanges;
+
+    public ObservableCollection<LiveFleetWingTargetViewModel> LiveStructureWings { get; } = [];
+
+    public ObservableCollection<LiveFleetStructureTargetViewModel> LiveStructureTargets { get; } = [];
+
+    public ObservableCollection<LiveFleetSquadTargetViewModel> LiveFleetSquadTargets { get; } = [];
+
+    public ObservableCollection<LiveFleetSquadTargetViewModel> LiveBulkMoveTargets { get; } = [];
+
+    public ObservableCollection<LiveFleetSquadTargetViewModel> LiveInviteTargets { get; } = [];
+
+    public bool HasStagedLiveMoves => StagedLiveMoves.Count > 0;
+
+    public bool HasStagedLiveInvites => StagedLiveInvites.Count > 0;
+
+    public bool HasStagedLiveStructureChanges => StagedLiveStructureChanges.Count > 0;
+
+    public bool HasPendingLiveChanges => pendingLiveChanges.HasQueuedChanges;
+
+    public int PendingLiveChangeCount => pendingLiveChanges.QueuedCount;
+
+    public string StagedLiveMovesSummary => HasStagedLiveMoves
+        ? $"{StagedLiveMoves.Count} pending move{(StagedLiveMoves.Count == 1 ? string.Empty : "s")} — no ESI write yet"
+        : "Drag a member to another squad to stage a move.";
+
+    public string PendingLiveChangesSummary => HasPendingLiveChanges
+        ? $"{PendingLiveChangeCount} queued fleet change{(PendingLiveChangeCount == 1 ? string.Empty : "s")} • nothing sent yet"
+        : "No queued moves, role changes, or structure edits.";
+
+    public string ApplyPendingLiveChangesText => IsFleetBusy
+        ? "Fleet check in progress…"
+        : PendingLiveChangeCount == 1
+            ? "Apply 1 fleet change"
+            : $"Apply {PendingLiveChangeCount} fleet changes";
+
+    public bool CanApplyPendingLiveChanges => HasPendingLiveChanges && !IsFleetBusy;
+
+    public bool HasLiveApplyFeedback => !string.IsNullOrWhiteSpace(LiveApplyFeedback);
+
+    public string SentLiveInvitesSummary => HasStagedLiveInvites
+        ? $"{StagedLiveInvites.Count} invitation{(StagedLiveInvites.Count == 1 ? string.Empty : "s")} sent • waiting for EVE acceptance"
+        : "No invitations are currently being tracked.";
+
+    public string LiveInviteTargetHint
+    {
+        get
+        {
+            var nameCount = RosterPasteParser.Parse(LiveInviteText).Length;
+            return nameCount switch
+            {
+                0 => "Paste one name for an empty command seat, or several names for a squad-member invite.",
+                1 when LiveInviteTargets.Any(target => target.IsCommandSeat) =>
+                    "One pilot: empty wing- and squad-command seats are available.",
+                1 => "One pilot: no command seat is currently empty; choose a squad-member destination.",
+                _ => $"{nameCount} pilots: commander seats are hidden because each seat accepts exactly one pilot.",
+            };
+        }
+    }
+
+    public int LiveFleetSelectedCount => FleetBoardWings
+        .SelectMany(wing => wing.Squads)
+        .SelectMany(squad => squad.Members)
+        .Count(member => member.IsSelected);
+
+    public int LiveFleetVisibleCount => GetBoardMembers().Count(member => member.IsVisible);
+
+    public string LiveFleetSelectionSummary => $"{LiveFleetSelectedCount} selected";
+
+    public string LiveFleetSearchSummary
+    {
+        get
+        {
+            var total = GetBoardMembers().Count();
+            return string.IsNullOrWhiteSpace(LiveFleetSearchText)
+                ? $"Showing all {total} pilot{(total == 1 ? string.Empty : "s")}."
+                : $"Showing {LiveFleetVisibleCount} of {total} pilots.";
+        }
+    }
 
     public MainWindowViewModel(
         IAppDataPaths paths,
         IOptions<EveDeveloperOptions> developerOptions,
         IEveAuthenticationService authenticationService,
         ILiveFleetService liveFleetService,
+        ICharacterNameResolver characterNameResolver,
+        IFleetInvitationService fleetInvitationService,
+        IFleetAdministrationService fleetAdministrationService,
+        IFleetRebuildService fleetRebuildService,
+        IDiagnosticExportService diagnosticExportService,
+        IWorkflowDiagnosticLog workflowDiagnosticLog,
+        ILocalDataService localDataService,
+        IUpdateCheckService updateCheckService,
+        IUserInteractionService userInteraction,
+        IFileDialogService fileDialogs,
         ProfilesViewModel profiles)
     {
         ArgumentNullException.ThrowIfNull(profiles);
@@ -96,23 +308,43 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         this.developerOptions = developerOptions.Value;
         this.authenticationService = authenticationService;
         this.liveFleetService = liveFleetService;
+        this.characterNameResolver = characterNameResolver;
+        this.fleetInvitationService = fleetInvitationService;
+        this.fleetAdministrationService = fleetAdministrationService;
+        this.fleetRebuildService = fleetRebuildService;
+        this.diagnosticExportService = diagnosticExportService;
+        this.workflowDiagnosticLog = workflowDiagnosticLog;
+        this.localDataService = localDataService;
+        this.updateCheckService = updateCheckService;
+        this.userInteraction = userInteraction;
+        this.fileDialogs = fileDialogs;
+        applicationVersion =
+            Assembly.GetEntryAssembly()?.GetName().Version?.ToString(3) ?? "development";
         Profiles = profiles;
         requiredScopes = string.Join(Environment.NewLine, EveDeveloperOptions.RequiredScopes);
         fleetRefreshTimer = new DispatcherTimer(DispatcherPriority.Background)
         {
-            Interval = TimeSpan.FromSeconds(30),
+            Interval = TimeSpan.FromSeconds(1),
         };
         fleetRefreshTimer.Tick += OnFleetRefreshTimerTick;
+        Profiles.PropertyChanged += OnProfilesPropertyChanged;
+        Profiles.AttentionRequested += OnAttentionRequested;
     }
 
     public string PageSubtitle => SelectedPage switch
     {
-        "Home" => "Choose a saved layout, review the exact changes, then organise the fleet.",
-        "Profiles" => "Manage reusable layouts and rosters. Advanced structure controls are optional.",
-        "Live Fleet" => "Read the current EVE fleet hierarchy, roles, ships, and locations.",
-        "Activity" => "See what the current run needs next, then open per-step recovery details.",
+        "Profiles" => "Create reusable layouts for the Run setup tab in Live Fleet.",
+        "Live Fleet" => "Run the fleet from one place: invite, drag, apply a saved setup, confirm.",
+        "Activity" => "Review the current run, recover individual steps, or reopen a previous fleet run.",
         "Settings" => "Configure EVE SSO, storage, polling, and appearance.",
         _ => string.Empty,
+    };
+
+    public string PageTitle => SelectedPage switch
+    {
+        "Profiles" => "Saved setups",
+        "Activity" => "Fleet activity",
+        _ => SelectedPage,
     };
 
     public ProfilesViewModel Profiles { get; }
@@ -129,48 +361,13 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
 
     public string RequiredScopes => requiredScopes;
 
-    public string StatusTitle
-    {
-        get
-        {
-            if (!developerOptions.IsClientIdConfigured)
-            {
-                return "Complete the EVE developer setup";
-            }
-
-            if (IsAuthenticationBusy)
-            {
-                return "Connecting securely to EVE SSO";
-            }
-
-            return IsAuthenticated
-                ? $"Signed in as {AuthenticatedCharacterName}"
-                : "Ready to sign in with EVE";
-        }
-    }
-
-    public string StatusDetail
-    {
-        get
-        {
-            if (!developerOptions.IsClientIdConfigured)
-            {
-                return "Paste only the public client ID into appsettings.Local.json. " +
-                    "The desktop app never uses or stores the developer secret.";
-            }
-
-            if (IsAuthenticationBusy)
-            {
-                return "Complete the authorization in your browser. Fleet Organizer validates the callback, token signature, application audience, and fleet scopes.";
-            }
-
-            return IsAuthenticated
-                ? "Authorization is encrypted for this Windows user. Live Fleet is read-only; reviewed profiles can start guarded repair, invitation, placement, and commander runs."
-                : "Open Settings and choose Sign in with EVE. Authorize the character that will be fleet boss.";
-        }
-    }
-
     public string DatabasePath => paths.DatabasePath;
+
+    public string ApplicationVersion => applicationVersion;
+
+    public bool StartMinimized => Profiles.StartMinimized;
+
+    public bool MinimizeToTray => Profiles.MinimizeToTray;
 
     private bool CanSignIn() =>
         developerOptions.IsClientIdConfigured &&
@@ -187,6 +384,11 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
     public async Task InitializeAsync()
     {
         await Profiles.InitializeAsync();
+        secondsUntilAutomaticCheck = Profiles.InvitationCheckSeconds;
+        secondsUntilFleetRefresh = Profiles.FleetPollingSeconds;
+        AutomaticCheckCountdownText = Profiles.IsWaitingForInvites
+            ? $"Automatic acceptance check in {secondsUntilAutomaticCheck} seconds"
+            : "Automatic acceptance check starts when invitations are sent";
 
         if (!developerOptions.IsClientIdConfigured)
         {
@@ -213,6 +415,11 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         {
             IsAuthenticationBusy = false;
             fleetRefreshTimer.Start();
+        }
+
+        if (IsAuthenticated)
+        {
+            await RefreshFleetAsync();
         }
     }
 
@@ -275,16 +482,97 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
         }
     }
 
+    [RelayCommand]
+    private async Task RunPagePrimaryActionAsync()
+    {
+        if (string.Equals(SelectedPage, "Live Fleet", StringComparison.Ordinal))
+        {
+            if (HasPendingLiveChanges)
+            {
+                await ApplyPendingLiveChangesAsync();
+            }
+            else if (!string.IsNullOrWhiteSpace(LiveInviteText))
+            {
+                await InviteNowAsync();
+            }
+            else
+            {
+                LiveCommandStatus = "Select pilots to move, paste invitation names, or queue a hierarchy edit first.";
+            }
+
+            return;
+        }
+
+        if (string.Equals(SelectedPage, "Profiles", StringComparison.Ordinal) &&
+            Profiles.CanPrepareFleet)
+        {
+            await Profiles.PrepareFleetCommand.ExecuteAsync(null);
+            return;
+        }
+
+        if (string.Equals(SelectedPage, "Activity", StringComparison.Ordinal) && Profiles.CanOperate)
+        {
+            await Profiles.ContinueOperationCommand.ExecuteAsync(null);
+        }
+    }
+
+    [RelayCommand]
+    private async Task RefreshPageAsync()
+    {
+        if (string.Equals(SelectedPage, "Live Fleet", StringComparison.Ordinal))
+        {
+            await RefreshFleetAsync();
+        }
+    }
+
+    [RelayCommand]
+    private void CancelPageAction()
+    {
+        if (string.Equals(SelectedPage, "Live Fleet", StringComparison.Ordinal))
+        {
+            if (!string.IsNullOrWhiteSpace(LiveFleetSearchText))
+            {
+                LiveFleetSearchText = string.Empty;
+            }
+            else
+            {
+                ClearLiveMemberSelection();
+            }
+
+            return;
+        }
+
+        Profiles.HideDryRunCommand.Execute(null);
+    }
+
+    [RelayCommand]
+    private void UndoPageAction()
+    {
+        if (!string.Equals(SelectedPage, "Live Fleet", StringComparison.Ordinal))
+        {
+            Profiles.HideDryRunCommand.Execute(null);
+            return;
+        }
+
+        var undone = pendingLiveChanges.UndoLastQueuedChange();
+        if (undone is not null)
+        {
+            LiveCommandStatus = $"Undid: {undone}.";
+            RefreshPendingLiveChangeState();
+        }
+    }
+
     [RelayCommand(CanExecute = nameof(CanRefreshFleet))]
     private async Task RefreshFleetAsync()
     {
+        secondsUntilFleetRefresh = Profiles.FleetPollingSeconds;
         IsFleetBusy = true;
         LiveFleetStatusTitle = "Reading the current EVE fleet";
         LiveFleetStatusDetail = "Checking fleet identity, settings, members, wings, and squads…";
 
         try
         {
-            var result = await liveFleetService.LoadCurrentAsync();
+            var result = await liveFleetService.RefreshCurrentAsync();
             ApplyLiveFleetResult(result);
         }
         catch (Exception exception)
@@ -292,6 +580,7 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
             IsLiveFleetReady = false;
             LiveFleetStatusTitle = "Live fleet refresh failed";
             LiveFleetStatusDetail = exception.Message;
+            await RecordWorkflowFailureAsync("live-fleet-refresh", exception);
         }
         finally
         {
@@ -309,6 +598,112 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
             UseShellExecute = true,
         });
     }
+
+    [RelayCommand]
+    private async Task ExportDiagnosticsAsync()
+    {
+        var path = fileDialogs.ChooseSavePath(
+            "Export redacted Fleet Desk diagnostics",
+            $"FleetDesk-diagnostics-{DateTimeOffset.Now:yyyyMMdd-HHmmss}.zip",
+            "ZIP archive (*.zip)|*.zip",
+            ".zip");
+        if (path is null)
+        {
+            return;
+        }
+
+        try
+        {
+            MaintenanceStatus = "Building redacted support bundle…";
+            await diagnosticExportService.ExportAsync(path);
+            MaintenanceStatus = $"Exported redacted diagnostics to {path}";
+        }
+        catch (Exception exception)
+        {
+            MaintenanceStatus = $"Diagnostics could not be exported: {exception.Message}";
+        }
+    }
+
+    private bool CanCheckForUpdates() => !IsUpdateCheckBusy;
+
+    [RelayCommand(CanExecute = nameof(CanCheckForUpdates))]
+    private async Task CheckForUpdatesAsync()
+    {
+        IsUpdateCheckBusy = true;
+        AvailableUpdateUrl = null;
+        HasAvailableUpdate = false;
+        UpdateStatus = "Checking the latest stable GitHub release…";
+        try
+        {
+            var result = await updateCheckService.CheckAsync();
+            UpdateStatus = result.UserMessage;
+            AvailableUpdateUrl = result.IsUpdateAvailable ? result.ReleaseUrl : null;
+            HasAvailableUpdate = result.IsUpdateAvailable &&
+                Uri.TryCreate(result.ReleaseUrl, UriKind.Absolute, out _);
+        }
+        catch (Exception exception)
+        {
+            UpdateStatus = $"Update check failed: {exception.Message}";
+        }
+        finally
+        {
+            IsUpdateCheckBusy = false;
+        }
+    }
+
+    private bool CanOpenAvailableUpdate() =>
+        Uri.TryCreate(AvailableUpdateUrl, UriKind.Absolute, out _);
+
+    [RelayCommand(CanExecute = nameof(CanOpenAvailableUpdate))]
+    private void OpenAvailableUpdate()
+    {
+        Process.Start(new ProcessStartInfo
+        {
+            FileName = AvailableUpdateUrl!,
+            UseShellExecute = true,
+        });
+    }
+
+    private bool CanResetLocalData() =>
+        string.Equals(ResetConfirmationText.Trim(), "RESET", StringComparison.Ordinal);
+
+    [RelayCommand(CanExecute = nameof(CanResetLocalData))]
+    private async Task ResetLocalDataAsync()
+    {
+        if (!userInteraction.Confirm(
+            "Reset Fleet Desk local data",
+            "Delete every local Fleet Desk template, operation, preference, crash log, and encrypted EVE sign-in?\n\nThis cannot be undone and does not change anything inside EVE.",
+            UserConfirmationKind.Warning))
+        {
+            return;
+        }
+
+        try
+        {
+            await authenticationService.SignOutAsync();
+            await localDataService.ResetAsync();
+            userInteraction.Inform(
+                "Fleet Desk reset complete",
+                "Local Fleet Desk data was removed. The app will now close; run it again to create a clean database.");
+            Application.Current.Shutdown();
+        }
+        catch (Exception exception)
+        {
+            MaintenanceStatus = $"Local data could not be reset: {exception.Message}";
+        }
+    }
+
+    [RelayCommand]
+    private async Task PreviewRestoreAsync()
+    {
+        if (await Profiles.PrepareRestorePreviewAsync())
+        {
+            SelectedPage = "Live Fleet";
+        }
+    }
+
+    [RelayCommand]
+    private void DismissAttention() => HasAttentionBanner = false;
 
     private void ApplyAuthenticationState(AuthenticatedCharacter? character)
     {
@@ -331,169 +726,84 @@ public partial class MainWindowViewModel : ObservableObject, IDisposable
     {
         fleetRefreshTimer.Stop();
         fleetRefreshTimer.Tick -= OnFleetRefreshTimerTick;
+        Profiles.PropertyChanged -= OnProfilesPropertyChanged;
+        Profiles.AttentionRequested -= OnAttentionRequested;
         GC.SuppressFinalize(this);
     }
 
     private async void OnFleetRefreshTimerTick(object? sender, EventArgs e)
     {
-        if (isFleetPollingEnabled &&
+        if (!isFleetPollingEnabled)
+        {
+            return;
+        }
+
+        if (Profiles.IsWaitingForInvites)
+        {
+            secondsUntilAutomaticCheck--;
+            AutomaticCheckCountdownText =
+                $"Automatic acceptance check in {secondsUntilAutomaticCheck} second{(secondsUntilAutomaticCheck == 1 ? string.Empty : "s")}";
+            if (secondsUntilAutomaticCheck <= 0)
+            {
+                secondsUntilAutomaticCheck = Profiles.InvitationCheckSeconds;
+                await Profiles.AutoContinueOperationAsync();
+            }
+        }
+        else
+        {
+            secondsUntilAutomaticCheck = Profiles.InvitationCheckSeconds;
+            AutomaticCheckCountdownText = "Automatic acceptance check starts when invitations are sent";
+        }
+
+        secondsUntilFleetRefresh--;
+        LiveFleetRefreshCountdownText = string.Equals(SelectedPage, "Live Fleet", StringComparison.Ordinal)
+            ? $"Automatically checking again in {Math.Max(0, secondsUntilFleetRefresh)} seconds"
+            : "Automatic fleet check starts when this page is open";
+        if (secondsUntilFleetRefresh <= 0 &&
             string.Equals(SelectedPage, "Live Fleet", StringComparison.Ordinal) &&
             CanRefreshFleet())
         {
+            secondsUntilFleetRefresh = Profiles.FleetPollingSeconds;
             await RefreshFleetAsync();
         }
     }
 
-    private void ApplyLiveFleetResult(LiveFleetLoadResult result)
+    private void OnProfilesPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        FleetHierarchy.Clear();
-        IsLiveFleetReady = result.Status == LiveFleetLoadStatus.Ready;
-
-        var snapshot = result.Snapshot;
-        if (snapshot is null)
+        _ = sender;
+        if (e.PropertyName == nameof(ProfilesViewModel.IsWaitingForInvites))
         {
-            DetectedFleetId = null;
-            LiveFleetBoss = "Not detected";
-            LiveFleetSummary = "No fleet data loaded";
-            LiveFleetFreshness = result.CheckedAtUtc is DateTimeOffset checkedAtUtc
-                ? $"Checked {checkedAtUtc.ToLocalTime():t} • auto-refreshes every 30 seconds while open"
-                : "Not refreshed yet";
-        }
-        else
-        {
-            DetectedFleetId = snapshot.FleetId;
-            LiveFleetBoss = $"{snapshot.FleetBossName} ({snapshot.FleetBossId})";
-            LiveFleetFreshness =
-                $"Confirmed {snapshot.ConfirmedAtUtc.ToLocalTime():t} • auto-refreshes every 30 seconds while open";
-            LiveFleetSummary = result.Status == LiveFleetLoadStatus.Ready
-                ? $"{snapshot.Members.Length} members • free move {(snapshot.IsFreeMove ? "on" : "off")} • advert {(snapshot.IsRegistered ? "active" : "off")} • voice {(snapshot.IsVoiceEnabled ? "on" : "off")}"
-                : "Fleet detected • detailed hierarchy requires the signed-in character to be fleet boss";
+            secondsUntilAutomaticCheck = Profiles.InvitationCheckSeconds;
         }
 
-        LiveFleetStatusTitle = result.Status switch
+        if (e.PropertyName == nameof(ProfilesViewModel.FleetPollingSeconds))
         {
-            LiveFleetLoadStatus.Ready => $"Fleet {snapshot!.FleetId} is live",
-            LiveFleetLoadStatus.SignedOut => "Sign in to read a fleet",
-            LiveFleetLoadStatus.NotInFleet => "No current fleet detected",
-            LiveFleetLoadStatus.NotFleetBoss => "Fleet detected — fleet boss access required",
-            _ => "Live fleet could not be refreshed",
-        };
-        LiveFleetStatusDetail = result.RetryAfter is null
-            ? result.UserMessage
-            : $"{result.UserMessage} Automatic refresh will resume when ESI allows it.";
+            secondsUntilFleetRefresh = Profiles.FleetPollingSeconds;
+        }
 
-        if (snapshot is not null && result.Status == LiveFleetLoadStatus.Ready)
+        if (e.PropertyName == nameof(ProfilesViewModel.InvitationCheckSeconds))
         {
-            foreach (var node in BuildFleetTree(snapshot))
+            secondsUntilAutomaticCheck = Profiles.InvitationCheckSeconds;
+        }
+    }
+
+    private void OnAttentionRequested(object? sender, FleetAttentionEventArgs e)
+    {
+        _ = sender;
+        AttentionBannerText = e.Message;
+        AttentionIsUrgent = e.IsUrgent;
+        HasAttentionBanner = true;
+        if (Profiles.AttentionSoundsEnabled)
+        {
+            if (e.IsUrgent)
             {
-                FleetHierarchy.Add(node);
+                SystemSounds.Exclamation.Play();
+            }
+            else
+            {
+                SystemSounds.Asterisk.Play();
             }
         }
     }
 
-    private void ClearLiveFleet()
-    {
-        FleetHierarchy.Clear();
-        DetectedFleetId = null;
-        IsLiveFleetReady = false;
-        LiveFleetBoss = "Not detected";
-        LiveFleetSummary = "No fleet data loaded";
-        LiveFleetFreshness = "Not refreshed yet";
-        LiveFleetStatusTitle = "Sign in to read a fleet";
-        LiveFleetStatusDetail = "Authorize the character that will be fleet boss.";
-    }
-
-    private static List<LiveFleetTreeNodeViewModel> BuildFleetTree(LiveFleetSnapshot snapshot)
-    {
-        var roots = new List<LiveFleetTreeNodeViewModel>();
-        var placedCharacterIds = new HashSet<long>();
-
-        var commandMembers = SortMembers(snapshot.Members.Where(member => member.WingId < 0).ToArray());
-        if (commandMembers.Length > 0)
-        {
-            foreach (var member in commandMembers)
-            {
-                placedCharacterIds.Add(member.CharacterId);
-            }
-
-            roots.Add(new LiveFleetTreeNodeViewModel(
-                "Fleet Command",
-                MemberCountText(commandMembers.Length),
-                commandMembers.Select(CreateMemberNode).ToArray()));
-        }
-
-        foreach (var wing in snapshot.Wings)
-        {
-            var wingChildren = new List<LiveFleetTreeNodeViewModel>();
-            var wingCommanders = SortMembers(snapshot.Members
-                .Where(member => member.WingId == wing.WingId && member.SquadId < 0)
-                .ToArray());
-            foreach (var commander in wingCommanders)
-            {
-                placedCharacterIds.Add(commander.CharacterId);
-                wingChildren.Add(CreateMemberNode(commander));
-            }
-
-            foreach (var squad in wing.Squads)
-            {
-                var squadMembers = SortMembers(snapshot.Members
-                    .Where(member => member.WingId == wing.WingId && member.SquadId == squad.SquadId)
-                    .ToArray());
-                foreach (var member in squadMembers)
-                {
-                    placedCharacterIds.Add(member.CharacterId);
-                }
-
-                wingChildren.Add(new LiveFleetTreeNodeViewModel(
-                    squad.Name,
-                    MemberCountText(squadMembers.Length),
-                    squadMembers.Select(CreateMemberNode).ToArray()));
-            }
-
-            var wingMemberCount = snapshot.Members.Count(member => member.WingId == wing.WingId);
-            roots.Add(new LiveFleetTreeNodeViewModel(
-                wing.Name,
-                MemberCountText(wingMemberCount),
-                wingChildren.ToArray()));
-        }
-
-        var unmatchedMembers = SortMembers(snapshot.Members
-            .Where(member => !placedCharacterIds.Contains(member.CharacterId))
-            .ToArray());
-        if (unmatchedMembers.Length > 0)
-        {
-            roots.Add(new LiveFleetTreeNodeViewModel(
-                "Unassigned / unknown structure",
-                MemberCountText(unmatchedMembers.Length),
-                unmatchedMembers.Select(CreateMemberNode).ToArray()));
-        }
-
-        return roots;
-    }
-
-    private static LiveFleetMember[] SortMembers(LiveFleetMember[] members) =>
-        members
-            .OrderBy(member => RoleOrder(member.Role))
-            .ThenBy(member => member.CharacterName, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-
-    private static LiveFleetTreeNodeViewModel CreateMemberNode(LiveFleetMember member)
-    {
-        var location = member.StationName ?? member.SolarSystemName;
-        return new LiveFleetTreeNodeViewModel(
-            member.CharacterName,
-            $"{member.RoleName} • {member.ShipTypeName} • {location} • fleet warp {(member.TakesFleetWarp ? "on" : "off")}",
-            []);
-    }
-
-    private static int RoleOrder(string role) => role switch
-    {
-        "fleet_commander" => 0,
-        "wing_commander" => 1,
-        "squad_commander" => 2,
-        _ => 3,
-    };
-
-    private static string MemberCountText(int count) =>
-        $"{count} member{(count == 1 ? string.Empty : "s")}";
 }

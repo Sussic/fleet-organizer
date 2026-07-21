@@ -3,17 +3,35 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using FleetOrganizer.Core.Domain;
 using FleetOrganizer.Core.Operations;
 using FleetOrganizer.Core.Planning;
+using FleetOrganizer.Core.Profiles;
 
 namespace FleetOrganizer.App.ViewModels;
 
-public sealed record ProfileListItemViewModel(FleetProfile Profile)
+public sealed partial class ProfileListItemViewModel(FleetProfile profile) : ObservableObject
 {
+    public FleetProfile Profile { get; } = profile;
+
     public Guid Id => Profile.Id;
 
     public string Name => Profile.Name;
 
     public string Summary =>
-        $"{Profile.Assignments.Count} characters • {Profile.Wings.Count} wings";
+        $"{Profile.Assignments.Count} characters • {Profile.Wings.Count} wings • " +
+        $"{Profile.ShipRules.Count} ship rule{(Profile.ShipRules.Count == 1 ? string.Empty : "s")}";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(StatusText))]
+    public partial bool IsPinned { get; set; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(StatusText))]
+    public partial bool IsDefault { get; set; }
+
+    public string StatusText => IsDefault
+        ? "DEFAULT"
+        : IsPinned
+            ? "PINNED"
+            : string.Empty;
 }
 
 public sealed partial class ProfileWingEditorViewModel(
@@ -36,6 +54,21 @@ public sealed partial class ProfileSquadEditorViewModel(
 
     [ObservableProperty]
     public partial string Name { get; set; } = name;
+
+    [ObservableProperty]
+    public partial int AssignmentCount { get; set; }
+
+    [ObservableProperty]
+    public partial string CharacterPreview { get; set; } = "Drop characters here";
+
+    public string AssignmentCountText =>
+        $"{AssignmentCount} character{(AssignmentCount == 1 ? string.Empty : "s")}";
+
+    partial void OnAssignmentCountChanged(int value)
+    {
+        _ = value;
+        OnPropertyChanged(nameof(AssignmentCountText));
+    }
 }
 
 public sealed partial class ProfileAssignmentEditorViewModel(
@@ -64,7 +97,83 @@ public sealed partial class ProfileAssignmentEditorViewModel(
 
 public sealed record ProfileSquadOptionViewModel(Guid Id, string DisplayName);
 
+public sealed partial class ProfileShipRuleEditorViewModel(
+    Guid id,
+    string shipTypeName,
+    Guid targetSquadId,
+    string label = "",
+    Guid? overflowSquadId = null,
+    int maximumPerSquad = ProfileValidator.MaximumCharactersPerSquad,
+    bool balanceAcrossTargets = false,
+    bool isFallback = false) : ObservableObject
+{
+    public Guid Id { get; } = id;
+
+    [ObservableProperty]
+    public partial string ShipTypeName { get; set; } = shipTypeName;
+
+    [ObservableProperty]
+    public partial Guid TargetSquadId { get; set; } = targetSquadId;
+
+    [ObservableProperty]
+    public partial string Label { get; set; } = label;
+
+    [ObservableProperty]
+    public partial Guid? OverflowSquadId { get; set; } = overflowSquadId;
+
+    [ObservableProperty]
+    public partial int MaximumPerSquad { get; set; } = maximumPerSquad;
+
+    [ObservableProperty]
+    public partial bool BalanceAcrossTargets { get; set; } = balanceAcrossTargets;
+
+    [ObservableProperty]
+    public partial bool IsFallback { get; set; } = isFallback;
+}
+
+public sealed record FleetOperationHistoryItemViewModel(FleetOperation Operation)
+{
+    public Guid Id => Operation.Id;
+
+    public string Title => $"{Operation.ProfileName} • fleet {Operation.FleetId}";
+
+    public string When => Operation.UpdatedAtUtc.ToLocalTime().ToString("g", System.Globalization.CultureInfo.CurrentCulture);
+
+    public string Status => Operation.State switch
+    {
+        OperationState.Complete => "Completed",
+        OperationState.Cancelled => "Cancelled",
+        OperationState.NeedsAttention => "Needs attention",
+        _ => Operation.State.ToString(),
+    };
+
+    public string Summary =>
+        $"{Operation.SucceededSteps} succeeded • {Operation.FailedSteps} failed • {Operation.SkippedSteps} skipped";
+}
+
 public sealed record DesiredRoleOptionViewModel(DesiredFleetRole Value, string DisplayName);
+
+public sealed record FleetRunModeOptionViewModel(
+    FleetRunMode Value,
+    string DisplayName,
+    string Description);
+
+public sealed record ThemeOptionViewModel(FleetDeskTheme Value, string DisplayName);
+
+public sealed record WaitingCharacterViewModel(
+    long CharacterId,
+    string CharacterName,
+    string Target,
+    string StateText);
+
+public sealed class FleetAttentionEventArgs(
+    string message,
+    bool isUrgent) : EventArgs
+{
+    public string Message { get; } = message;
+
+    public bool IsUrgent { get; } = isUrgent;
+}
 
 public sealed record FleetPlanItemViewModel(FleetPlanItem Item)
 {

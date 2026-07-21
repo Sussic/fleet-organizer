@@ -35,3 +35,19 @@ jobs:
 
       - name: Test
         run: dotnet test FleetOrganizer.sln -c Release --no-build --collect:"XPlat Code Coverage"
+
+      - name: Publish portable Windows smoke artifact
+        run: >-
+          dotnet publish src/FleetOrganizer.App/FleetOrganizer.App.csproj
+          -c Release -r win-x64 --self-contained true
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:PublishTrimmed=false
+          -o artifacts/FleetOrganizer-win-x64
+
+      - name: Upload smoke artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FleetOrganizer-win-x64
+          path: artifacts/FleetOrganizer-win-x64
+          if-no-files-found: error

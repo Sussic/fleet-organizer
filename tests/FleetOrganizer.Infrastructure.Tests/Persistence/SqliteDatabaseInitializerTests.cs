@@ -33,7 +33,7 @@ public sealed class SqliteDatabaseInitializerTests : IDisposable
             await command.ExecuteScalarAsync(CancellationToken.None),
             System.Globalization.CultureInfo.InvariantCulture);
 
-        Assert.Equal(2, version);
+        Assert.Equal(5, version);
 
         await using var columnCommand = connection.CreateCommand();
         columnCommand.CommandText =
@@ -42,6 +42,22 @@ public sealed class SqliteDatabaseInitializerTests : IDisposable
             await columnCommand.ExecuteScalarAsync(CancellationToken.None),
             System.Globalization.CultureInfo.InvariantCulture);
         Assert.Equal(3, operationColumnCount);
+
+        await using var shipRuleTableCommand = connection.CreateCommand();
+        shipRuleTableCommand.CommandText =
+            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'profile_ship_rules';";
+        var shipRuleTableCount = Convert.ToInt64(
+            await shipRuleTableCommand.ExecuteScalarAsync(CancellationToken.None),
+            System.Globalization.CultureInfo.InvariantCulture);
+        Assert.Equal(1, shipRuleTableCount);
+
+        await using var shipPolicyColumnCommand = connection.CreateCommand();
+        shipPolicyColumnCommand.CommandText =
+            "SELECT COUNT(*) FROM pragma_table_info('profile_ship_rules') WHERE name IN ('label', 'overflow_squad_id', 'max_per_squad', 'balance_targets', 'is_fallback');";
+        var shipPolicyColumnCount = Convert.ToInt64(
+            await shipPolicyColumnCommand.ExecuteScalarAsync(CancellationToken.None),
+            System.Globalization.CultureInfo.InvariantCulture);
+        Assert.Equal(5, shipPolicyColumnCount);
     }
 
     [Fact]
@@ -58,17 +74,17 @@ public sealed class SqliteDatabaseInitializerTests : IDisposable
         await using var connection = new SqliteConnection($"Data Source={paths.DatabasePath}");
         await connection.OpenAsync(CancellationToken.None);
         await using var command = connection.CreateCommand();
-        command.CommandText = "SELECT COUNT(*) FROM schema_migrations WHERE version IN (1, 2);";
+        command.CommandText = "SELECT COUNT(*) FROM schema_migrations WHERE version IN (1, 2, 3, 4, 5);";
 
         var migrationCount = Convert.ToInt64(
             await command.ExecuteScalarAsync(CancellationToken.None),
             System.Globalization.CultureInfo.InvariantCulture);
 
-        Assert.Equal(2, migrationCount);
+        Assert.Equal(5, migrationCount);
     }
 
     [Fact]
-    public async Task ExistingVersionOneDatabaseUpgradesToVersionTwo()
+    public async Task ExistingVersionOneDatabaseUpgradesToCurrentVersion()
     {
         var paths = new TestAppDataPaths(testRoot);
         Directory.CreateDirectory(paths.RootDirectory);
@@ -88,6 +104,14 @@ public sealed class SqliteDatabaseInitializerTests : IDisposable
                 );
                 INSERT INTO schema_migrations (version, applied_utc)
                 VALUES (1, '2026-07-15T00:00:00.0000000+00:00');
+
+                CREATE TABLE fleet_profiles (
+                    id TEXT NOT NULL PRIMARY KEY,
+                    name TEXT NOT NULL COLLATE NOCASE UNIQUE,
+                    schema_version INTEGER NOT NULL,
+                    created_utc TEXT NOT NULL,
+                    updated_utc TEXT NOT NULL
+                );
 
                 CREATE TABLE active_operations (
                     id TEXT NOT NULL PRIMARY KEY,
@@ -118,7 +142,7 @@ public sealed class SqliteDatabaseInitializerTests : IDisposable
         var version = Convert.ToInt64(
             await versionCommand.ExecuteScalarAsync(CancellationToken.None),
             System.Globalization.CultureInfo.InvariantCulture);
-        Assert.Equal(2, version);
+        Assert.Equal(5, version);
     }
 
     [Fact]

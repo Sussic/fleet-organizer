@@ -2,11 +2,13 @@ using FleetOrganizer.Core.Abstractions;
 using FleetOrganizer.Infrastructure.Authentication;
 using FleetOrganizer.Infrastructure.Configuration;
 using FleetOrganizer.Infrastructure.Esi;
+using FleetOrganizer.Infrastructure.Diagnostics;
 using FleetOrganizer.Infrastructure.Operations;
 using FleetOrganizer.Infrastructure.Persistence;
 using FleetOrganizer.Infrastructure.Security;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using System.Reflection;
 
 namespace FleetOrganizer.Infrastructure;
 
@@ -32,8 +34,9 @@ public static class DependencyInjection
             {
                 Timeout = TimeSpan.FromSeconds(30),
             };
+            var version = Assembly.GetEntryAssembly()?.GetName().Version?.ToString(3) ?? "development";
             client.DefaultRequestHeaders.UserAgent.ParseAdd(
-                "FleetOrganizer/0.6 (+https://github.com/Sussic/fleet-organizer)");
+                $"FleetOrganizer/{version} (+https://github.com/Sussic/fleet-organizer)");
             return client;
         });
         services.AddSingleton<AuthenticatedCharacterRepository>();
@@ -42,10 +45,18 @@ public static class DependencyInjection
         services.AddSingleton<EveEsiClient>();
         services.AddSingleton<ILiveFleetService, EveFleetService>();
         services.AddSingleton<IFleetWriteService, EveFleetWriteService>();
+        services.AddSingleton<IFleetInvitationService, EveFleetInvitationService>();
+        services.AddSingleton<IFleetAdministrationService, EveFleetAdministrationService>();
+        services.AddSingleton<IFleetRebuildService, EveFleetRebuildService>();
         services.AddSingleton<ICharacterNameResolver, EveCharacterNameResolver>();
         services.AddSingleton<IFleetProfileRepository, FleetProfileRepository>();
+        services.AddSingleton<IFleetDeskPreferencesRepository, FleetDeskPreferencesRepository>();
         services.AddSingleton<IFleetOperationRepository, FleetOperationRepository>();
         services.AddSingleton<IFleetOperationService, FleetOperationService>();
+        services.AddSingleton<IDiagnosticExportService, DiagnosticExportService>();
+        services.AddSingleton<IWorkflowDiagnosticLog, WorkflowDiagnosticLog>();
+        services.AddSingleton<ILocalDataService, LocalDataService>();
+        services.AddSingleton<IUpdateCheckService, GitHubUpdateCheckService>();
         services.AddSingleton<SqliteDatabaseInitializer>();
 
         return services;

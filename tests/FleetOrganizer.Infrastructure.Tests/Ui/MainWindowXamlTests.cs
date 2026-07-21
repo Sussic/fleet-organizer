@@ -26,9 +26,9 @@ public sealed class MainWindowXamlTests
     {
         var xaml = ReadMainWindowXaml();
 
-        Assert.Contains("Check fleet &amp; review changes", xaml, StringComparison.Ordinal);
-        Assert.Contains("Start guarded run", xaml, StringComparison.Ordinal);
-        Assert.Contains("Check accepted characters", xaml, StringComparison.Ordinal);
+        Assert.Contains("Preview template against fleet", xaml, StringComparison.Ordinal);
+        Assert.Contains("Profiles.RunPrimaryActionText", xaml, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Check now\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Value=\"Activity\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Text=\"Run details\"", xaml, StringComparison.Ordinal);
         Assert.DoesNotContain("This page is the next product milestone", xaml, StringComparison.Ordinal);
@@ -61,6 +61,117 @@ public sealed class MainWindowXamlTests
         Assert.Contains("Key=\"Escape\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Profiles.IsAdvancedMode", xaml, StringComparison.Ordinal);
         Assert.Contains("Text=\"Fleet hierarchy\"", xaml, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void FleetDeskSupportsDragPlacementAndShipRules()
+    {
+        var xaml = ReadMainWindowXaml();
+
+        Assert.Contains("Text=\"Automatic ship placement\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Profiles.ObservedShipTypes", xaml, StringComparison.Ordinal);
+        Assert.Contains("Profiles.AddShipRuleCommand", xaml, StringComparison.Ordinal);
+        Assert.Contains("DragOver=\"OnSquadDragOver\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Drop=\"OnSquadDrop\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("MouseMove=\"OnRosterMouseMove\"", xaml, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CommanderRunModeWaitingRoomAndRestoreAreVisibleWorkflows()
+    {
+        var xaml = ReadMainWindowXaml();
+
+        Assert.Contains("Profiles.RunModeOptions", xaml, StringComparison.Ordinal);
+        Assert.Contains("Invitation waiting room", xaml, StringComparison.Ordinal);
+        Assert.Contains("AutomaticCheckCountdownText", xaml, StringComparison.Ordinal);
+        Assert.Contains("Preview pre-run restore", xaml, StringComparison.Ordinal);
+        Assert.Contains("Profiles.AttentionSoundsEnabled", xaml, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void LiveFleetIsACompactCommandWorkspaceRatherThanAReadOnlyPage()
+    {
+        var xaml = ReadMainWindowXaml();
+
+        Assert.Contains("Text=\"Fleet board\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("DragOver=\"OnLiveSquadDragOver\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Drop=\"OnLiveSquadDrop\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("ApplyPendingLiveChangesCommand", xaml, StringComparison.Ordinal);
+        Assert.Contains("CanApplyPendingLiveChanges", xaml, StringComparison.Ordinal);
+        Assert.Contains("LiveApplyFeedback", xaml, StringComparison.Ordinal);
+        Assert.Contains("InviteNowCommand", xaml, StringComparison.Ordinal);
+        Assert.Contains("ItemsSource=\"{Binding LiveInviteTargets}\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Text=\"{Binding LiveInviteTargetHint}\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("PreviewSelectedTemplateCommand", xaml, StringComparison.Ordinal);
+        Assert.Contains("Click • Ctrl-click • Shift-click range", xaml, StringComparison.Ordinal);
+        Assert.Contains("Content=\"Move (staged)\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("CancelStagedLiveMemberCommand", xaml, StringComparison.Ordinal);
+        Assert.Contains("SelectionMode=\"Extended\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("ItemsSource=\"{Binding FleetBoardRows}\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Header=\"Structure\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("QueueLiveStructureRenameCommand", xaml, StringComparison.Ordinal);
+        Assert.Contains("CleanRebuildFleetCommand", xaml, StringComparison.Ordinal);
+        Assert.Contains("Header=\"Invite\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Header=\"Saved setup\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Header=\"Changes\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Header=\"Danger\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Profiles.CanStartReviewedOperation", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("Content=\"Stage invitations\"", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("Content=\"Review pending changes\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("UnlockHighImpactActions", xaml, StringComparison.Ordinal);
+        Assert.Contains("KickSelectedLiveMembersCommand", xaml, StringComparison.Ordinal);
+        Assert.Contains("TransferFleetBossToSelectedCommand", xaml, StringComparison.Ordinal);
+        Assert.Contains("ApplyFleetSettingsCommand", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("Legacy Live Fleet", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("Value=\"Home\"", xaml, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void FcScaleAndMaintenanceControlsAreVisible()
+    {
+        var xaml = ReadMainWindowXaml();
+
+        Assert.Contains("LiveFleetSearchText", xaml, StringComparison.Ordinal);
+        Assert.Contains("SelectAllVisibleLiveMembersCommand", xaml, StringComparison.Ordinal);
+        Assert.Contains("ClearLiveFleetFilterCommand", xaml, StringComparison.Ordinal);
+        Assert.Contains("LiveFleetSearchSummary", xaml, StringComparison.Ordinal);
+        Assert.Contains("LiveBulkMoveTargets", xaml, StringComparison.Ordinal);
+        Assert.Contains("StageSelectedLiveMembersCommand", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("Content=\"Home\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Profiles.OperationHistory", xaml, StringComparison.Ordinal);
+        Assert.Contains("Profiles.MoveShipRuleUpCommand", xaml, StringComparison.Ordinal);
+        Assert.Contains("Profiles.InvitationTimeoutMinutes", xaml, StringComparison.Ordinal);
+        Assert.Contains("ExportDiagnosticsCommand", xaml, StringComparison.Ordinal);
+        Assert.Contains("CheckForUpdatesCommand", xaml, StringComparison.Ordinal);
+        Assert.Contains("ResetLocalDataCommand", xaml, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void EmptyFleetAndOptionalSetupEditorsStayCompact()
+    {
+        var xaml = ReadMainWindowXaml();
+
+        Assert.Contains("Text=\"Waiting for a fleet\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Binding IsLiveFleetReady", xaml, StringComparison.Ordinal);
+        Assert.Contains("Optional • expand to edit rules", xaml, StringComparison.Ordinal);
+        Assert.Contains("Paste names only when changing the roster", xaml, StringComparison.Ordinal);
+        Assert.Contains("Squad cards — expand for drag &amp; drop", xaml, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void KeyboardFocusAndLiveStatusAreExposedToAssistiveTechnology()
+    {
+        var xaml = ReadMainWindowXaml();
+
+        Assert.Contains("Content=\"_Live Fleet\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Content=\"_Saved setups\"", xaml, StringComparison.Ordinal);
+        Assert.True(
+            CountOccurrences(xaml, "AutomationProperties.LiveSetting=\"Assertive\"") >= 4,
+            "Changing workflow feedback and attention banners should be announced.");
+        Assert.Contains(
+            "AutomationProperties.Name=\"{Binding LiveCommandStatus}\"",
+            xaml,
+            StringComparison.Ordinal);
     }
 
     private static string ReadMainWindowXaml()

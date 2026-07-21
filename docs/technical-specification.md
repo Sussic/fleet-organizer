@@ -1,17 +1,17 @@
 # Fleet Organizer — Technical Specification
 
 **Status:** Approved implementation baseline
-**Revision:** 1.6
-**Reviewed:** 17 July 2026
+**Revision:** 2.2
+**Reviewed:** 19 July 2026
 **Target:** Windows 11, local single-user desktop application
 **Working title:** Fleet Organizer (name can change without affecting the architecture)
 
-### Implementation checkpoint — Milestone 6 usability slice
+### Implementation checkpoint — Fleet Desk usability slice
 
 Implemented and tested in the current repository:
 
 - EVE SSO Authorization Code + PKCE, JWT validation, DPAPI refresh-token storage, and logout.
-- Cache/rate-aware read-only fleet detection with named hierarchy and member details.
+- Cache/rate-aware live fleet detection with named hierarchy, member details, and a bounded command workspace.
 - SQLite-backed profile create, rename, duplicate, delete, and current-fleet capture.
 - Wing/squad add, rename, reorder, duplicate, and guarded deletion.
 - Newline/comma/tab and structured roster paste with exact public `POST /universe/ids` resolution in batches of 500.
@@ -19,9 +19,9 @@ Implemented and tested in the current repository:
 - Versioned profile JSON import/export and validation before persistence.
 - Deterministic desired-versus-live comparison ordered as structure, invites, moves, and role changes.
 - Explicit already-correct and unmanaged-live-member counts, with no-op entries hidden by default.
-- Hard blockers for lost fleet-boss access, ambiguous hierarchy targets, fleet-boss transfer, and fleet-boss demotion.
+- Hard blockers for lost fleet-boss access, ambiguous hierarchy targets, and an attempted fleet-boss transfer. Fleet-boss authority is deliberately independent of the member's fleet/wing/squad command slot.
 - Automatic stale-preview invalidation whenever the current profile hierarchy or assignment data changes.
-- Guarded `POST /fleets/{fleet_id}/members` invitation writes and `PUT /fleets/{fleet_id}/members/{member_id}` ordinary squad-member placement.
+- Guarded role-aware `POST /fleets/{fleet_id}/members` invitation writes and `PUT /fleets/{fleet_id}/members/{member_id}` member/commander placement with role-correct optional wing/squad IDs.
 - Fresh same-fleet and fleet-boss verification immediately before execution, with forced re-review when the live plan differs from the reviewed plan.
 - SQLite schema v2 durable operations, typed step payloads, initial live snapshots, attempts, failures, and retry timestamps.
 - Crash-safe invite handling: an in-progress invitation with an unknown outcome is never blindly replayed; the live roster is checked before an explicit retry.
@@ -34,10 +34,31 @@ Implemented and tested in the current repository:
 - Unmanaged commander occupancy is a hard blocker; fleet-boss transfer/demotion, hierarchy deletion, and kicks remain outside the operation boundary.
 - Final live hierarchy/member/role drift verification before a clean completion state.
 - Global WPF dispatcher exception capture with a visible failure message and timestamped local crash report; operation state remains durable across restart.
+- SQLite schema v3 persistence for exact ship-type placement rules.
+- Native WPF multi-character drag/drop from the template roster to visual squad cards; dragging edits local desired state only.
+- Exact live ship-type matching with explicit-character precedence, fleet-boss exclusion, ordinary-member-only roles, and visible preview match counts.
+- Automatic 30-second continuation while a confirmed operation waits for invitation acceptance, with the manual check action retained.
+- A cohesive Fleet Desk visual system and plain preview → organise → monitor terminology across Live Fleet, saved setups, and activity.
+- Persistent default, last-used, and pinned templates plus remembered run mode and attention-sound preference.
+- Safe filtered run modes for full organisation, invitations only, present-member placement, structure only, and commander assignment; the selected mode is part of stale-review validation.
+- Preflight fleet-capacity validation for wings, squads, and ordinary squad positions.
+- A named invitation waiting room with a visible automatic-check countdown.
+- A compact Live Fleet command tree ordered around FC frequency: direct role-aware exact-name invitations, saved setup/ship-policy application, visually staged member/commander drag/drop, fleet settings, and separately unlocked dangerous actions.
+- A state-aware layout that hides the unusable command board when no fleet is detected and collapses optional saved-setup editors until explicitly opened.
+- One-click low-risk invitations with a fresh same-fleet/fleet-boss/target check, session waiting-state reconciliation, and no redundant second review screen.
+- One-confirmation queued live placement: the exact confirmation is the review, while broad saved setups retain a separate preview.
+- Best-effort pre-run snapshot restore preview and in-app/Windows-sound attention notifications.
+- Searchable Windows-style click/Ctrl-click/Shift-click Live Fleet staging by character, ship, role, wing, or squad, including wing/squad command positions.
+- A separately unlocked clean rebuild that uses an `Unknown` staging wing/squad, evacuates the roster before deletion, reconstructs the selected saved layout, restores known/ship-rule placements and command roles, and leaves unmatched members staged safely.
+- Separately unlocked, freshly revalidated, and reconfirmed manual kick, empty hierarchy deletion, and fleet-boss transfer actions.
+- Ordered multi-ship policies with capacity, overflow, even balancing, and a final fallback rule.
+- Durable latest-50 run history with direct per-run reopening.
+- Configurable fleet/invitation polling and attention timeout, System/Light/Dark theme, and optional notification-tray operation.
+- Redacted diagnostics ZIP, typed local reset, manual stable-release checking, semantic versioning, and self-contained Windows release packaging.
 
 Milestone 5 keeps the complete write queue serialized. Structure create results are persisted before dependent naming/placement steps, interrupted creates are reconciled against the initial snapshot, and ambiguous outcomes require attention instead of blind duplication. Rename and commander writes are also verified from fresh live state.
 
-The first Milestone 6 slice adds the repetitive-use interface around that engine: a guided Home launcher, plain-language review and operation phases, a real Activity page, profile/roster filtering, recycling virtualization for growing tables, filtered bulk selection, simple-versus-advanced profile editing, unsaved-change status, and keyboard shortcuts. Snapshot restore preview, chronological history, and redacted diagnostic export remain separate recovery slices; this UI checkpoint does not widen the ESI write boundary.
+The FC workflow slice adds the repetitive-use interface around that engine: a unified Live Fleet command centre, role-aware paste-and-send invitations, one-confirmation routine moves, in-destination staged previews, standard range selection, remembered frequent setups, safe partial-run modes, plain-language blockers and operation phases, a dense searchable live hierarchy, compact template roster/drag targets, ordered capacity-aware ship policies, named automatic acceptance checks, restore previews, durable history, redacted diagnostics, configurable polling/tray/theme preferences, recycling virtualization, optional hierarchy editing, unsaved-change status, and keyboard shortcuts. Normal runs retain the non-destructive boundary; clean rebuild is a separately unlocked and reconfirmed high-impact path.
 
 ## 1. Executive decision
 
@@ -72,7 +93,7 @@ Only the boss character needs an ESI token. Invitees are identified by character
 - Invite saved characters who are not currently in fleet.
 - Wait for accepted characters to appear, then place them automatically.
 - Reconcile the live fleet to a selected profile using only necessary ESI writes.
-- Drag one or multiple live members to a target squad.
+- Drag one or multiple saved character assignments to a target squad before previewing the run.
 - Promote/demote members with a clear preview of the resulting change.
 - Save a snapshot before a profile is applied and offer best-effort restore.
 - Persist operations so a run can resume safely after restart or network failure.
@@ -102,7 +123,7 @@ These are either outside the simple organiser goal or not available through ESI.
 | HTTP | Typed `HttpClient` services | Central authentication, retry, compatibility-date, rate, and cache handlers |
 | Local database | SQLite through `Microsoft.Data.Sqlite` | One portable file, transactions and migrations without a server |
 | Secrets at rest | Windows DPAPI, `DataProtectionScope.CurrentUser` | Refresh token is decryptable only by the same Windows user on the same Windows installation |
-| Drag/drop | `GongSolutions.WPF.DragDrop` | MVVM-aware tree/list drag/drop and multi-selection support |
+| Drag/drop | Native WPF drag/drop events | No extra dependency; local template rows carry only a character ID and update the view model after a validated squad drop |
 | Logging | `Microsoft.Extensions.Logging` + Serilog file sink | Structured local diagnostics with rotation and redaction |
 | Tests | xUnit + fake `HttpMessageHandler` fixtures | Fast deterministic core and HTTP contract testing |
 | Packaging | Self-contained `win-x64` single-file publish | No runtime installation required for the released build |
@@ -170,6 +191,12 @@ FleetOrganizer.sln
 | `RoleTransitionPlanner` | Legal, ordered member/commander moves with intermediate states |
 | `CharacterResolver` | Bulk name-to-ID resolution and canonicalization |
 | `SnapshotService` | Pre-run snapshots and best-effort restore plans |
+| `LiveFleetPendingChanges` | One ordered owner for staged moves, hierarchy edits, invite tracking, replacement, clear, and Undo |
+| `LiveFleetSelectionModel` | Click, Ctrl-click, Shift-range, select-shown, and clear semantics independent of WPF events |
+| `LiveFleetRunCoordinator` | Compose and persist the internal ad-hoc target, build the guarded plan, and select the run mode |
+| `IUserInteractionService` / `IFileDialogService` | Injected WPF confirmation, information, and file-picker boundaries; view models contain no direct dialogs |
+| `MainWindowViewModel.LiveActions` / `.LiveBoard` | Focused partials for live commands and live hierarchy projection/reconciliation |
+| `ProfilesViewModel.Editor` / `.Operations` | Focused partials for saved-layout editing and durable run presentation/recovery |
 
 ## 6. Authentication and secret handling
 
@@ -309,7 +336,7 @@ SQLite runs in WAL mode, enables foreign keys, and uses explicit transactions. S
 | `ProfileSquad` | local GUID, wing GUID, name, sort order |
 | `RosterCharacter` | character ID, canonical name, aliases/display note, tags, last resolved |
 | `ProfileAssignment` | profile ID, character ID, target squad GUID, desired role |
-| `PlacementRule` | profile ID, priority, rule type, JSON condition, target squad/role |
+| `ProfileShipRule` | local GUID, exact ship type name, target squad GUID, sort order |
 | `ActiveOperation` | operation GUID, profile/fleet IDs, state, created/updated, cancellation reason |
 | `OperationStep` | operation ID, stable step key, type, target, state, attempts, last failure |
 | `FleetSnapshot` | operation/fleet ID, captured time, serialized immutable hierarchy/members |
@@ -325,20 +352,17 @@ ESI wing and squad IDs are ephemeral fleet-instance identifiers and are never us
 - Names are trimmed, normalized, and validated against ESI's current length/schema constraints before save. The UI initially enforces the current 10-character fleet wing/squad name limit.
 - Duplicate character assignments are rejected.
 - A squad may have at most one desired squad commander, a wing at most one wing commander, and the profile at most one desired fleet commander.
-- Rules have deterministic integer priority and a single default fallback.
+- Ship rules have deterministic integer order, unique case-insensitive exact ship names, and a valid target squad.
 
 ### 8.4 Placement precedence
 
 When a member has several possible destinations, the first match wins:
 
-1. Temporary override made in the current run.
-2. Exact character assignment.
-3. Highest-priority character-tag rule.
-4. Highest-priority ship-type/group rule using current ESI member data.
-5. Profile default squad.
-6. Leave in current position and mark **Unassigned**.
+1. Exact saved character assignment.
+2. First exact ship-type rule using the current ESI member ship name.
+3. Leave the live member untouched.
 
-The planner records why each decision was made so the UI can say, for example, “Moved to Logi — matched tag `logi`”.
+Ship rules resolve only members currently in the fleet, skip the fleet boss, and generate ordinary squad-member assignments. They cannot invite an absent character or request a commander role. The preview reports how many characters were added by ship rules before the user confirms the guarded run.
 
 ## 9. Desired-state reconciliation engine
 
@@ -380,15 +404,17 @@ Every transition and external write is recorded. On restart, the runner does not
 
 - Commander changes are serialized because one slot may need to be vacated before another member can occupy it.
 - The transition planner uses legal intermediate `squad_member` moves where needed.
-- The currently authenticated fleet boss is never demoted, moved into a state that would lose required write authority, or treated as fleet commander/boss interchangeably.
+- Fleet-boss authority and the fleet/wing/squad command slot are separate. A boss occupying Wing Command or a squad role remains authorized; the planner blocks only attempts to transfer boss authority automatically.
 - Before each commander write, refresh the involved member(s) if the cached state could be stale.
 - A failed transition stops only the dependent role chain; unrelated squad-member placements continue.
-- Drag/drop uses the same planner and execution path as a profile run, so manual and automated moves have identical validation.
+- Template drag/drop edits local assignments and invalidates stale previews. Live-board movement queues the exact selected changes, validates them, and uses one explicit exact-count confirmation before the durable operation engine writes.
 
 ### 9.4 Invite behavior
 
 - Invite requests are per character because ESI has no bulk fleet-invite transaction.
 - Default invite role is `squad_member`; placement occurs after acceptance.
+- The explicit **Invite now** click sends immediately after exact-name resolution and a fresh same-fleet, fleet-boss, and target-squad check; a second confirmation would add no useful information for this reversible/ignorable request.
+- Sent quick invitations are tracked in the current session until the automatic live-fleet refresh sees the character join. Stopping local tracking does not and cannot recall an EVE invitation.
 - A character already in the fleet is never invited.
 - A character present in a different fleet or unavailable receives a clear per-character failure; the rest of the roster continues.
 - Pending invitations have an operation timeout (default 10 minutes) but remain individually retryable.
@@ -407,7 +433,7 @@ Kicking and hierarchy deletion are separate, explicit commands with a confirmati
 
 ### 9.6 Snapshot and restore
 
-A snapshot stores the hierarchy, member IDs, roles, and positions seen immediately before applying a profile. Restore is a **best-effort forward operation**, not a database rollback: ESI has no transaction, some characters may have left, and live fleet IDs may have changed. The restore preview shows possible, impossible, and destructive parts before execution. MVP restore never reinvites departed characters automatically.
+A snapshot stores the hierarchy, member IDs, roles, and positions seen immediately before applying a profile. Restore is a **best-effort forward operation**, not a database rollback: ESI has no transaction, some characters may have left, and live fleet IDs may have changed. The restore preview makes any departed-character invitations visible and requires the normal explicit start confirmation; it never starts or reinvites automatically.
 
 ## 10. User experience specification
 
@@ -417,53 +443,42 @@ The app is optimized for one person operating several clients. Primary actions r
 
 Left navigation contains:
 
-- **Home**
-- **Profiles**
 - **Live Fleet**
+- **Saved setups**
 - **Activity**
 - **Settings**
 
 The title/status area always shows authenticated character, current fleet ID/state, boss status, last refresh age, ESI health/rate state, and active operation.
 
-### 10.2 Home — fast path
-
-Home is the default screen and includes:
-
-- Profile selector remembering the last choice.
-- Large primary **Invite & Organise** button.
-- Secondary **Invite Missing**, **Repair Layout**, and **Open Live Fleet** commands.
-- Compact preflight summary: “12 saved characters; 4 already present; 8 to invite; 2 squads to create.”
-- Active-run list grouped into **Inviting**, **Waiting for acceptance**, **Placing**, **Done**, and **Needs attention**.
-- **Retry failed**, **Skip**, and **Cancel safely** actions.
-
-Clicking the primary action first opens a dry-run preview only when there are warnings, destructive-looking role transitions, unresolved names, or an invalid profile. A routine clean run starts immediately and remains cancelable.
-
-### 10.3 Profiles
+### 10.2 Saved setups
 
 - Hierarchical wing/squad editor with add, rename, reorder, duplicate, and delete.
-- Roster table with character, tags, intended squad, intended role, and resolution status.
+- Dense extended-selection roster table with character, tags, intended squad, intended role, and resolution status; Ctrl/Shift selection and compact drag targets follow normal Windows list behaviour.
 - Paste roster dialog accepting lines, commas, tabs, copied spreadsheets, and `Name — Squad — Role` where recognizable.
 - Bulk assign selected characters to a squad/tag.
 - **Save current fleet as profile** imports the live structure and assignments.
 - Validation appears inline before save; invalid profiles cannot be run.
 
-### 10.4 Live Fleet
+### 10.3 Live Fleet — default command centre
 
-- Virtualized hierarchy tree grouped by wing and squad.
-- Search by character, squad, ship type, or tag.
-- Multi-select members and drag to another squad.
-- Context actions: move, set squad commander, set wing commander, set fleet commander, return to member, copy name, and retry failed placement.
+- Dense live tree grouped by fleet command, wing, and squad, with one row per pilot and the raw ESI tree available only as optional detail.
+- Context-preserving filter by character, squad, wing, ship type, or role with an explicit shown/total count.
+- Select members with click/Ctrl-click/Shift-click, drag them to another position, and preview them in the destination with `MOVED` plus per-row Undo before Apply/Cancel.
+- Apply a saved setup, stage exact-name invitations, review pending changes, update fleet settings, and unlock high-impact operations without navigating away.
+- Position actions: move/return to squad member, set squad commander, set wing commander, copy name, and retry failed placement. Fleet-boss transfer stays in the separately confirmed high-impact controls.
+- Direct invitations can target an ordinary squad position or one empty squad/wing commander seat; the request omits wing/squad IDs according to ESI's role contract.
+- Clean rebuild is high impact: create/reuse `Unknown`, evacuate every member before deleting emptied live hierarchy, create the saved hierarchy, place exact/ship-rule matches, restore command roles, and leave unmatched members in `Unknown`.
 - Badges for `Correct`, `Wrong squad`, `Wrong role`, `Unassigned`, `Pending invite`, and `ESI stale`.
 - A ghost/placeholder row can show a saved character expected in a squad but not yet in fleet.
 
-### 10.5 Activity
+### 10.4 Activity
 
 - Chronological operation list with summary and final status.
 - Expandable per-step audit: intended action, ESI result, attempt count, and safe user message.
 - Resume interrupted operation, retry selected failures, view pre-run snapshot, and start restore preview.
 - Export a redacted diagnostic bundle containing logs, app version, settings excluding tokens, and relevant operation metadata.
 
-### 10.6 Settings
+### 10.5 Settings
 
 - Sign in/out and display granted scopes.
 - Client ID and registered callback validation.
@@ -483,7 +498,7 @@ Clicking the primary action first opens a dry-run preview only when there are wa
 
 ### 11.1 Reliability rules
 
-- External side effects occur only inside persisted operation steps.
+- Routine side effects occur only inside persisted operation steps. Separately unlocked direct administration and clean rebuild actions require a fresh same-fleet/fleet-boss check plus an exact confirmation; an ambiguous write outcome is never automatically replayed.
 - Plan computation is pure and covered by table-driven tests.
 - Every step is idempotent or preceded by a fresh state check.
 - Database writes for step completion are transactional.
@@ -517,7 +532,7 @@ Required table-driven coverage:
 - Structure matching with missing, duplicate, renamed, and extra live nodes.
 - Desired/actual diff emits only necessary operations.
 - Re-running an already-satisfied profile emits no writes.
-- Placement precedence for override, exact, tag, ship, default, and unassigned.
+- Placement precedence for exact assignments, ship rules, fleet-boss exclusion, and unmatched live members.
 - Commander swaps and legal intermediate transitions.
 - Authenticated boss protection.
 - Invite partitioning: present, missing, unresolved, failed, accepted.
@@ -583,7 +598,6 @@ The WPF app additionally sets `UseWPF=true`. Any unavoidable XAML-generated warn
 - `Microsoft.Extensions.Http`
 - `Microsoft.Data.Sqlite`
 - `System.Security.Cryptography.ProtectedData`
-- `GongSolutions.WPF.DragDrop`
 - `Serilog.Extensions.Hosting`
 - `Serilog.Sinks.File`
 - `xunit`
@@ -683,7 +697,7 @@ No Rust, Node.js, database server, Docker, IIS, or cloud account is required.
 - Pure diff planner, durable operation state machine, invite queue, acceptance detection, ordinary member placement, resume/cancel, and per-character progress.
 - **Exit:** one button invites a 15-character saved roster and places accepted characters idempotently.
 
-**Implemented:** guarded start/re-review, durable steps and snapshot, serialized invite queue, acceptance checks, ordinary placement, restart resume, retry/skip/cancel, CSPA guidance, and rate-pause timestamps. A routine run continues with **Refresh & continue** after invitations are accepted; unattended background polling remains a later quality-of-life option.
+**Implemented:** guarded start/re-review, durable steps and snapshot, serialized invite queue, acceptance checks, ordinary placement, restart resume, retry/skip/cancel, CSPA guidance, and rate-pause timestamps. A waiting confirmed run checks for accepted invitations every 30 seconds while the app is open; **Check now** remains available.
 
 ### Milestone 5 — hierarchy and commanders
 
@@ -694,13 +708,17 @@ No Rust, Node.js, database server, Docker, IIS, or cloud account is required.
 
 ### Milestone 6 — quality-of-life and recovery
 
-- Multi-select drag/drop, snapshots, restore preview, activity history, diagnostic export, keyboard flows, tray behavior, sounds, and stale-state badges.
+- Multi-select drag/drop, ship placement rules, automatic invite-acceptance checks, snapshots, restore preview, activity history, diagnostic export, keyboard flows, tray behavior, sounds, and stale-state badges.
 - **Exit:** routine repeated use requires only profile choice, one click, and invite acceptance.
+
+**Implemented:** frequent-template preferences, safe partial modes, searchable multi-select template/live-board staging, priority/overflow/balanced/fallback ship policies, named acceptance waiting and timeout, capacity preflight, restore preview, durable chronological history, redacted diagnostic export, keyboard flows, theme/startup/tray preferences, and attention sounds.
 
 ### Milestone 7 — release hardening
 
 - Clean-machine package test, performance/accessibility pass, rate/network soak tests, ESI contract review, documentation, checksum, and release workflow.
 - **Exit:** self-contained Windows release meets all acceptance criteria.
+
+**Implemented in repository automation:** semantic version metadata, MIT license/changelog, self-contained single-file Windows x64 packaging, SHA-256 generation, CI artifact upload, a read-only manual/tag release-candidate workflow, a manual stable-release check, and explicit exclusion of developer-local configuration. Publishing a GitHub Release, code signing, installer packaging, and clean-machine/manual EVE acceptance remain explicit release-operator tasks.
 
 ## 16. MVP acceptance criteria
 
@@ -727,15 +745,15 @@ The MVP is complete when all statements below are true:
 - Live fleet numeric wing/squad IDs do not persist between fleets; profile mapping must be name/parent based.
 - Best-effort restore cannot reconstruct a fleet exactly if characters leave or the live hierarchy changes incompatibly.
 
-## 18. Open decisions that do not block coding
+## 18. Remaining release-operator decisions
 
 - Final product name, icon, and color accent.
-- Portable executable only versus signed installer for the first public handoff.
+- Portable ZIP only versus a signed installer for a later public handoff.
 - Whether profile import/export uses JSON only or also a simple CSV roster format.
-- Whether ship rules enter MVP or the first follow-up release; the architecture supports them either way.
-- Optional completion sounds and minimize-to-tray defaults.
+- Whether to purchase a Windows code-signing certificate.
+- Whether the first tag is a prerelease after the clean-machine/two-alt acceptance run.
 
-None of these changes the selected stack or core operation engine. They can be decided independently while Milestone 6 is implemented.
+None of these changes the selected stack or core operation engine.
 
 ## 19. Research sources
 
@@ -744,14 +762,15 @@ None of these changes the selected stack or core operation engine. They can be d
 - [EVE ESI rate limiting](https://developers.eveonline.com/docs/services/esi/rate-limiting/)
 - [EVE ESI best practices](https://developers.eveonline.com/docs/services/esi/best-practices/)
 - [Current ESI OpenAPI document](https://esi.evetech.net/meta/openapi.json)
+- [CCP fleet multi-selection and mass-operation design](https://www.eveonline.com/ja/news/view/fleetchanges_ui)
+- [CCP distinction between Fleet Commander and Fleet Boss authority](https://www.eveonline.com/ko/news/view/fleet-you-fools)
 - [.NET 10 overview and LTS status](https://learn.microsoft.com/en-us/dotnet/core/whats-new/dotnet-10/overview)
 - [WPF changes in .NET 10](https://learn.microsoft.com/en-us/dotnet/desktop/wpf/whats-new/net100)
 - [Microsoft MVVM Toolkit](https://learn.microsoft.com/en-us/dotnet/communitytoolkit/mvvm/)
 - [Microsoft.Data.Sqlite](https://learn.microsoft.com/en-us/dotnet/standard/data/sqlite/)
 - [Windows data protection from .NET](https://learn.microsoft.com/en-us/dotnet/standard/security/how-to-use-data-protection)
 - [.NET single-file deployment](https://learn.microsoft.com/en-us/dotnet/core/deploying/single-file/overview)
-- [GongSolutions WPF DragDrop](https://github.com/punker76/gong-wpf-dragdrop)
 
 ## 20. Current build checkpoint
 
-Milestones 0–5 and the first Milestone 6 usability slice are implemented in the repository. The current live-write boundary includes safe structure creation/renaming, invitations, managed-member staging, and serialized squad/wing commander transitions with final verification. Remaining Milestone 6 recovery slices are snapshot/restore preview, chronological activity history, and redacted diagnostics.
+Milestones 0–6 and the repository-side Milestone 7 packaging work are implemented. The current live-write boundary includes safe structure creation/renaming, invitations, managed-member staging, and serialized squad/wing commander transitions with final verification. Frequent-template preferences, filtered quick-run modes, searchable bulk staging, priority/overflow ship policies, named automatic acceptance checks, configurable timeouts/polling, capacity preflight, restore preview, durable history, redacted diagnostics, themes, tray mode, and attention sounds are implemented without widening that boundary. A signed installer and live clean-machine/two-alt acceptance remain release work rather than missing application behavior.

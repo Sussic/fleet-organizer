@@ -47,6 +47,46 @@ internal sealed class FleetOperationRepository(
             : null;
     }
 
+    public async Task<FleetOperation[]> LoadRecentAsync(
+        int maximumCount,
+        CancellationToken cancellationToken = default)
+    {
+        if (maximumCount is < 1 or > 500)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(maximumCount),
+                "Operation history supports between 1 and 500 entries.");
+        }
+
+        await using var connection = CreateConnection();
+        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        await EnableForeignKeysAsync(connection, cancellationToken).ConfigureAwait(false);
+
+        var ids = new List<Guid>();
+        await using (var command = connection.CreateCommand())
+        {
+            command.CommandText =
+                "SELECT id FROM active_operations ORDER BY updated_utc DESC LIMIT $maximumCount;";
+            command.Parameters.AddWithValue("$maximumCount", maximumCount);
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+            {
+                ids.Add(Guid.Parse(reader.GetString(0)));
+            }
+        }
+
+        var operations = new List<FleetOperation>(ids.Count);
+        foreach (var id in ids)
+        {
+            if (await LoadAsync(connection, id, cancellationToken).ConfigureAwait(false) is { } operation)
+            {
+                operations.Add(operation);
+            }
+        }
+
+        return operations.ToArray();
+    }
+
     public async Task<LiveFleetSnapshot?> LoadInitialSnapshotAsync(
         Guid operationId,
         CancellationToken cancellationToken = default)

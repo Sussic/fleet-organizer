@@ -470,18 +470,6 @@ public static class FleetPlanner
             return true;
         }
 
-        if (assignment.CharacterId == snapshot.FleetBossId &&
-            assignment.DesiredRole != DesiredFleetRole.FleetCommander)
-        {
-            blockers.Add(new FleetPlanItem(
-                FleetPlanItemKind.Blocked,
-                $"Cannot demote fleet boss {assignment.CharacterName}",
-                "The authenticated fleet boss must retain fleet-command authority while an operation runs.",
-                assignment.CharacterId,
-                assignment.TargetSquadId));
-            return true;
-        }
-
         return false;
     }
 

@@ -60,6 +60,10 @@ internal sealed record FleetInfoResponse(
     [property: JsonPropertyName("is_voice_enabled")] bool IsVoiceEnabled,
     [property: JsonPropertyName("motd")] string Motd);
 
+internal sealed record UpdateFleetRequest(
+    [property: JsonPropertyName("is_free_move")] bool IsFreeMove,
+    [property: JsonPropertyName("motd")] string Motd);
+
 internal sealed record FleetMemberResponse(
     [property: JsonPropertyName("character_id")] long CharacterId,
     [property: JsonPropertyName("join_time")] DateTimeOffset JoinTime,
@@ -96,8 +100,10 @@ internal sealed record UniverseIdsResponse(
 internal sealed record InviteFleetMemberRequest(
     [property: JsonPropertyName("character_id")] long CharacterId,
     [property: JsonPropertyName("role")] string Role,
-    [property: JsonPropertyName("squad_id")] long SquadId,
-    [property: JsonPropertyName("wing_id")] long WingId);
+    [property: JsonPropertyName("squad_id")]
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] long? SquadId,
+    [property: JsonPropertyName("wing_id")]
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] long? WingId);
 
 internal sealed record CreatedFleetWingResponse(
     [property: JsonPropertyName("wing_id")] long WingId);

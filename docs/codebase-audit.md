@@ -1,0 +1,97 @@
+# Fleet Desk codebase audit
+
+Audit date: 2026-07-21  
+Audited release: 0.12.0 candidate
+
+## Verdict
+
+The guarded ESI, authentication, persistence, planning, and recovery layers are substantially safer and better tested than the desktop workflow built on top of them. The application is not a throwaway scaffold, but the UI layer has accumulated several generations of workflow in two very large view models and one oversized XAML file. That mismatch explains why engine-level tests pass while normal FC interactions can still feel inconsistent or appear not to work.
+
+Release 0.12 closes the remaining structural findings from the original audit. Dead workflow generations are gone, the live board is flat and virtualized, hierarchy edits and moves share one ordered pending owner, ad-hoc runs have an isolated coordinator and internal audit profile, confirmations/file dialogs are injected, and the former catch-all view models are split by responsibility. Executable App tests now cover the FC interaction policies that previously existed only in WPF event paths. Windows high contrast, visible keyboard focus, access keys, and screen-reader live status are explicit behavior rather than follow-up recommendations.
+
+## What was reviewed
+
+- EVE SSO, JWT validation, refresh-token storage, and DPAPI protection.
+- ESI request serialization, response caching, error/rate-limit backoff, and write mapping.
+- Live-fleet detection, hierarchy/name resolution, manual and scheduled refresh.
+- Direct invitation, staged movement, commander transitions, destructive controls, and clean rebuild.
+- Saved setups, ship rules, dry-run planning, durable execution, retry/recovery, and persistence.
+- WPF navigation, selection, drag/drop, status feedback, keyboard commands, scaling, and setup/release scripts.
+- Core, infrastructure, persistence, UI-markup, dependency audit, CI, and packaging coverage.
+
+## Confirmed defects corrected in 0.10.1
+
+1. Quick Invite reused the general movement target list, so multiple pasted names could be paired with one commander seat. Commander invite targets now appear only for one name and only when the live seat is empty and unreserved. The ESI service still rejects stale invalid requests before writing.
+2. Bulk movement had the same cardinality leak. Multiple selected pilots now see only squad-member targets, and a shared Core rule rejects stale multi-pilot command-seat requests.
+3. A second pilot could be staged into an occupied or reserved command seat. The current commander must now be staged out first, making replacement intent explicit.
+4. Apply performed asynchronous preparation without nearby progress, and blockers were written to a status area away from the clicked button. Apply now has a busy state and inline success/blocker/error feedback.
+5. Routine live execution eligibility incorrectly depended on Saved Setup editor state. Starting a reviewed live change now depends on operation state, not whether the template editor happens to be active.
+6. An existing durable run could block a new Apply with no useful local explanation. The Apply area now directs the FC to Activity to finish, retry, or cancel that run.
+7. After a run started, staging markers were cleared while the board still used the old in-memory snapshot. A fresh ESI read now occurs immediately so the board reflects the actual result.
+8. Refresh now used the cache-friendly load path, so it could visibly reuse stale fleet detection. Manual and scheduled checks now use the cache-invalidating refresh path; the ESI client still serializes requests and honors backoff.
+9. Empty hierarchy deletion used staged visual occupancy. Delete availability and command validation now use actual EVE occupancy, with the service retaining its fresh pre-write check.
+10. Setup failed with locked DLLs when the app was open. It now detects the process and offers to close it before building.
+
+## Strong parts worth preserving
+
+- PKCE SSO, issuer/audience/signature/scope checks, DPAPI-protected refresh tokens, and no required client secret.
+- Serialized ESI writes, no blind write replay, cache validators, request IDs, and 420/429/error-limit pause handling.
+- Fresh fleet-ID and fleet-boss checks immediately before write paths.
+- Pure Core validation/planning for hierarchy ambiguity, capacities, role uniqueness, unmanaged commanders, and fleet-boss safety.
+- Durable operations with per-step state, initial snapshots, create-ID propagation, verification, retry/skip/cancel, restart recovery, and history.
+- Destructive actions are separated from routine moves and receive explicit confirmation plus service-side revalidation.
+- Clean rebuild stops before unsafe deletion when evacuation cannot be confirmed and preserves unmatched pilots in `Unknown`.
+- Windows CI builds, tests, audits packages, and publishes a self-contained smoke artifact.
+
+## 0.12 structural correction status
+
+### P1 — UI behavior tests — complete
+
+The infrastructure test assembly references the App and executes live-board projection, live-profile composition, pending state, selection, target policy, Apply policy, reconciliation, occupancy, theme, and live-run coordinator tests. XAML smoke tests remain as a separate binding/virtualization/accessibility guard. Durable operation restart and changed-snapshot behavior remain covered in the operation service suite.
+
+Minimum regression scenarios:
+
+- zero, one, and several invite names against occupied and empty command seats;
+- click, Ctrl-click, Shift-click, select-shown, drag, undo, cancel-all, and staged replacement;
+- Apply while idle, refreshing, blocked by an active run, rejected by a changed live snapshot, completed, and needs-attention;
+- accepted invite reconciliation and restart recovery;
+- actual-vs-staged occupancy for destructive controls.
+
+### P1 — Remove dead workflow generations — complete
+
+The unreachable `Home` and `Legacy Live Fleet` trees and their dead command/property surface were removed. Live Fleet has one authoritative board and action rail.
+
+### P1 — Split state ownership — complete
+
+`LiveFleetPendingChanges` owns moves, structure edits, invite tracking, replacement, clearing, and chronological Undo. `LiveFleetSelectionModel` owns Windows-style selection. `LiveFleetRunCoordinator` owns ad-hoc profile composition, internal persistence, planning, and mode selection. WPF confirmations and file pickers are behind injected services. Durable operation display remains in the operation partial of `ProfilesViewModel`, while orchestration remains in the existing tested operation service.
+
+### P1 — Virtualize the live board — complete
+
+`LiveFleetBoardProjection` flattens the displayed EVE hierarchy into ordered wing, squad, and member rows. A recycling virtualizing `ListBox` renders only the visible rows while preserving staged destinations, extended selection, and squad drop targets.
+
+### P2 — Complete direct live hierarchy management — complete
+
+The new Structure tab queues add-wing, add-squad, rename-wing, and rename-squad changes. They appear in the shared Changes queue and use the same guarded one-confirmation operation as pilot moves. Deletion and fleet-boss transfer remain separately unlocked and reconfirmed.
+
+### P2 — Make keyboard/accessibility behavior page-aware — complete
+
+Ctrl+Enter applies the live pending queue or sends pasted invitation names on Live Fleet, while retaining setup/activity behavior on those pages. Ctrl+K focuses live search, Ctrl+Z undoes the actual latest queued edit across move/structure types, F5 is page-aware, and Escape clears the current live filter/selection. The shell has access keys and visible keyboard focus; dynamic fleet, Apply, command, and attention status use automation live regions. Theme resources switch to Windows system colors when high contrast is active and update while the app is open.
+
+### P2 — Improve handled-error diagnostics — complete for direct workflows
+
+Handled refresh, invitation, Apply, administration, and rebuild exceptions now append a redacted structured workflow log with timestamp, action, fleet ID, exception type, and message. The existing support export includes those logs; durable operation summaries already include step key, failure kind, attempts, and retry state.
+
+### P3 — Unify naming and documentation — user-facing complete
+
+The product is now Fleet Desk in the window, dialogs, setup output, README, exported setup labels, and current documentation. The `FleetOrganizer` assembly, namespace, data directory, and artifact IDs remain stable intentionally so the upgrade does not split user data or break automation.
+
+## Feature boundary
+
+Within ESI's fleet endpoints, the engine covers detection, settings/MOTD, invitation, member placement, squad/wing commander assignment, hierarchy create/rename/delete, kick, fleet-boss transfer, saved-layout repair, and guarded rebuild. Client-only EVE actions such as fleet warp, broadcasts, watch lists, voice controls, and accepting invitations cannot be automated through this ESI application and should not be represented as promised features.
+
+## Release verification sequence
+
+1. Run the 0.12 Windows build/test/package gate.
+2. Manually exercise invitation, movement, hierarchy edit, Apply, restart recovery, and destructive confirmations against a disposable EVE fleet.
+3. Verify Windows Narrator announcements and keyboard focus in the packaged artifact.
+4. Treat further decomposition as normal maintenance rather than known release-blocking debt.

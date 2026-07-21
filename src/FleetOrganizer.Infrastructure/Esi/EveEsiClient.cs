@@ -61,6 +61,24 @@ internal sealed class EveEsiClient : IDisposable
             LiveFleetCacheDuration,
             cancellationToken);
 
+    public Task<EsiResult<EsiEmptyResponse>> UpdateFleetAsync(
+        long fleetId,
+        UpdateFleetRequest settings,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+
+        return SendWriteAsync(
+            () => new HttpRequestMessage(
+                HttpMethod.Put,
+                new Uri(EsiBaseUri, $"fleets/{fleetId}"))
+            {
+                Content = JsonContent.Create(settings, options: SerializerOptions),
+            },
+            fleetId,
+            cancellationToken);
+    }
+
     public Task<EsiResult<FleetMemberResponse[]>> GetFleetMembersAsync(
         long fleetId,
         CancellationToken cancellationToken) =>
@@ -113,6 +131,27 @@ internal sealed class EveEsiClient : IDisposable
             fleetId,
             cancellationToken);
     }
+
+    public Task<EsiResult<EsiEmptyResponse>> KickFleetMemberAsync(
+        long fleetId,
+        long characterId,
+        CancellationToken cancellationToken) =>
+        SendWriteAsync(
+            () => new HttpRequestMessage(
+                HttpMethod.Delete,
+                new Uri(EsiBaseUri, $"fleets/{fleetId}/members/{characterId}")),
+            fleetId,
+            cancellationToken);
+
+    public Task<EsiResult<EsiEmptyResponse>> TransferFleetBossAsync(
+        long fleetId,
+        long characterId,
+        CancellationToken cancellationToken) =>
+        MoveFleetMemberAsync(
+            fleetId,
+            characterId,
+            new MoveFleetMemberRequest("fleet_commander", SquadId: null, WingId: null),
+            cancellationToken);
 
     public Task<EsiResult<CreatedFleetWingResponse>> CreateFleetWingAsync(
         long fleetId,
@@ -172,6 +211,28 @@ internal sealed class EveEsiClient : IDisposable
             fleetId,
             cancellationToken);
     }
+
+    public Task<EsiResult<EsiEmptyResponse>> DeleteFleetSquadAsync(
+        long fleetId,
+        long squadId,
+        CancellationToken cancellationToken) =>
+        SendWriteAsync(
+            () => new HttpRequestMessage(
+                HttpMethod.Delete,
+                new Uri(EsiBaseUri, $"fleets/{fleetId}/squads/{squadId}")),
+            fleetId,
+            cancellationToken);
+
+    public Task<EsiResult<EsiEmptyResponse>> DeleteFleetWingAsync(
+        long fleetId,
+        long wingId,
+        CancellationToken cancellationToken) =>
+        SendWriteAsync(
+            () => new HttpRequestMessage(
+                HttpMethod.Delete,
+                new Uri(EsiBaseUri, $"fleets/{fleetId}/wings/{wingId}")),
+            fleetId,
+            cancellationToken);
 
     public async Task<EsiResult<UniverseNameResponse[]>> PostUniverseNamesAsync(
         long[] ids,

@@ -8,7 +8,7 @@ public sealed partial class SqliteDatabaseInitializer(
     IAppDataPaths paths,
     ILogger<SqliteDatabaseInitializer> logger)
 {
-    private const long CurrentSchemaVersion = 2;
+    private const long CurrentSchemaVersion = 5;
 
     static SqliteDatabaseInitializer()
     {
@@ -62,6 +62,24 @@ public sealed partial class SqliteDatabaseInitializer(
         {
             ApplyVersionTwo(connection);
             LogMigrationApplied(logger, 2);
+        }
+
+        if (currentVersion < 3)
+        {
+            ApplyVersionThree(connection);
+            LogMigrationApplied(logger, 3);
+        }
+
+        if (currentVersion < 4)
+        {
+            ApplyVersionFour(connection);
+            LogMigrationApplied(logger, 4);
+        }
+
+        if (currentVersion < 5)
+        {
+            ApplyVersionFive(connection);
+            LogMigrationApplied(logger, 5);
         }
 
         LogDatabaseReady(logger, CurrentSchemaVersion);
@@ -123,6 +141,69 @@ public sealed partial class SqliteDatabaseInitializer(
         migrationCommand.CommandText =
             "INSERT INTO schema_migrations (version, applied_utc) VALUES ($version, $appliedUtc);";
         migrationCommand.Parameters.AddWithValue("$version", 2);
+        migrationCommand.Parameters.AddWithValue(
+            "$appliedUtc",
+            DateTimeOffset.UtcNow.ToString("O", System.Globalization.CultureInfo.InvariantCulture));
+        migrationCommand.ExecuteNonQuery();
+
+        transaction.Commit();
+    }
+
+    private static void ApplyVersionThree(SqliteConnection connection)
+    {
+        using var transaction = connection.BeginTransaction();
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = VersionThreeSql;
+        command.ExecuteNonQuery();
+
+        using var migrationCommand = connection.CreateCommand();
+        migrationCommand.Transaction = transaction;
+        migrationCommand.CommandText =
+            "INSERT INTO schema_migrations (version, applied_utc) VALUES ($version, $appliedUtc);";
+        migrationCommand.Parameters.AddWithValue("$version", 3);
+        migrationCommand.Parameters.AddWithValue(
+            "$appliedUtc",
+            DateTimeOffset.UtcNow.ToString("O", System.Globalization.CultureInfo.InvariantCulture));
+        migrationCommand.ExecuteNonQuery();
+
+        transaction.Commit();
+    }
+
+    private static void ApplyVersionFour(SqliteConnection connection)
+    {
+        using var transaction = connection.BeginTransaction();
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = VersionFourSql;
+        command.ExecuteNonQuery();
+
+        using var migrationCommand = connection.CreateCommand();
+        migrationCommand.Transaction = transaction;
+        migrationCommand.CommandText =
+            "INSERT INTO schema_migrations (version, applied_utc) VALUES ($version, $appliedUtc);";
+        migrationCommand.Parameters.AddWithValue("$version", 4);
+        migrationCommand.Parameters.AddWithValue(
+            "$appliedUtc",
+            DateTimeOffset.UtcNow.ToString("O", System.Globalization.CultureInfo.InvariantCulture));
+        migrationCommand.ExecuteNonQuery();
+
+        transaction.Commit();
+    }
+
+    private static void ApplyVersionFive(SqliteConnection connection)
+    {
+        using var transaction = connection.BeginTransaction();
+        using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = VersionFiveSql;
+        command.ExecuteNonQuery();
+
+        using var migrationCommand = connection.CreateCommand();
+        migrationCommand.Transaction = transaction;
+        migrationCommand.CommandText =
+            "INSERT INTO schema_migrations (version, applied_utc) VALUES ($version, $appliedUtc);";
+        migrationCommand.Parameters.AddWithValue("$version", 5);
         migrationCommand.Parameters.AddWithValue(
             "$appliedUtc",
             DateTimeOffset.UtcNow.ToString("O", System.Globalization.CultureInfo.InvariantCulture));
@@ -268,5 +349,49 @@ public sealed partial class SqliteDatabaseInitializer(
 
         CREATE INDEX ix_active_operations_updated
             ON active_operations(updated_utc DESC);
+        """;
+
+    private const string VersionThreeSql =
+        """
+        CREATE TABLE profile_ship_rules (
+            id TEXT NOT NULL PRIMARY KEY,
+            profile_id TEXT NOT NULL,
+            ship_type_name TEXT NOT NULL COLLATE NOCASE,
+            target_squad_id TEXT NOT NULL,
+            sort_order INTEGER NOT NULL,
+            FOREIGN KEY (profile_id) REFERENCES fleet_profiles(id) ON DELETE CASCADE,
+            FOREIGN KEY (target_squad_id) REFERENCES profile_squads(id) ON DELETE CASCADE,
+            UNIQUE (profile_id, ship_type_name)
+        );
+
+        CREATE INDEX ix_profile_ship_rules_profile_sort
+            ON profile_ship_rules(profile_id, sort_order);
+        """;
+
+    private const string VersionFourSql =
+        """
+        ALTER TABLE profile_ship_rules
+            ADD COLUMN label TEXT NOT NULL DEFAULT '';
+
+        ALTER TABLE profile_ship_rules
+            ADD COLUMN overflow_squad_id TEXT NULL;
+
+        ALTER TABLE profile_ship_rules
+            ADD COLUMN max_per_squad INTEGER NOT NULL DEFAULT 10;
+
+        ALTER TABLE profile_ship_rules
+            ADD COLUMN balance_targets INTEGER NOT NULL DEFAULT 0;
+
+        ALTER TABLE profile_ship_rules
+            ADD COLUMN is_fallback INTEGER NOT NULL DEFAULT 0;
+        """;
+
+    private const string VersionFiveSql =
+        """
+        ALTER TABLE fleet_profiles
+            ADD COLUMN is_internal INTEGER NOT NULL DEFAULT 0;
+
+        CREATE INDEX ix_fleet_profiles_internal_name
+            ON fleet_profiles(is_internal, name COLLATE NOCASE);
         """;
 }

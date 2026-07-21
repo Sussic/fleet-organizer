@@ -180,6 +180,57 @@ public sealed class EveEsiClientTests
     }
 
     [Fact]
+    public async Task WingCommanderInvitationOmitsSquadId()
+    {
+        string? requestBody = null;
+        using var httpClient = new HttpClient(new AsyncDelegateHandler(async (
+            request,
+            cancellationToken) =>
+        {
+            requestBody = await request.Content!.ReadAsStringAsync(cancellationToken);
+            return CreateEmptyResponse(HttpStatusCode.NoContent);
+        }));
+        using var client = CreateClient(httpClient, new TestAuthenticationService());
+
+        var result = await client.InviteFleetMemberAsync(
+            7001,
+            new InviteFleetMemberRequest(9002, "wing_commander", null, 10),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var body = Assert.IsType<string>(requestBody);
+        Assert.Contains("\"role\":\"wing_commander\"", body, StringComparison.Ordinal);
+        Assert.Contains("\"wing_id\":10", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("squad_id", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task FleetSettingsUpdatePreservesCurrentOpenApiContract()
+    {
+        string? requestBody = null;
+        using var httpClient = new HttpClient(new AsyncDelegateHandler(async (
+            request,
+            cancellationToken) =>
+        {
+            Assert.Equal(HttpMethod.Put, request.Method);
+            Assert.Equal("/fleets/7001", request.RequestUri?.AbsolutePath);
+            requestBody = await request.Content!.ReadAsStringAsync(cancellationToken);
+            return CreateEmptyResponse(HttpStatusCode.NoContent);
+        }));
+        using var client = CreateClient(httpClient, new TestAuthenticationService());
+
+        var result = await client.UpdateFleetAsync(
+            7001,
+            new UpdateFleetRequest(true, "Form on anchor"),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var body = Assert.IsType<string>(requestBody);
+        Assert.Contains("\"is_free_move\":true", body, StringComparison.Ordinal);
+        Assert.Contains("\"motd\":\"Form on anchor\"", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task FleetPlacementHonorsRateLimitRetryAfter()
     {
         using var httpClient = new HttpClient(new DelegateHandler(request =>
@@ -248,6 +299,59 @@ public sealed class EveEsiClientTests
         Assert.Contains("\"role\":\"wing_commander\"", body, StringComparison.Ordinal);
         Assert.Contains("\"wing_id\":10", body, StringComparison.Ordinal);
         Assert.DoesNotContain("squad_id", body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task FleetBossTransferUsesFleetCommanderRoleWithoutStructureIds()
+    {
+        string? requestBody = null;
+        using var httpClient = new HttpClient(new AsyncDelegateHandler(async (
+            request,
+            cancellationToken) =>
+        {
+            Assert.Equal(HttpMethod.Put, request.Method);
+            Assert.Equal("/fleets/7001/members/9002", request.RequestUri?.AbsolutePath);
+            requestBody = await request.Content!.ReadAsStringAsync(cancellationToken);
+            return CreateEmptyResponse(HttpStatusCode.NoContent);
+        }));
+        using var client = CreateClient(httpClient, new TestAuthenticationService());
+
+        var result = await client.TransferFleetBossAsync(7001, 9002, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var body = Assert.IsType<string>(requestBody);
+        Assert.Contains("\"role\":\"fleet_commander\"", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("squad_id", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("wing_id", body, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("/fleets/7001/members/9002", "member")]
+    [InlineData("/fleets/7001/squads/20", "squad")]
+    [InlineData("/fleets/7001/wings/10", "wing")]
+    public async Task DestructiveFleetRoutesUseDeleteWithoutAutomaticReplay(
+        string expectedPath,
+        string action)
+    {
+        var requestCount = 0;
+        using var httpClient = new HttpClient(new DelegateHandler(request =>
+        {
+            requestCount++;
+            Assert.Equal(HttpMethod.Delete, request.Method);
+            Assert.Equal(expectedPath, request.RequestUri?.AbsolutePath);
+            return CreateEmptyResponse(HttpStatusCode.NoContent);
+        }));
+        using var client = CreateClient(httpClient, new TestAuthenticationService());
+
+        var result = action switch
+        {
+            "member" => await client.KickFleetMemberAsync(7001, 9002, CancellationToken.None),
+            "squad" => await client.DeleteFleetSquadAsync(7001, 20, CancellationToken.None),
+            _ => await client.DeleteFleetWingAsync(7001, 10, CancellationToken.None),
+        };
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(1, requestCount);
     }
 
     [Fact]

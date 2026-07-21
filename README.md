@@ -1,8 +1,10 @@
-# Fleet Organizer
+# Fleet Desk
 
-Fleet Organizer is a local Windows 11 utility for repeatedly creating the same useful EVE Online fleet layout. It is designed for one player managing their own fleets and alts.
+Fleet Desk is a local Windows 11 utility for repeatedly creating and operating useful EVE Online fleet layouts. It is designed for one player managing their own fleets and alts.
 
-This repository currently contains the **Milestone 6 usability slice** on top of the guarded Milestone 5 fleet engine. Home now provides a guided choose → check → review → run workflow, Profiles has searchable/virtualized profile and roster views with a simple default and optional advanced hierarchy editor, and Activity explains the current durable operation in plain language before showing technical per-step recovery controls. The existing fresh-fleet checks, explicit confirmation, persistence, and no-kick/no-delete safety boundary are unchanged.
+The current implementation review and prioritized engineering debt are recorded in [docs/codebase-audit.md](docs/codebase-audit.md).
+
+This repository contains the **Fleet Desk 0.12 FC workflow** on top of the guarded fleet engine. Live Fleet is the primary compact command workspace: filter a virtualized EVE-style hierarchy, select pilots with normal click/Ctrl-click/Shift-click behaviour, stage their destination visually, invite directly into squads or empty command seats, queue wing/squad creation and renaming, or apply a saved setup and its ship policies without page hopping. Normal moves and structure edits use one ordered queue, one reliable Undo path, and one confirmation. Invite destinations prevent invalid multi-pilot commander batches before the click. Kick, hierarchy deletion, fleet-boss transfer, and clean rebuild are separately unlocked, freshly revalidated, and confirmed again before they write. High-contrast system colors, visible keyboard focus, access keys, and screen-reader live status are built into the shell.
 
 ## Requirements
 
@@ -58,43 +60,50 @@ Do not paste or commit the EVE client secret. The desktop app uses Authorization
 
 After saving the public client ID, run `run.cmd`, open **Settings**, and choose **Sign in with EVE**. Authorize the character that will act as fleet boss. The refresh token is encrypted with Windows DPAPI for the current Windows user; the access token remains in memory only.
 
-## Use Live Fleet
+## Use Live Fleet and stage quick moves
 
 1. Create or join a fleet in the EVE client.
 2. Make the signed-in character fleet boss.
-3. Open **Live Fleet** in Fleet Organizer.
-4. Use **Refresh now** when you want an immediate cache-aware check.
+3. Open **Live Fleet** in Fleet Desk.
+4. Leave the page open for automatic cache-aware checks, or use **Check immediately** when needed.
+5. Use **Find** to narrow the hierarchy. Click a pilot, Ctrl-click individuals, or Shift-click a range; then choose a destination or drag the selection onto a squad/wing-command row.
+6. Use **Invite** for paste-and-send invitations to a squad or empty commander seat, **Structure** for queued wing/squad creation and renaming, **Saved setup** for a reusable layout, or **Changes** for the complete pending queue.
+7. Normal moves need one exact confirmation. Invitations send immediately from the explicit **Invite now** button. Fleet Desk remains on the command page while work proceeds.
 
-The view shows fleet command, wings, squads, member roles, ships, and locations. It automatically refreshes every 30 seconds while the page is open and pauses while the app is minimized. ESI's own cache expiry can mean a just-created fleet takes up to roughly one minute to appear.
+The view shows fleet command, wing command, squads, member roles, and ships in one dense tree. A staged pilot immediately appears in the destination with a `MOVED` marker; use its **Undo** action or **Cancel all** before applying. Commander placement uses the same reviewed queue as ordinary movement. The page automatically refreshes every 30 seconds while open and reconciles completed pending work. ESI's cache expiry can mean a just-created fleet takes roughly one minute to appear.
 
 ## Build saved profiles
 
-Open **Profiles**, then choose one of these quick starts:
+Open **Saved setups**, then choose one of these quick starts:
 
-- **New profile** creates an empty Wing 1 / Squad 1 layout.
+- **New template** creates an empty Wing 1 / Squad 1 layout.
 - **Capture current** reads the current live fleet and saves its hierarchy, characters, and roles as an editable profile.
-- **Import JSON** loads a profile exported from Fleet Organizer and creates a separate local copy.
+- **Import JSON** loads a profile exported from Fleet Desk and creates a separate local copy.
 
 Wing and squad names can be edited inline, reordered, duplicated, and removed. Paste exact character names using new lines, commas, or tabs, then choose **Resolve and add**. A structured row such as `Character Name — Squad 1 — Squad Commander` also applies the recognized squad and role immediately. Name resolution uses ESI's public exact-name endpoint, so pasted characters do not need to authorize the app.
 
-Use the checkboxes and bulk controls to assign several characters to a squad, desired role, or local tags. Choose **Save changes** when the validation line says the profile is valid. Profile edits are not sent to EVE.
+The saved roster is the normal layout workspace: click, Ctrl-click, or Shift-click rows, then move the selection, set its role/tags, or drag it onto a compact squad target. Choose **Save changes** when the validation line says the template is ready. Template edits are local and are not sent to EVE.
 
-The normal Profiles view keeps routine roster work visible and hides the denser hierarchy controls. Enable **Advanced editor** when you need to add, copy, rename, reorder, or delete wings and squads. Profile and roster searches update as you type; **Select all** applies only to the currently filtered roster rows.
+For a deliberately clean hierarchy, choose the saved setup on **Live Fleet → Danger**, unlock high-impact actions, and choose **Clean rebuild…**. After a second confirmation, Fleet Desk creates or reuses an `Unknown` staging wing/squad, temporarily moves and demotes the live roster there, removes the now-empty old hierarchy, creates the saved hierarchy, places known and ship-rule pilots, restores commander seats, and sends missing invitations. Pilots not covered by an exact assignment or ship rule remain in `Unknown`. This path is destructive and separate from the normal non-deleting saved-setup run.
+
+Optional **Automatic ship placement** policies match one or more comma-separated exact ship names seen in the current live fleet (for example `Hulk, Mackinaw`). Policies run in visible priority order and can use a second overflow squad, balance between both targets, cap each target, or act as the final fallback. Exact character assignments take priority, the fleet boss is ignored, full targets are reported, unmatched characters are untouched, and policies never invite characters or promote commanders. Preview once to load current ship names into the suggestions, or type exact EVE ship types.
+
+The normal template view keeps routine roster work visible and hides the denser hierarchy controls. Enable **Edit wings & squads** when you need to add, copy, rename, reorder, or delete structure. Template and roster searches update as you type; **Select all** applies only to the currently filtered roster rows.
 
 ## Quick routine workflow
 
-1. Open **Home** and choose a saved profile.
-2. Choose **Check fleet & review changes**. This is a read-only comparison.
-3. Read the plain summary, then choose **Start guarded run** and confirm the exact action counts.
-4. Accept invitations in EVE.
-5. Choose **Check accepted characters** until the run reports **Fleet ready**.
+1. Open **Live Fleet**; it is the default command centre and refreshes automatically while visible.
+2. For a quick invite, open **Invite**, paste exact names, choose the arrival squad, and press **Invite now**. Sent invitations are tracked until the next automatic live-fleet check sees them join.
+3. For live placement, drag pilots or select several and choose their squad/role. Open **Changes** and press **Apply N fleet changes**; the single confirmation shows the exact counts before writing.
+4. For broader repair, open **Saved setup**, choose **Full organise**, **Invite missing**, **Place joined**, **Fix structure**, or **Assign commanders**, then preview and confirm the reviewed plan.
+5. Fleet settings remain separate, while kick, deletion, and fleet-boss transfer live under **Danger** and require an explicit unlock plus confirmation.
 
-Open **Activity** for the current/recovered run, its phase, next action, progress, and virtualized per-step recovery table. `Ctrl+Enter` prepares the selected profile, `F5` refreshes the live fleet when available, and `Esc` closes the current dry-run preview.
+Open **Activity** for the current/recovered run, its phase, next action, progress, virtualized per-step recovery table, and the latest 50 durable runs. A completed run can generate a best-effort **pre-run restore preview**; it never starts a rollback automatically. Fleet Desk can play a Windows attention sound for accepted invitations, completion, and failures without stealing focus from EVE. Shortcuts are page-aware: `Ctrl+K` focuses live search, `Ctrl+Enter` applies pending live work (or sends pasted invitations), `Ctrl+Z` undoes the latest queued change, `F5` refreshes Live Fleet, and `Esc` clears the current live search/selection or closes a saved-setup preview.
 
 ## Preview a profile against the live fleet
 
 1. Sign in as the current fleet boss and select a profile.
-2. Choose **Compare to live** in the profile details card.
+2. Choose **Preview with live fleet** in the template details card.
 3. Review the ordered dry run: missing wings/squads, invitations, moves, role changes, blockers, and the already-correct count.
 4. Enable **Show characters already in the correct place** when you want the full no-op detail.
 
@@ -102,17 +111,23 @@ The preview uses the current editor state, so it is useful before saving. Any hi
 
 ## Run guarded repair and organisation
 
-1. Generate **Compare to live** and review every proposed create, rename, invitation, move, and role change.
-2. Choose **Repair & organise**, then confirm the fleet ID and exact action counts.
+1. Generate **Preview with live fleet** and review every proposed create, rename, invitation, move, role change, and ship-rule match.
+2. Choose **Organise fleet now**, then confirm the fleet ID and exact action counts.
 3. Accept invitations on the target EVE clients.
-4. Choose **Refresh & continue** after accepted characters appear; the app stages managed characters as ordinary members before serialized commander promotion.
+4. Fleet Desk detects accepted characters automatically every 30 seconds while open; **Check now** remains available. The app stages managed characters as ordinary members before serialized commander promotion.
 5. Continue until the operation reports that final live verification is complete.
 
 The app re-reads the live fleet before the first write. If the plan changed after review, it sends nothing and asks you to review again. Each step is persisted around external writes, so a restart resumes from confirmed live state rather than replaying an assumed success. A failed character can be retried or skipped individually; cancelling stops future steps but does not undo writes ESI already accepted.
 
-An unexpected WPF UI exception is shown before shutdown and written to `%LOCALAPPDATA%\FleetOrganizer\logs\crash-*.log`; the active operation remains persisted for reconciliation after reopening. Inspect a crash log before sharing it because automatic redacted diagnostic export remains a later Milestone 6 recovery slice.
+An unexpected WPF UI exception is shown before shutdown and written to `%LOCALAPPDATA%\FleetOrganizer\logs\crash-*.log`; the active operation remains persisted for reconciliation after reopening. Settings can export a redacted support ZIP containing environment, preferences, recent operation summaries, and sanitized logs; it excludes the database, EVE tokens, public client ID, and absolute user paths. Review the ZIP before sharing because fleet/profile names remain useful for diagnosis.
 
-For a missing name, Milestone 5 first reuses the next unmatched live wing/squad only when that node contains no unmanaged member; otherwise it creates a new node. Every rename is shown in the dry run. Extra live structure is left alone. A desired commander slot occupied by a character absent from the profile is a blocker rather than an implicit demotion. An invite can still be rejected by EVE when the target character has a CSPA charge enabled; target characters do not need to sign in to Fleet Organizer, but they must accept the invite in EVE.
+For a missing name, Fleet Desk first reuses the next unmatched live wing/squad only when that node contains no unmanaged member; otherwise it creates a new node. Every rename is shown in the dry run. Extra live structure is left alone. A desired commander slot occupied by a character absent from the profile is a blocker rather than an implicit demotion. An invite can still be rejected by EVE when the target character has a CSPA charge enabled; target characters do not need to sign in to Fleet Desk, but they must accept the invite in EVE.
+
+## Settings, tray mode, and releases
+
+Settings controls live-fleet polling, invitation checks, the attention timeout, sound, System/Light/Dark theme, startup minimization, and optional notification-tray operation. Tray mode keeps invitation checks active; ordinary minimization pauses background polling. **Export redacted diagnostics** creates a shareable support bundle, while the typed **RESET** action removes all local Fleet Desk data without touching EVE. **Check for updates** only compares the installed version with the latest stable GitHub release and opens that release on request—it never downloads or installs silently.
+
+Run `release.cmd` to create a self-contained Windows x64 ZIP and SHA-256 file under `artifacts`. GitHub Actions builds the same self-contained artifact on every change; the read-only release-candidate workflow packages tagged/manual candidates for the repository owner to test and publish explicitly. Local `appsettings.Local.json` is explicitly excluded from published output.
 
 ## Useful commands
 
@@ -145,4 +160,6 @@ The EVE client ID is public but kept in `appsettings.Local.json` so each develop
 
 ## Current safety boundary
 
-The Milestone 6 interface uses the Milestone 5 guarded engine for ESI wing/squad creation and naming, invitations, ordinary staging, and serialized squad/wing commander transitions. Every run requires a reviewed dry run, explicit confirmation, fresh same-fleet/fleet-boss checks, durable per-write state, and final live verification. Fleet-boss transfer, hierarchy deletion, kicks, unmanaged-commander demotion, and automatic cleanup remain disabled.
+The normal Fleet Desk run uses the guarded engine for ESI wing/squad creation and naming, invitations, staging, and serialized squad/wing commander transitions. Every run requires a reviewed preview, explicit confirmation, fresh same-fleet/fleet-boss checks, durable per-write state, and final live verification. Normal runs never kick members, delete hierarchy, or transfer fleet boss.
+
+Those ESI-supported high-impact actions are available manually on Live Fleet. They require the **Unlock high-impact actions** flag, a second action-specific confirmation, and another fresh same-fleet/fleet-boss validation immediately before the write. Empty hierarchy is deletion-only; Fleet Desk will not delete an occupied squad or wing. Fleet-boss transfer intentionally ends the current character's write access.

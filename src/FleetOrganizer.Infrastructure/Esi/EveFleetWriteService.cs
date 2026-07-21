@@ -78,13 +78,19 @@ internal sealed class EveFleetWriteService(
     {
         ArgumentNullException.ThrowIfNull(target);
 
+        var placement = GetPlacement(
+            target.InviteDirectlyToRole
+                ? target.DesiredRole
+                : DesiredFleetRole.SquadMember,
+            target.WingId,
+            target.SquadId);
         var result = await esiClient.InviteFleetMemberAsync(
             fleetId,
             new InviteFleetMemberRequest(
                 target.CharacterId,
-                "squad_member",
-                target.SquadId,
-                target.WingId),
+                placement.Role,
+                placement.SquadId,
+                placement.WingId),
             cancellationToken).ConfigureAwait(false);
         return MapResult(
             result,
@@ -92,6 +98,17 @@ internal sealed class EveFleetWriteService(
                 ? $"EVE rejected the invitation for {target.CharacterName}. The character may have CSPA enabled, may already have an invitation, or the fleet position changed."
                 : null);
     }
+
+    private static (string Role, long? SquadId, long? WingId) GetPlacement(
+        DesiredFleetRole desiredRole,
+        long wingId,
+        long squadId) => desiredRole switch
+    {
+        DesiredFleetRole.FleetCommander => ("fleet_commander", null, null),
+        DesiredFleetRole.WingCommander => ("wing_commander", null, wingId),
+        DesiredFleetRole.SquadCommander => ("squad_commander", squadId, wingId),
+        _ => ("squad_member", squadId, wingId),
+    };
 
     public async Task<FleetWriteResult> PlaceAsync(
         long fleetId,

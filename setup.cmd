@@ -2,8 +2,22 @@
 setlocal
 cd /d "%~dp0"
 
-echo Fleet Organizer - first-time setup
+echo Fleet Desk - first-time setup
 echo.
+
+tasklist /FI "IMAGENAME eq FleetOrganizer.exe" 2>nul | find /I "FleetOrganizer.exe" >nul
+if not errorlevel 1 (
+  echo Fleet Desk is currently running and locks the build output.
+  choice /C YN /M "Close it before setup continues"
+  if errorlevel 2 exit /b 1
+  taskkill /IM FleetOrganizer.exe /F >nul 2>nul
+  if errorlevel 1 (
+    echo ERROR: Fleet Desk could not be closed. Close it manually, then run setup.cmd again.
+    exit /b 1
+  )
+  echo Closed Fleet Desk.
+  echo.
+)
 
 where dotnet >nul 2>nul
 if errorlevel 1 (
@@ -45,5 +59,5 @@ echo Setup completed successfully.
 echo If it is not configured yet, place your public EVE client ID in:
 echo   src\FleetOrganizer.App\appsettings.Local.json
 echo.
-echo Start the app with run.cmd, choose a saved profile on Home, then use Check fleet ^& review changes.
+echo Start the app with run.cmd. Live Fleet is the command centre for inviting, moving, and applying saved setups.
 exit /b 0

@@ -48,7 +48,8 @@ public sealed record FleetOperationTarget(
     long WingId,
     long SquadId,
     DesiredFleetRole DesiredRole,
-    string? PreviousName = null);
+    string? PreviousName = null,
+    bool InviteDirectlyToRole = false);
 
 public sealed record FleetOperationStep(
     string StepKey,
@@ -170,6 +171,12 @@ public static class FleetOperationFactory
                     now));
             }
 
+
+            if (plan.Mode == FleetRunMode.InviteMissing)
+            {
+                continue;
+            }
+
             var liveMember = snapshot.Members.FirstOrDefault(member =>
                 member.CharacterId == assignment.CharacterId);
             var needsBasePlacement = isMissing ||
@@ -264,12 +271,12 @@ public static class FleetOperationFactory
 
         return string.Join(
             "\n",
-            plan.Items
+            [$"MODE|{plan.Mode}", .. plan.Items
                 .Where(item => item.Kind != FleetPlanItemKind.AlreadyCorrect)
                 .Select(item =>
                     $"{item.Kind}|{item.CharacterId}|{item.TargetSquadId}|" +
                     $"{item.LiveWingId}|{item.LiveSquadId}|{item.TargetWingName}|" +
-                    $"{item.TargetSquadName}|{item.PreviousName}|{item.Title}"));
+                    $"{item.TargetSquadName}|{item.PreviousName}|{item.Title}")]);
     }
 
     private static StructureMappings BuildStructureMappings(
@@ -289,6 +296,9 @@ public static class FleetOperationFactory
             {
                 FleetPlanItemKind.CreateWing => 0,
                 FleetPlanItemKind.RenameWing => wingChange.LiveWingId ?? 0,
+                _ when plan.Mode == FleetRunMode.InviteMissing => snapshot.Wings
+                    .SingleOrDefault(wing => NamesMatch(wing.Name, profileWing.Name))
+                    ?.WingId ?? 0,
                 _ => snapshot.Wings.Single(wing => NamesMatch(wing.Name, profileWing.Name)).WingId,
             };
             wingIds[profileWing.Id] = wingId;
@@ -302,6 +312,11 @@ public static class FleetOperationFactory
                 {
                     FleetPlanItemKind.CreateSquad => 0,
                     FleetPlanItemKind.RenameSquad => squadChange.LiveSquadId ?? 0,
+                    _ when plan.Mode == FleetRunMode.InviteMissing && wingId > 0 => snapshot.Wings
+                        .Single(wing => wing.WingId == wingId)
+                        .Squads.SingleOrDefault(squad => NamesMatch(squad.Name, profileSquad.Name))
+                        ?.SquadId ?? 0,
+                    _ when plan.Mode == FleetRunMode.InviteMissing => 0,
                     _ when wingId > 0 => snapshot.Wings
                         .Single(wing => wing.WingId == wingId)
                         .Squads.Single(squad => NamesMatch(squad.Name, profileSquad.Name))

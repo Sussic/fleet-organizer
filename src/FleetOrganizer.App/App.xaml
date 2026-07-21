@@ -1,26 +1,183 @@
 <Application x:Class="FleetOrganizer.App.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:po="http://schemas.microsoft.com/winfx/2006/xaml/presentation/options"
              ThemeMode="System">
   <Application.Resources>
     <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
-    <SolidColorBrush x:Key="EveAccentBrush" Color="#4F9FCE" />
-    <SolidColorBrush x:Key="SuccessBrush" Color="#43A047" />
-    <SolidColorBrush x:Key="WarningBrush" Color="#F5A623" />
+    <SolidColorBrush x:Key="AppBackgroundBrush" po:Freeze="False" Color="#F4F7FB" />
+    <SolidColorBrush x:Key="SidebarBrush" po:Freeze="False" Color="#101827" />
+    <SolidColorBrush x:Key="SidebarTextBrush" po:Freeze="False" Color="#E7ECF4" />
+    <SolidColorBrush x:Key="SurfaceBrush" po:Freeze="False" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="SurfaceAltBrush" po:Freeze="False" Color="#F7F9FC" />
+    <SolidColorBrush x:Key="BorderBrush" po:Freeze="False" Color="#DCE3EC" />
+    <SolidColorBrush x:Key="TextPrimaryBrush" po:Freeze="False" Color="#172033" />
+    <SolidColorBrush x:Key="TextMutedBrush" po:Freeze="False" Color="#667085" />
+    <SolidColorBrush x:Key="EveAccentBrush" po:Freeze="False" Color="#2F7CF6" />
+    <SolidColorBrush x:Key="AccentTextBrush" po:Freeze="False" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="EveAccentHoverBrush" po:Freeze="False" Color="#1F68D8" />
+    <SolidColorBrush x:Key="AccentSoftBrush" po:Freeze="False" Color="#EAF2FF" />
+    <SolidColorBrush x:Key="SuccessBrush" po:Freeze="False" Color="#16865C" />
+    <SolidColorBrush x:Key="WarningBrush" po:Freeze="False" Color="#C76A13" />
+    <SolidColorBrush x:Key="DangerBrush" po:Freeze="False" Color="#C83E4D" />
 
-    <Style x:Key="NavigationButtonStyle" TargetType="Button">
+    <Style TargetType="Window">
+      <Setter Property="Background" Value="{StaticResource AppBackgroundBrush}" />
+      <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+      <Setter Property="FontFamily" Value="Segoe UI Variable Text, Segoe UI" />
+      <Setter Property="TextOptions.TextFormattingMode" Value="Display" />
+    </Style>
+
+    <Style x:Key="ButtonBaseStyle" TargetType="Button">
+      <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
+      <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+      <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Padding" Value="13,8" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <Border x:Name="ButtonBorder"
+                    Background="{TemplateBinding Background}"
+                    BorderBrush="{TemplateBinding BorderBrush}"
+                    BorderThickness="{TemplateBinding BorderThickness}"
+                    CornerRadius="7"
+                    Padding="{TemplateBinding Padding}">
+              <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                RecognizesAccessKey="True" />
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="{StaticResource EveAccentBrush}" />
+                <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.9" />
+              </Trigger>
+              <Trigger Property="IsPressed" Value="True">
+                <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.82" />
+              </Trigger>
+              <Trigger Property="IsKeyboardFocused" Value="True">
+                <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="{StaticResource EveAccentBrush}" />
+                <Setter TargetName="ButtonBorder" Property="BorderThickness" Value="3" />
+              </Trigger>
+              <Trigger Property="IsEnabled" Value="False">
+                <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.46" />
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <Style TargetType="Button" BasedOn="{StaticResource ButtonBaseStyle}" />
+
+    <Style x:Key="PrimaryButtonStyle" TargetType="Button" BasedOn="{StaticResource ButtonBaseStyle}">
+      <Setter Property="Background" Value="{StaticResource EveAccentBrush}" />
+      <Setter Property="BorderBrush" Value="{StaticResource EveAccentBrush}" />
+      <Setter Property="Foreground" Value="{StaticResource AccentTextBrush}" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Style.Triggers>
+        <Trigger Property="IsMouseOver" Value="True">
+          <Setter Property="Background" Value="{StaticResource EveAccentHoverBrush}" />
+          <Setter Property="BorderBrush" Value="{StaticResource EveAccentHoverBrush}" />
+        </Trigger>
+      </Style.Triggers>
+    </Style>
+
+    <Style x:Key="DangerButtonStyle" TargetType="Button" BasedOn="{StaticResource ButtonBaseStyle}">
+      <Setter Property="Foreground" Value="{StaticResource DangerBrush}" />
+    </Style>
+
+    <Style x:Key="NavigationButtonStyle" TargetType="Button" BasedOn="{StaticResource ButtonBaseStyle}">
       <Setter Property="HorizontalContentAlignment" Value="Left" />
       <Setter Property="Padding" Value="14,10" />
-      <Setter Property="Margin" Value="0,2" />
+      <Setter Property="Margin" Value="0,3" />
       <Setter Property="FontSize" Value="14" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="Foreground" Value="{StaticResource SidebarTextBrush}" />
+    </Style>
+
+    <Style x:Key="ProfilesNavigationButtonStyle" TargetType="Button" BasedOn="{StaticResource NavigationButtonStyle}">
+      <Style.Triggers>
+        <DataTrigger Binding="{Binding SelectedPage}" Value="Profiles">
+          <Setter Property="Background" Value="{StaticResource EveAccentBrush}" />
+          <Setter Property="BorderBrush" Value="{StaticResource EveAccentBrush}" />
+          <Setter Property="Foreground" Value="{StaticResource AccentTextBrush}" />
+        </DataTrigger>
+      </Style.Triggers>
+    </Style>
+
+    <Style x:Key="FleetNavigationButtonStyle" TargetType="Button" BasedOn="{StaticResource NavigationButtonStyle}">
+      <Style.Triggers>
+        <DataTrigger Binding="{Binding SelectedPage}" Value="Live Fleet">
+          <Setter Property="Background" Value="{StaticResource EveAccentBrush}" />
+          <Setter Property="BorderBrush" Value="{StaticResource EveAccentBrush}" />
+          <Setter Property="Foreground" Value="{StaticResource AccentTextBrush}" />
+        </DataTrigger>
+      </Style.Triggers>
+    </Style>
+
+    <Style x:Key="ActivityNavigationButtonStyle" TargetType="Button" BasedOn="{StaticResource NavigationButtonStyle}">
+      <Style.Triggers>
+        <DataTrigger Binding="{Binding SelectedPage}" Value="Activity">
+          <Setter Property="Background" Value="{StaticResource EveAccentBrush}" />
+          <Setter Property="BorderBrush" Value="{StaticResource EveAccentBrush}" />
+          <Setter Property="Foreground" Value="{StaticResource AccentTextBrush}" />
+        </DataTrigger>
+      </Style.Triggers>
+    </Style>
+
+    <Style x:Key="SettingsNavigationButtonStyle" TargetType="Button" BasedOn="{StaticResource NavigationButtonStyle}">
+      <Style.Triggers>
+        <DataTrigger Binding="{Binding SelectedPage}" Value="Settings">
+          <Setter Property="Background" Value="{StaticResource EveAccentBrush}" />
+          <Setter Property="BorderBrush" Value="{StaticResource EveAccentBrush}" />
+          <Setter Property="Foreground" Value="{StaticResource AccentTextBrush}" />
+        </DataTrigger>
+      </Style.Triggers>
     </Style>
 
     <Style x:Key="CardStyle" TargetType="Border">
-      <Setter Property="CornerRadius" Value="8" />
-      <Setter Property="Padding" Value="18" />
+      <Setter Property="CornerRadius" Value="12" />
+      <Setter Property="Padding" Value="20" />
       <Setter Property="BorderThickness" Value="1" />
-      <Setter Property="BorderBrush" Value="{DynamicResource {x:Static SystemColors.ActiveBorderBrushKey}}" />
-      <Setter Property="Background" Value="{DynamicResource {x:Static SystemColors.ControlBrushKey}}" />
+      <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+      <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
+    </Style>
+
+    <Style x:Key="DropCardStyle" TargetType="Border">
+      <Setter Property="CornerRadius" Value="9" />
+      <Setter Property="Padding" Value="13" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+      <Setter Property="Background" Value="{StaticResource SurfaceAltBrush}" />
+    </Style>
+
+    <Style TargetType="TextBox">
+      <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
+      <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+      <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+      <Setter Property="Padding" Value="9,7" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+
+    <Style TargetType="ComboBox">
+      <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
+      <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+      <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+      <Setter Property="Padding" Value="8,6" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+
+    <Style TargetType="DataGrid">
+      <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
+      <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+      <Setter Property="GridLinesVisibility" Value="Horizontal" />
+      <Setter Property="HorizontalGridLinesBrush" Value="{StaticResource BorderBrush}" />
+      <Setter Property="RowBackground" Value="{StaticResource SurfaceBrush}" />
+      <Setter Property="AlternatingRowBackground" Value="{StaticResource SurfaceAltBrush}" />
+      <Setter Property="RowHeaderWidth" Value="0" />
     </Style>
   </Application.Resources>
 </Application>

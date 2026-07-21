@@ -2,6 +2,7 @@ using System.Globalization;
 using System.IO;
 using System.Windows;
 using System.Windows.Threading;
+using FleetOrganizer.App.Services;
 using FleetOrganizer.App.ViewModels;
 using FleetOrganizer.Infrastructure;
 using FleetOrganizer.Infrastructure.Persistence;
@@ -9,6 +10,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Application = System.Windows.Application;
 
 namespace FleetOrganizer.App;
 
@@ -32,6 +34,9 @@ public partial class App : Application
             .ConfigureServices((context, services) =>
             {
                 services.AddFleetOrganizerInfrastructure(context.Configuration);
+                services.AddSingleton<IUserInteractionService, WpfUserInteractionService>();
+                services.AddSingleton<IFileDialogService, WpfFileDialogService>();
+                services.AddSingleton<ILiveFleetRunCoordinator, LiveFleetRunCoordinator>();
                 services.AddSingleton<ProfilesViewModel>();
                 services.AddSingleton<MainWindowViewModel>();
                 services.AddSingleton<MainWindow>();
@@ -52,16 +57,16 @@ public partial class App : Application
             await databaseInitializer.InitializeAsync();
 
             var mainWindow = host.Services.GetRequiredService<MainWindow>();
-            mainWindow.Show();
-
             var viewModel = host.Services.GetRequiredService<MainWindowViewModel>();
             await viewModel.InitializeAsync();
+            mainWindow.Show();
+            mainWindow.ApplyStartupPreferences();
         }
         catch (Exception exception)
         {
             MessageBox.Show(
-                $"Fleet Organizer could not start.\n\n{exception.Message}",
-                "Fleet Organizer",
+                $"Fleet Desk could not start.\n\n{exception.Message}",
+                "Fleet Desk",
                 MessageBoxButton.OK,
                 MessageBoxImage.Error);
             Shutdown(-1);
@@ -93,13 +98,13 @@ public partial class App : Application
 
         var crashLogPath = TryWriteCrashLog(e.Exception);
         var logMessage = crashLogPath is null
-            ? "Fleet Organizer could not save a crash report."
+            ? "Fleet Desk could not save a crash report."
             : $"A crash report was saved to:\n{crashLogPath}";
         MessageBox.Show(
-            "Fleet Organizer encountered an unexpected error and must close.\n\n" +
+            "Fleet Desk encountered an unexpected error and must close.\n\n" +
             $"{e.Exception.Message}\n\n{logMessage}\n\n" +
             "Any active fleet operation remains saved and can be resumed after reopening.",
-            "Fleet Organizer error",
+            "Fleet Desk error",
             MessageBoxButton.OK,
             MessageBoxImage.Error);
         Shutdown(-1);
@@ -120,7 +125,7 @@ public partial class App : Application
                 $"crash-{now.ToUnixTimeMilliseconds()}.log");
             File.WriteAllText(
                 path,
-                $"Fleet Organizer unhandled UI exception{Environment.NewLine}" +
+                $"Fleet Desk unhandled UI exception{Environment.NewLine}" +
                 $"UTC: {now.ToString("O", CultureInfo.InvariantCulture)}" +
                 $"{Environment.NewLine}{Environment.NewLine}" +
                 exception.ToString());

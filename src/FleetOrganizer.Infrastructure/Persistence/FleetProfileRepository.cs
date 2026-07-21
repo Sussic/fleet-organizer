@@ -27,6 +27,7 @@ internal sealed class FleetProfileRepository(
         {
             await LoadHierarchyAsync(connection, profile, cancellationToken).ConfigureAwait(false);
             await LoadAssignmentsAsync(connection, profile, cancellationToken).ConfigureAwait(false);
+            await LoadShipRulesAsync(connection, profile, cancellationToken).ConfigureAwait(false);
         }
 
         return profiles
@@ -35,9 +36,20 @@ internal sealed class FleetProfileRepository(
             .ToArray();
     }
 
-    public async Task SaveAsync(
+    public Task SaveAsync(
         FleetProfile profile,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        SaveCoreAsync(profile, isInternal: false, cancellationToken);
+
+    public Task SaveInternalAsync(
+        FleetProfile profile,
+        CancellationToken cancellationToken = default) =>
+        SaveCoreAsync(profile, isInternal: true, cancellationToken);
+
+    private async Task SaveCoreAsync(
+        FleetProfile profile,
+        bool isInternal,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(profile);
 
@@ -55,7 +67,7 @@ internal sealed class FleetProfileRepository(
             .ConfigureAwait(false);
 
         var nowText = timeProvider.GetUtcNow().ToString("O", CultureInfo.InvariantCulture);
-        await UpsertProfileAsync(connection, transaction, profile, nowText, cancellationToken)
+        await UpsertProfileAsync(connection, transaction, profile, isInternal, nowText, cancellationToken)
             .ConfigureAwait(false);
         await DeleteProfileContentsAsync(connection, transaction, profile.Id, cancellationToken)
             .ConfigureAwait(false);
@@ -67,6 +79,8 @@ internal sealed class FleetProfileRepository(
             profile,
             nowText,
             cancellationToken).ConfigureAwait(false);
+        await InsertShipRulesAsync(connection, transaction, profile, cancellationToken)
+            .ConfigureAwait(false);
 
         await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
     }
@@ -123,7 +137,7 @@ internal sealed class FleetProfileRepository(
         var profiles = new List<ProfileBuilder>();
         await using var command = connection.CreateCommand();
         command.CommandText =
-            "SELECT id, name FROM fleet_profiles ORDER BY name COLLATE NOCASE;";
+            "SELECT id, name FROM fleet_profiles WHERE is_internal = 0 ORDER BY name COLLATE NOCASE;";
         await using var reader = await command
             .ExecuteReaderAsync(cancellationToken)
             .ConfigureAwait(false);
@@ -220,10 +234,40 @@ internal sealed class FleetProfileRepository(
         }
     }
 
+    private static async Task LoadShipRulesAsync(
+        SqliteConnection connection,
+        ProfileBuilder profile,
+        CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText =
+            "SELECT id, ship_type_name, target_squad_id, sort_order, label, overflow_squad_id, max_per_squad, balance_targets, is_fallback FROM profile_ship_rules WHERE profile_id = $profileId ORDER BY sort_order, ship_type_name COLLATE NOCASE;";
+        command.Parameters.AddWithValue("$profileId", profile.Id.ToString("D"));
+        await using var reader = await command
+            .ExecuteReaderAsync(cancellationToken)
+            .ConfigureAwait(false);
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            profile.ShipRules.Add(new ProfileShipRule(
+                Guid.Parse(reader.GetString(0)),
+                reader.GetString(1),
+                Guid.Parse(reader.GetString(2)),
+                reader.GetInt32(3))
+            {
+                Label = reader.GetString(4),
+                OverflowSquadId = reader.IsDBNull(5) ? null : Guid.Parse(reader.GetString(5)),
+                MaximumPerSquad = reader.GetInt32(6),
+                BalanceAcrossTargets = reader.GetInt32(7) != 0,
+                IsFallback = reader.GetInt32(8) != 0,
+            });
+        }
+    }
+
     private static async Task UpsertProfileAsync(
         SqliteConnection connection,
         SqliteTransaction transaction,
         FleetProfile profile,
+        bool isInternal,
         string nowText,
         CancellationToken cancellationToken)
     {
@@ -231,16 +275,18 @@ internal sealed class FleetProfileRepository(
         command.Transaction = transaction;
         command.CommandText =
             """
-            INSERT INTO fleet_profiles (id, name, schema_version, created_utc, updated_utc)
-            VALUES ($id, $name, 1, $now, $now)
+            INSERT INTO fleet_profiles (id, name, schema_version, created_utc, updated_utc, is_internal)
+            VALUES ($id, $name, 1, $now, $now, $isInternal)
             ON CONFLICT(id) DO UPDATE SET
                 name = excluded.name,
                 schema_version = excluded.schema_version,
-                updated_utc = excluded.updated_utc;
+                updated_utc = excluded.updated_utc,
+                is_internal = excluded.is_internal;
             """;
         command.Parameters.AddWithValue("$id", profile.Id.ToString("D"));
         command.Parameters.AddWithValue("$name", profile.Name.Trim());
         command.Parameters.AddWithValue("$now", nowText);
+        command.Parameters.AddWithValue("$isInternal", isInternal ? 1 : 0);
         await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
     }
 
@@ -254,6 +300,7 @@ internal sealed class FleetProfileRepository(
         command.Transaction = transaction;
         command.CommandText =
             """
+            DELETE FROM profile_ship_rules WHERE profile_id = $profileId;
             DELETE FROM profile_assignments WHERE profile_id = $profileId;
             DELETE FROM profile_wings WHERE profile_id = $profileId;
             """;
@@ -335,6 +382,50 @@ internal sealed class FleetProfileRepository(
         }
     }
 
+    private static async Task InsertShipRulesAsync(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        FleetProfile profile,
+        CancellationToken cancellationToken)
+    {
+        for (var ruleIndex = 0; ruleIndex < profile.ShipRules.Count; ruleIndex++)
+        {
+            var rule = profile.ShipRules[ruleIndex];
+            await using var command = connection.CreateCommand();
+            command.Transaction = transaction;
+            command.CommandText =
+                """
+                INSERT INTO profile_ship_rules (
+                    id,
+                    profile_id,
+                    ship_type_name,
+                    target_squad_id,
+                    sort_order,
+                    label,
+                    overflow_squad_id,
+                    max_per_squad,
+                    balance_targets,
+                    is_fallback)
+                VALUES ($id, $profileId, $shipTypeName, $targetSquadId, $sortOrder, $label, $overflowSquadId, $maxPerSquad, $balanceTargets, $isFallback);
+                """;
+            command.Parameters.AddWithValue("$id", rule.Id.ToString("D"));
+            command.Parameters.AddWithValue("$profileId", profile.Id.ToString("D"));
+            command.Parameters.AddWithValue("$shipTypeName", rule.ShipTypeName.Trim());
+            command.Parameters.AddWithValue("$targetSquadId", rule.TargetSquadId.ToString("D"));
+            command.Parameters.AddWithValue("$sortOrder", ruleIndex);
+            command.Parameters.AddWithValue("$label", rule.Label.Trim());
+            command.Parameters.AddWithValue(
+                "$overflowSquadId",
+                rule.OverflowSquadId is Guid overflowSquadId
+                    ? overflowSquadId.ToString("D")
+                    : DBNull.Value);
+            command.Parameters.AddWithValue("$maxPerSquad", rule.MaximumPerSquad);
+            command.Parameters.AddWithValue("$balanceTargets", rule.BalanceAcrossTargets ? 1 : 0);
+            command.Parameters.AddWithValue("$isFallback", rule.IsFallback ? 1 : 0);
+            await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        }
+    }
+
     private static async Task UpsertRosterCharacterAsync(
         SqliteConnection connection,
         SqliteTransaction transaction,
@@ -388,11 +479,16 @@ internal sealed class FleetProfileRepository(
 
         public List<ProfileAssignment> Assignments { get; } = [];
 
-        public FleetProfile Build() => new(
+        public List<ProfileShipRule> ShipRules { get; } = [];
+
+        public FleetProfile Build() => new FleetProfile(
             Id,
             Name,
             Wings.Select(wing => wing.Build()).ToArray(),
-            Assignments.ToArray());
+            Assignments.ToArray())
+        {
+            ShipRules = ShipRules.ToArray(),
+        };
     }
 
     private sealed class WingBuilder(Guid id, string name, int sortOrder)
