@@ -8,10 +8,7 @@ public static class LiveFleetTargetPolicy
         Func<LiveFleetSquadTargetViewModel, bool>? commandSeatAvailable = null)
     {
         ArgumentNullException.ThrowIfNull(targets);
-        if (pilotCount < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(pilotCount));
-        }
+        ArgumentOutOfRangeException.ThrowIfNegative(pilotCount);
 
         return targets.Where(target =>
             !target.IsCommandSeat ||
