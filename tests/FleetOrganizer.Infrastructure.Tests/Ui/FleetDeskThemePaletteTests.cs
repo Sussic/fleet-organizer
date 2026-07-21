@@ -1,6 +1,6 @@
 using System.Windows;
 using FleetOrganizer.App.Services;
-using FleetOrganizer.App.ViewModels;
+using FleetOrganizer.Core.Profiles;
 
 namespace FleetOrganizer.Infrastructure.Tests.Ui;
 

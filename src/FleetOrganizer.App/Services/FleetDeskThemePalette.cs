@@ -1,6 +1,6 @@
 using System.Windows;
 using System.Windows.Media;
-using FleetOrganizer.App.ViewModels;
+using FleetOrganizer.Core.Profiles;
 
 namespace FleetOrganizer.App.Services;
 
