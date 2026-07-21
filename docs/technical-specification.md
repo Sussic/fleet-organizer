@@ -191,6 +191,12 @@ FleetOrganizer.sln
 | `RoleTransitionPlanner` | Legal, ordered member/commander moves with intermediate states |
 | `CharacterResolver` | Bulk name-to-ID resolution and canonicalization |
 | `SnapshotService` | Pre-run snapshots and best-effort restore plans |
+| `LiveFleetPendingChanges` | One ordered owner for staged moves, hierarchy edits, invite tracking, replacement, clear, and Undo |
+| `LiveFleetSelectionModel` | Click, Ctrl-click, Shift-range, select-shown, and clear semantics independent of WPF events |
+| `LiveFleetRunCoordinator` | Compose and persist the internal ad-hoc target, build the guarded plan, and select the run mode |
+| `IUserInteractionService` / `IFileDialogService` | Injected WPF confirmation, information, and file-picker boundaries; view models contain no direct dialogs |
+| `MainWindowViewModel.LiveActions` / `.LiveBoard` | Focused partials for live commands and live hierarchy projection/reconciliation |
+| `ProfilesViewModel.Editor` / `.Operations` | Focused partials for saved-layout editing and durable run presentation/recovery |
 
 ## 6. Authentication and secret handling
 

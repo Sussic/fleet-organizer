@@ -7,9 +7,9 @@
     <AnalysisLevel>latest-recommended</AnalysisLevel>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <Deterministic>true</Deterministic>
-    <Version>0.11.0</Version>
-    <AssemblyVersion>0.11.0.0</AssemblyVersion>
-    <FileVersion>0.11.0.0</FileVersion>
+    <Version>0.12.0</Version>
+    <AssemblyVersion>0.12.0.0</AssemblyVersion>
+    <FileVersion>0.12.0.0</FileVersion>
     <RepositoryUrl>https://github.com/Sussic/fleet-organizer</RepositoryUrl>
     <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>

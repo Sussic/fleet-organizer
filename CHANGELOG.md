@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.12.0
+
+- Split the two oversized view models into focused state, live-action, live-board, saved-editor, and durable-operation partial files.
+- Added one live pending-change owner with chronological cross-type Undo, replacement semantics, queued clearing, and invite tracking.
+- Extracted Windows-style click/Ctrl/Shift selection, commander-target cardinality, Apply readiness, live reconciliation, and actual-EVE occupancy policies with executable regression coverage.
+- Moved ad-hoc Live Fleet plan composition and internal-profile persistence into an injected run coordinator.
+- Moved confirmations, informational dialogs, and file pickers behind injected interaction services so workflow decisions can be tested without WPF dialogs.
+- Added high-contrast system palettes, automatic reaction to Windows contrast changes, visible keyboard focus, access keys, and assertive screen-reader announcements for changing workflow status.
+- Expanded App-layer tests to cover empty/single/bulk invite targets, selection ranges, select-shown, ordered Undo, staged replacement, Apply blockers, accepted/departed/completed reconciliation, and destructive occupancy.
+
 ## 0.11.0
 
 - Removed the unreachable Home and legacy Live Fleet implementations and their dead commands/properties.

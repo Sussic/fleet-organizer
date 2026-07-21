@@ -158,6 +158,22 @@ public sealed class MainWindowXamlTests
         Assert.Contains("Squad cards — expand for drag &amp; drop", xaml, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void KeyboardFocusAndLiveStatusAreExposedToAssistiveTechnology()
+    {
+        var xaml = ReadMainWindowXaml();
+
+        Assert.Contains("Content=\"_Live Fleet\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Content=\"_Saved setups\"", xaml, StringComparison.Ordinal);
+        Assert.True(
+            CountOccurrences(xaml, "AutomationProperties.LiveSetting=\"Assertive\"") >= 4,
+            "Changing workflow feedback and attention banners should be announced.");
+        Assert.Contains(
+            "AutomationProperties.Name=\"{Binding LiveCommandStatus}\"",
+            xaml,
+            StringComparison.Ordinal);
+    }
+
     private static string ReadMainWindowXaml()
     {
         var xamlPath = Path.Combine(

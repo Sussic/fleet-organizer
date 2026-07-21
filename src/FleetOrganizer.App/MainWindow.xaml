@@ -40,7 +40,7 @@
             BorderThickness="0,0,1,0"
             BorderBrush="#243044"
             Background="{StaticResource SidebarBrush}"
-            TextElement.Foreground="#E7ECF4">
+            TextElement.Foreground="{StaticResource SidebarTextBrush}">
       <Grid>
         <Grid.RowDefinitions>
           <RowDefinition Height="Auto" />
@@ -60,19 +60,19 @@
 
         <StackPanel Grid.Row="1">
           <Button Style="{StaticResource FleetNavigationButtonStyle}"
-                  Content="Live Fleet"
+                  Content="_Live Fleet"
                   Command="{Binding NavigateCommand}"
                   CommandParameter="Live Fleet" />
           <Button Style="{StaticResource ProfilesNavigationButtonStyle}"
-                  Content="Saved setups"
+                  Content="_Saved setups"
                   Command="{Binding NavigateCommand}"
                   CommandParameter="Profiles" />
           <Button Style="{StaticResource ActivityNavigationButtonStyle}"
-                  Content="Activity"
+                  Content="_Activity"
                   Command="{Binding NavigateCommand}"
                   CommandParameter="Activity" />
           <Button Style="{StaticResource SettingsNavigationButtonStyle}"
-                  Content="Settings"
+                  Content="Se_ttings"
                   Command="{Binding NavigateCommand}"
                   CommandParameter="Settings" />
         </StackPanel>
@@ -149,7 +149,9 @@
                 Background="{StaticResource SurfaceBrush}"
                 BorderBrush="{StaticResource BorderBrush}"
                 BorderThickness="1"
-                CornerRadius="10">
+                CornerRadius="10"
+                AutomationProperties.LiveSetting="Polite"
+                AutomationProperties.Name="{Binding LiveFleetStatusTitle}">
           <Grid>
             <Grid.ColumnDefinitions>
               <ColumnDefinition Width="*" />
@@ -336,6 +338,8 @@
                                FontWeight="SemiBold" />
                     <TextBlock Margin="0,2,0,0"
                                Text="{Binding LiveApplyFeedback}"
+                               AutomationProperties.LiveSetting="Assertive"
+                               AutomationProperties.Name="{Binding LiveApplyFeedback}"
                                FontSize="10"
                                TextWrapping="Wrap"
                                Visibility="{Binding HasLiveApplyFeedback, Converter={StaticResource BooleanToVisibilityConverter}}" />
@@ -722,6 +726,8 @@
                               Command="{Binding ApplyPendingLiveChangesCommand}" />
                       <TextBlock Margin="0,5,0,0"
                                  Text="{Binding LiveApplyFeedback}"
+                                 AutomationProperties.LiveSetting="Assertive"
+                                 AutomationProperties.Name="{Binding LiveApplyFeedback}"
                                  FontSize="11"
                                  TextWrapping="Wrap"
                                  Visibility="{Binding HasLiveApplyFeedback, Converter={StaticResource BooleanToVisibilityConverter}}" />
@@ -814,7 +820,9 @@
               </TabControl>
 
               <Border Grid.Row="1" Margin="0,8,0,0" Padding="9,7"
-                      Background="{StaticResource SurfaceAltBrush}" CornerRadius="7">
+                      Background="{StaticResource SurfaceAltBrush}" CornerRadius="7"
+                      AutomationProperties.LiveSetting="Assertive"
+                      AutomationProperties.Name="{Binding LiveCommandStatus}">
                 <TextBlock Text="{Binding LiveCommandStatus}" FontSize="11" TextWrapping="Wrap" />
               </Border>
 
@@ -2123,7 +2131,9 @@
             BorderBrush="{StaticResource EveAccentBrush}"
             BorderThickness="2"
             CornerRadius="9"
-            Visibility="{Binding HasAttentionBanner, Converter={StaticResource BooleanToVisibilityConverter}}">
+            Visibility="{Binding HasAttentionBanner, Converter={StaticResource BooleanToVisibilityConverter}}"
+            AutomationProperties.LiveSetting="Assertive"
+            AutomationProperties.Name="{Binding AttentionBannerText}">
       <DockPanel>
         <Button DockPanel.Dock="Right"
                 Margin="14,0,0,0"

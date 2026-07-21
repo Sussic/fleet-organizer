@@ -2,6 +2,7 @@ using System.Globalization;
 using System.IO;
 using System.Windows;
 using System.Windows.Threading;
+using FleetOrganizer.App.Services;
 using FleetOrganizer.App.ViewModels;
 using FleetOrganizer.Infrastructure;
 using FleetOrganizer.Infrastructure.Persistence;
@@ -33,6 +34,9 @@ public partial class App : Application
             .ConfigureServices((context, services) =>
             {
                 services.AddFleetOrganizerInfrastructure(context.Configuration);
+                services.AddSingleton<IUserInteractionService, WpfUserInteractionService>();
+                services.AddSingleton<IFileDialogService, WpfFileDialogService>();
+                services.AddSingleton<ILiveFleetRunCoordinator, LiveFleetRunCoordinator>();
                 services.AddSingleton<ProfilesViewModel>();
                 services.AddSingleton<MainWindowViewModel>();
                 services.AddSingleton<MainWindow>();

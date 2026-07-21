@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using FleetOrganizer.App.Services;
 using FleetOrganizer.App.ViewModels;
 using FleetOrganizer.Core.Profiles;
 using Application = System.Windows.Application;
@@ -40,6 +41,7 @@ public sealed partial class MainWindow : Window, IDisposable
         trayMenu.Items.Add("Exit", null, (_, _) => ExitFromTray());
         trayIcon.ContextMenuStrip = trayMenu;
         viewModel.Profiles.PropertyChanged += OnProfilePreferencesChanged;
+        SystemParameters.StaticPropertyChanged += OnSystemParametersChanged;
         ApplyTheme(viewModel.Profiles.SelectedTheme);
     }
 
@@ -97,6 +99,7 @@ public sealed partial class MainWindow : Window, IDisposable
 
         isDisposed = true;
         viewModel.Profiles.PropertyChanged -= OnProfilePreferencesChanged;
+        SystemParameters.StaticPropertyChanged -= OnSystemParametersChanged;
         trayIcon.Visible = false;
         trayIcon.Dispose();
         trayMenu.Dispose();
@@ -135,17 +138,36 @@ public sealed partial class MainWindow : Window, IDisposable
         }
     }
 
+    private void OnSystemParametersChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        _ = sender;
+        if (e.PropertyName == nameof(SystemParameters.HighContrast))
+        {
+            ApplyTheme(viewModel.Profiles.SelectedTheme);
+        }
+    }
+
     private static void ApplyTheme(FleetDeskTheme theme)
     {
-        var useDark = theme == FleetDeskTheme.Dark ||
-            (theme == FleetDeskTheme.System && WindowsUsesDarkTheme());
-        SetBrush("AppBackgroundBrush", useDark ? "#0B1220" : "#F4F7FB");
-        SetBrush("SurfaceBrush", useDark ? "#151E2E" : "#FFFFFF");
-        SetBrush("SurfaceAltBrush", useDark ? "#1B2638" : "#F7F9FC");
-        SetBrush("BorderBrush", useDark ? "#334155" : "#DCE3EC");
-        SetBrush("TextPrimaryBrush", useDark ? "#F1F5F9" : "#172033");
-        SetBrush("TextMutedBrush", useDark ? "#A9B5C7" : "#667085");
-        SetBrush("AccentSoftBrush", useDark ? "#172D50" : "#EAF2FF");
+        var palette = FleetDeskThemePalette.Resolve(
+            theme,
+            SystemParameters.HighContrast,
+            WindowsUsesDarkTheme());
+        SetBrush("AppBackgroundBrush", palette.AppBackground);
+        SetBrush("SidebarBrush", palette.Sidebar);
+        SetBrush("SidebarTextBrush", palette.SidebarText);
+        SetBrush("SurfaceBrush", palette.Surface);
+        SetBrush("SurfaceAltBrush", palette.SurfaceAlt);
+        SetBrush("BorderBrush", palette.Border);
+        SetBrush("TextPrimaryBrush", palette.TextPrimary);
+        SetBrush("TextMutedBrush", palette.TextMuted);
+        SetBrush("EveAccentBrush", palette.Accent);
+        SetBrush("AccentTextBrush", palette.AccentText);
+        SetBrush("EveAccentHoverBrush", palette.AccentHover);
+        SetBrush("AccentSoftBrush", palette.AccentSoft);
+        SetBrush("SuccessBrush", palette.Success);
+        SetBrush("WarningBrush", palette.Warning);
+        SetBrush("DangerBrush", palette.Danger);
     }
 
     private static bool WindowsUsesDarkTheme()
@@ -155,17 +177,17 @@ public sealed partial class MainWindow : Window, IDisposable
         return key?.GetValue("AppsUseLightTheme") is int value && value == 0;
     }
 
-    private static void SetBrush(string key, string color)
+    private static void SetBrush(string key, Color color)
     {
         if (Application.Current.Resources[key] is SolidColorBrush brush)
         {
             if (brush.IsFrozen)
             {
-                Application.Current.Resources[key] = new SolidColorBrush((Color)ColorConverter.ConvertFromString(color));
+                Application.Current.Resources[key] = new SolidColorBrush(color);
             }
             else
             {
-                brush.Color = (Color)ColorConverter.ConvertFromString(color);
+                brush.Color = color;
             }
         }
     }

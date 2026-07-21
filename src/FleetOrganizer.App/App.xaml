@@ -7,12 +7,14 @@
     <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
     <SolidColorBrush x:Key="AppBackgroundBrush" po:Freeze="False" Color="#F4F7FB" />
     <SolidColorBrush x:Key="SidebarBrush" po:Freeze="False" Color="#101827" />
+    <SolidColorBrush x:Key="SidebarTextBrush" po:Freeze="False" Color="#E7ECF4" />
     <SolidColorBrush x:Key="SurfaceBrush" po:Freeze="False" Color="#FFFFFF" />
     <SolidColorBrush x:Key="SurfaceAltBrush" po:Freeze="False" Color="#F7F9FC" />
     <SolidColorBrush x:Key="BorderBrush" po:Freeze="False" Color="#DCE3EC" />
     <SolidColorBrush x:Key="TextPrimaryBrush" po:Freeze="False" Color="#172033" />
     <SolidColorBrush x:Key="TextMutedBrush" po:Freeze="False" Color="#667085" />
     <SolidColorBrush x:Key="EveAccentBrush" po:Freeze="False" Color="#2F7CF6" />
+    <SolidColorBrush x:Key="AccentTextBrush" po:Freeze="False" Color="#FFFFFF" />
     <SolidColorBrush x:Key="EveAccentHoverBrush" po:Freeze="False" Color="#1F68D8" />
     <SolidColorBrush x:Key="AccentSoftBrush" po:Freeze="False" Color="#EAF2FF" />
     <SolidColorBrush x:Key="SuccessBrush" po:Freeze="False" Color="#16865C" />
@@ -54,6 +56,10 @@
               <Trigger Property="IsPressed" Value="True">
                 <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.82" />
               </Trigger>
+              <Trigger Property="IsKeyboardFocused" Value="True">
+                <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="{StaticResource EveAccentBrush}" />
+                <Setter TargetName="ButtonBorder" Property="BorderThickness" Value="3" />
+              </Trigger>
               <Trigger Property="IsEnabled" Value="False">
                 <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.46" />
               </Trigger>
@@ -68,7 +74,7 @@
     <Style x:Key="PrimaryButtonStyle" TargetType="Button" BasedOn="{StaticResource ButtonBaseStyle}">
       <Setter Property="Background" Value="{StaticResource EveAccentBrush}" />
       <Setter Property="BorderBrush" Value="{StaticResource EveAccentBrush}" />
-      <Setter Property="Foreground" Value="White" />
+      <Setter Property="Foreground" Value="{StaticResource AccentTextBrush}" />
       <Setter Property="FontWeight" Value="SemiBold" />
       <Style.Triggers>
         <Trigger Property="IsMouseOver" Value="True">
@@ -89,14 +95,15 @@
       <Setter Property="FontSize" Value="14" />
       <Setter Property="Background" Value="Transparent" />
       <Setter Property="BorderBrush" Value="Transparent" />
-      <Setter Property="Foreground" Value="#E7ECF4" />
+      <Setter Property="Foreground" Value="{StaticResource SidebarTextBrush}" />
     </Style>
 
     <Style x:Key="ProfilesNavigationButtonStyle" TargetType="Button" BasedOn="{StaticResource NavigationButtonStyle}">
       <Style.Triggers>
         <DataTrigger Binding="{Binding SelectedPage}" Value="Profiles">
-          <Setter Property="Background" Value="#243A5A" />
+          <Setter Property="Background" Value="{StaticResource EveAccentBrush}" />
           <Setter Property="BorderBrush" Value="{StaticResource EveAccentBrush}" />
+          <Setter Property="Foreground" Value="{StaticResource AccentTextBrush}" />
         </DataTrigger>
       </Style.Triggers>
     </Style>
@@ -104,8 +111,9 @@
     <Style x:Key="FleetNavigationButtonStyle" TargetType="Button" BasedOn="{StaticResource NavigationButtonStyle}">
       <Style.Triggers>
         <DataTrigger Binding="{Binding SelectedPage}" Value="Live Fleet">
-          <Setter Property="Background" Value="#243A5A" />
+          <Setter Property="Background" Value="{StaticResource EveAccentBrush}" />
           <Setter Property="BorderBrush" Value="{StaticResource EveAccentBrush}" />
+          <Setter Property="Foreground" Value="{StaticResource AccentTextBrush}" />
         </DataTrigger>
       </Style.Triggers>
     </Style>
@@ -113,8 +121,9 @@
     <Style x:Key="ActivityNavigationButtonStyle" TargetType="Button" BasedOn="{StaticResource NavigationButtonStyle}">
       <Style.Triggers>
         <DataTrigger Binding="{Binding SelectedPage}" Value="Activity">
-          <Setter Property="Background" Value="#243A5A" />
+          <Setter Property="Background" Value="{StaticResource EveAccentBrush}" />
           <Setter Property="BorderBrush" Value="{StaticResource EveAccentBrush}" />
+          <Setter Property="Foreground" Value="{StaticResource AccentTextBrush}" />
         </DataTrigger>
       </Style.Triggers>
     </Style>
@@ -122,8 +131,9 @@
     <Style x:Key="SettingsNavigationButtonStyle" TargetType="Button" BasedOn="{StaticResource NavigationButtonStyle}">
       <Style.Triggers>
         <DataTrigger Binding="{Binding SelectedPage}" Value="Settings">
-          <Setter Property="Background" Value="#243A5A" />
+          <Setter Property="Background" Value="{StaticResource EveAccentBrush}" />
           <Setter Property="BorderBrush" Value="{StaticResource EveAccentBrush}" />
+          <Setter Property="Foreground" Value="{StaticResource AccentTextBrush}" />
         </DataTrigger>
       </Style.Triggers>
     </Style>
